@@ -1,0 +1,443 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator json {
+  provider = "prisma-json-types-generator"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Represents a user in the system (Student, Advisor, Evaluator, Admin)
+model User {
+  id                   String               @id @default(cuid())
+  /// Institutional email address
+  username             String               @unique
+  name                 String?
+  /// Store hashed passwords only
+  passwordHash         String
+  role                 Role                 @default(STUDENT)
+  emailVerified        Boolean              @default(false)
+  verificationToken    String?              @unique
+  passwordResetToken   String?              @unique
+  passwordResetExpires DateTime?
+  /// For additional info like advisor expertise
+  profileInfo          Json?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  advisorRequestsMade  AdvisorRequest[]     @relation("AdvisorRequester")
+  announcementsCreated Announcement[]       @relation("AnnouncementCreator")
+  commitsAuthored      Commit[]             @relation("CommitAuthor")
+  evaluationsProvided  Evaluation[]         @relation("EvaluationAuthor")
+  feedbackProvided     Feedback[]           @relation("FeedbackAuthor")
+  groupsLed            Group[]              @relation("GroupLeader")
+  groupsMemberOf       GroupMember[]
+  mergeRequestsCreated MergeRequest[]       @relation("MergeRequestCreator")
+  mergeRequestsReviews MergeRequestReview[]
+  notifications        Notification[]       @relation("NotificationRecipient")
+  advisedProjects      Project[]            @relation("ProjectAdvisor")
+  evaluatedProjects    ProjectEvaluator[]
+  tasksAssigned        Task[]               @relation("TaskAssignee")
+  tasksCreated         Task[]               @relation("TaskCreator")
+
+  @@index([username])
+}
+
+/// Represents a project group formed by students
+model Group {
+  id              String          @id @default(cuid())
+  name            String          @unique
+  description     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  /// ID of the student who is the group leader
+  leaderId        String
+  advisorRequests AdvisorRequest?
+  leader          User            @relation("GroupLeader", fields: [leaderId], references: [id])
+  members         GroupMember[]
+  project         Project?
+
+  @@index([name])
+}
+
+/// Join table for Group Members (Many-to-Many between User and Group)
+model GroupMember {
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+/// Represents a final-year project
+model Project {
+  id                String             @id @default(cuid())
+  title             String
+  description       String?
+  /// e.g., "Active", "Submitted", "Completed", "Archived"
+  status            String?
+  submissionDate    DateTime?
+  archived          Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  /// Each project belongs to one group
+  groupId           String             @unique
+  /// Assigned advisor
+  advisorId         String?
+  /// To store milestones and deadlines
+  milestones        Json?
+  evaluationReports Evaluation[]
+  feedback          Feedback[]
+  advisor           User?              @relation("ProjectAdvisor", fields: [advisorId], references: [id])
+  group             Group              @relation(fields: [groupId], references: [id])
+  evaluations       ProjectEvaluator[]
+  repository        Repository?
+  tasks             Task[]
+
+  @@index([title])
+  @@index([advisorId])
+}
+
+/// Join table for Project Evaluators (Many-to-Many between Project and User (Evaluator role))
+model ProjectEvaluator {
+  projectId   String
+  /// User ID of the evaluator
+  evaluatorId String
+  assignedAt  DateTime @default(now())
+  evaluator   User     @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, evaluatorId])
+  @@index([evaluatorId])
+}
+
+/// Represents the Vec repository for a project
+model Repository {
+  id            String         @id @default(cuid())
+  /// Repository name, likely derived from project/group
+  name          String
+  isPrivate     Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  /// Each repository belongs to one project
+  projectId     String         @unique
+  branches      Branch[]
+  commits       Commit[]
+  mergeRequests MergeRequest[]
+  remotes       Remote[]
+  project       Project        @relation(fields: [projectId], references: [id])
+
+  @@index([name])
+}
+
+/// Represents a commit in the Vec repository
+model Commit {
+  /// SHA-256 hash of commit contents
+  id              String        @id
+  message         String
+  timestamp       DateTime      @default(now())
+  /// Internal record creation time
+  createdAt       DateTime      @default(now())
+  repositoryId    String
+  /// User who made the commit
+  authorId        String
+  /// Representing DAG parents. A commit can have multiple parents (merge commit).
+  /// Storing as String array is simpler in Prisma than a direct many-to-many self-relation.
+  parentCommitIDs String[]
+  /// If this commit is the result of a merge
+  mergeRequestId  String?       @unique
+  author          User          @relation("CommitAuthor", fields: [authorId], references: [id])
+  mergeRequest    MergeRequest? @relation("MergeCommit", fields: [mergeRequestId], references: [id])
+  repository      Repository    @relation(fields: [repositoryId], references: [id])
+  fileChanges     FileChange[]
+
+  @@index([repositoryId])
+  @@index([authorId])
+  @@index([timestamp])
+}
+
+/// Represents a file change within a Vec commit
+model FileChange {
+  id                      String     @id @default(cuid())
+  filePath                String
+  changeType              ChangeType
+  /// SHA-256 hash of the file content after change
+  fileContentHash         String?
+  /// SHA-256 hash before change (for MODIFIED)
+  previousFileContentHash String?
+  commitId                String
+  commit                  Commit     @relation(fields: [commitId], references: [id])
+
+  @@index([commitId])
+  @@index([filePath])
+}
+
+/// Represents a branch in the Vec repository
+model Branch {
+  id                        String                     @id @default(cuid())
+  name                      String
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  repositoryId              String
+  /// The commit the branch currently points to
+  headCommitId              String
+  repository                Repository                 @relation(fields: [repositoryId], references: [id])
+  branchMergeRequestSources BranchMergeRequestSource[]
+  branchMergeRequestTargets BranchMergeRequestTarget[]
+  mergeRequestsAsSource     MergeRequest[]             @relation("BranchMergeRequestSource")
+  mergeRequestsAsTarget     MergeRequest[]             @relation("BranchMergeRequestTarget")
+
+  @@unique([repositoryId, name])
+  @@index([repositoryId])
+}
+
+/// Represents a merge request (like a Pull Request)
+model MergeRequest {
+  id                        String                     @id @default(cuid())
+  title                     String
+  description               String?
+  status                    MergeRequestStatus         @default(OPEN)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  repositoryId              String
+  /// User who created the merge request
+  creatorId                 String
+  sourceBranchId            String
+  targetBranchId            String
+  branchMergeRequestSources BranchMergeRequestSource[]
+  branchMergeRequestTargets BranchMergeRequestTarget[]
+  mergeCommit               Commit?                    @relation("MergeCommit")
+  feedback                  Feedback[]
+  creator                   User                       @relation("MergeRequestCreator", fields: [creatorId], references: [id])
+  repository                Repository                 @relation(fields: [repositoryId], references: [id])
+  sourceBranch              Branch                     @relation("BranchMergeRequestSource", fields: [sourceBranchId], references: [id])
+  targetBranch              Branch                     @relation("BranchMergeRequestTarget", fields: [targetBranchId], references: [id])
+  reviews                   MergeRequestReview[]
+
+  @@index([repositoryId])
+  @@index([creatorId])
+  @@index([status])
+  @@index([sourceBranchId])
+  @@index([targetBranchId])
+}
+
+/// Explicit join model for source branch in MergeRequest
+model BranchMergeRequestSource {
+  branchId       String
+  mergeRequestId String
+  branch         Branch       @relation(fields: [branchId], references: [id])
+  mergeRequest   MergeRequest @relation(fields: [mergeRequestId], references: [id])
+
+  @@id([branchId, mergeRequestId])
+}
+
+/// Explicit join model for target branch in MergeRequest
+model BranchMergeRequestTarget {
+  branchId       String
+  mergeRequestId String
+  branch         Branch       @relation(fields: [branchId], references: [id])
+  mergeRequest   MergeRequest @relation(fields: [mergeRequestId], references: [id])
+
+  @@id([branchId, mergeRequestId])
+}
+
+/// Represents a review on a merge request (Approval/Rejection/Comments)
+model MergeRequestReview {
+  id             String             @id @default(cuid())
+  /// Approved, Rejected, Changes_Requested
+  decision       MergeRequestStatus
+  comment        String?
+  createdAt      DateTime           @default(now())
+  mergeRequestId String
+  /// User (Advisor/Leader) who reviewed
+  reviewerId     String
+  mergeRequest   MergeRequest       @relation(fields: [mergeRequestId], references: [id])
+  reviewer       User               @relation(fields: [reviewerId], references: [id])
+
+  @@index([mergeRequestId])
+  @@index([reviewerId])
+}
+
+/// Represents a task within a project
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  deadline    DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  projectId   String
+  /// User assigned to the task
+  assigneeId  String?
+  /// User who created the task
+  creatorId   String
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator     User       @relation("TaskCreator", fields: [creatorId], references: [id])
+  project     Project    @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([status])
+}
+
+/// Represents feedback provided on a project or merge request
+model Feedback {
+  id             String        @id @default(cuid())
+  content        String
+  createdAt      DateTime      @default(now())
+  /// User (Advisor/Evaluator) providing feedback
+  authorId       String
+  /// Feedback linked to the overall project
+  projectId      String?
+  /// Feedback linked to a specific merge request
+  mergeRequestId String?
+  author         User          @relation("FeedbackAuthor", fields: [authorId], references: [id])
+  mergeRequest   MergeRequest? @relation(fields: [mergeRequestId], references: [id])
+  project        Project?      @relation(fields: [projectId], references: [id])
+
+  @@index([authorId])
+  @@index([projectId])
+  @@index([mergeRequestId])
+}
+
+/// Represents an evaluation submitted for a project
+model Evaluation {
+  id           String   @id @default(cuid())
+  /// Overall score or grade if applicable
+  score        Float?
+  comments     String
+  /// Store structured evaluation based on rubric
+  criteriaData Json?
+  createdAt    DateTime @default(now())
+  /// Evaluator user ID
+  authorId     String
+  projectId    String
+  author       User     @relation("EvaluationAuthor", fields: [authorId], references: [id])
+  project      Project  @relation(fields: [projectId], references: [id])
+
+  @@index([authorId])
+  @@index([projectId])
+}
+
+/// Represents notifications sent to users
+model Notification {
+  id          String   @id @default(cuid())
+  message     String
+  read        Boolean  @default(false)
+  /// Link to relevant page (e.g., merge request, project)
+  link        String?
+  createdAt   DateTime @default(now())
+  /// User receiving the notification
+  recipientId String
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id])
+
+  @@index([recipientId])
+  @@index([read])
+}
+
+/// Represents a student group's request for an advisor
+model AdvisorRequest {
+  id                 String               @id @default(cuid())
+  status             AdvisorRequestStatus @default(PENDING)
+  /// Optional message from the group
+  requestMessage     String?
+  /// Optional message from the advisor
+  responseMessage    String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  /// A group should only have one active request at a time
+  groupId            String               @unique
+  /// The User ID of the advisor being requested
+  requestedAdvisorId String
+  group              Group                @relation(fields: [groupId], references: [id])
+  requestedAdvisor   User                 @relation("AdvisorRequester", fields: [requestedAdvisorId], references: [id])
+
+  @@index([groupId])
+  @@index([requestedAdvisorId])
+  @@index([status])
+}
+
+/// Represents a remote repository link for distributed Vec operations
+/// Added based on user request for distributed Vec schema.
+model Remote {
+  id           String     @id @default(cuid())
+  /// e.g., "origin"
+  name         String
+  /// URL of the remote repository
+  url          String
+  createdAt    DateTime   @default(now())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+
+  @@unique([repositoryId, name])
+  @@index([repositoryId])
+}
+
+/// Represents system-wide announcements created by administrators
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  /// The announcement message content
+  content   String
+  /// Whether the announcement is currently active/visible
+  active    Boolean  @default(true)
+  /// Higher values indicate higher priority (for sorting)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  /// User ID of the admin who created the announcement
+  creatorId String
+  creator   User     @relation("AnnouncementCreator", fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([active])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+/// User roles within the platform
+enum Role {
+  STUDENT
+  ADVISOR
+  EVALUATOR
+  ADMINISTRATOR
+}
+
+/// Status for advisor requests
+enum AdvisorRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/// Status for merge requests (equivalent to Pull Requests)
+enum MergeRequestStatus {
+  OPEN
+  APPROVED
+  REJECTED
+  MERGED
+  CLOSED
+  CHANGES_REQUESTED
+}
+
+/// Types of changes tracked by Vec
+enum ChangeType {
+  ADDED
+  MODIFIED
+  DELETED
+}
+
+/// Status for tasks within a project
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
