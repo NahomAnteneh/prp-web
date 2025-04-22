@@ -5,6 +5,7 @@ import { Hero } from "@/components/landing/hero";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/landing/navbar";
 import StudentDashboard from "@/components/dashboard/student-dashboard";
+import { Footer } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
   title: "Project Repository Platform - BiT",
@@ -26,6 +27,7 @@ export default async function Home() {
         <Hero />
         <Features />
         <CTA />
+        <Footer />
       </>
     );
   }
