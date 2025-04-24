@@ -35,6 +35,7 @@ model User {
   feedbackProvided     Feedback[]           @relation("FeedbackAuthor")
   groupsLed            Group[]              @relation("GroupLeader")
   groupsMemberOf       GroupMember[]
+  invitesCreated       GroupInvite[]
   mergeRequestsCreated MergeRequest[]       @relation("MergeRequestCreator")
   mergeRequestsReviews MergeRequestReview[]
   notifications        Notification[]       @relation("NotificationRecipient")
@@ -59,6 +60,7 @@ model Group {
   leader          User            @relation("GroupLeader", fields: [leaderId], references: [id])
   members         GroupMember[]
   project         Project?
+  invites         GroupInvite[]
 
   @@index([name])
 }
@@ -402,6 +404,19 @@ model Announcement {
   @@index([createdAt])
 }
 
+/// System-wide rules and configuration settings
+model Rule {
+  id                       String    @id @default(cuid())
+  /// Maximum number of students allowed in a group
+  maxGroupSize             Int       @default(5)
+  /// Deadline for requesting advisors
+  advisorRequestDeadline   DateTime
+  /// Deadline for submitting projects
+  projectSubmissionDeadline DateTime
+  /// When the rules were last updated
+  updatedAt                DateTime  @updatedAt
+}
+
 /// User roles within the platform
 enum Role {
   STUDENT
@@ -440,4 +455,31 @@ enum TaskStatus {
   IN_PROGRESS
   DONE
   BLOCKED
+}
+
+/// Represents an invitation to join a group
+model GroupInvite {
+  id           String   @id @default(cuid())
+  /// Unique invitation code
+  code         String   @unique
+  /// When the invitation expires
+  expiresAt    DateTime
+  /// When the invitation was created
+  createdAt    DateTime @default(now())
+  /// When the invitation was used (null if not used)
+  usedAt       DateTime?
+  /// Who generated the invitation
+  createdById  String
+  /// The group this invitation is for
+  groupId      String
+  /// Email this invitation was sent to (optional)
+  email        String?
+  
+  /// Relations
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy    User     @relation(fields: [createdById], references: [id])
+
+  @@index([code])
+  @@index([groupId])
+  @@index([expiresAt])
 }

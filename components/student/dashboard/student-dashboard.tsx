@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 
-import Navbar from "./navbar"
+import Navbar from "../navbar"
 import Announcements, { Announcement } from "./announcements"
 import StatusOverview, { ProjectSummary, TaskSummary } from "./status-overview"
 import RecentActivities, { Activity } from "./recent-activities"
-import Footer from "./footer"
+import Footer from "../footer"
 
 // Define interface for API data objects
 interface AnnouncementData extends Omit<Announcement, 'createdAt'> {

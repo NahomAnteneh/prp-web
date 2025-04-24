@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Menu, X, User, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LogoutButton } from "@/components/ui/logout-button"
-import NotificationDropdown from "./notification-dropdown"
+import NotificationDropdown from "./dashboard/notification-dropdown"
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -78,6 +78,14 @@ export default function Navbar({ unreadNotifications = 0, userName }: NavbarProp
                   className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
                 >
                   Tasks
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink 
+                  href="/explore"
+                  className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
+                >
+                  Explore
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
@@ -190,6 +198,13 @@ export default function Navbar({ unreadNotifications = 0, userName }: NavbarProp
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Tasks
+            </Link>
+            <Link 
+              href="/explore" 
+              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Explore
             </Link>
             <Link 
               href="/resources" 

@@ -1,7 +1,11 @@
 import { getServerSession } from "next-auth";
 import { cache } from "react";
 import { Role } from "@prisma/client";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { PrismaAdapter } from '@next-auth/prisma-adapter';
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { compare } from 'bcrypt';
+import { db } from '@/lib/db';
 
 // Use React cache to prevent multiple session fetches within a request
 export const getSession = cache(async () => {
@@ -49,4 +53,86 @@ export const hasRole = cache(async (role: Role | string) => {
     console.error("Role check error:", error);
     return false;
   }
-}); 
+});
+
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(db),
+  pages: {
+    signIn: '/login',
+  },
+  session: {
+    strategy: 'jwt',
+  },
+  providers: [
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        username: { label: 'Username', type: 'text' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.username || !credentials?.password) {
+          return null;
+        }
+
+        const user = await db.user.findUnique({
+          where: { username: credentials.username },
+        });
+
+        if (!user) {
+          return null;
+        }
+
+        const passwordValid = await compare(credentials.password, user.passwordHash);
+
+        if (!passwordValid) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          name: user.name || '',
+          username: user.username,
+          role: user.role,
+        };
+      },
+    }),
+  ],
+  callbacks: {
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id as string;
+        session.user.name = token.name as string;
+        session.user.username = token.username as string;
+        session.user.role = token.role as string;
+      }
+      return session;
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.username = user.username;
+        token.role = user.role as Role;
+      }
+      return token;
+    },
+  },
+};
+
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+      name: string;
+      username: string;
+      role: string;
+    };
+  }
+  
+  interface User {
+    id: string;
+    name: string;
+    username: string;
+    role: string;
+  }
+} 
