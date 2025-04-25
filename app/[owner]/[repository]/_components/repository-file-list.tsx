@@ -1,23 +1,28 @@
 "use client";
-import type { TreeNode } from "@/server/api/routers/github";
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "../../../../components/ui/table";
 import { Folder, File } from "lucide-react";
 import ShallowLink from "@/components/shallow-link";
-import { api } from "@/trpc/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Define FileNode interface
+interface FileNode {
+  name: string;
+  path: string;
+  type: "tree" | "blob";
+  size: number;
+}
+
 // Define props interface
 interface FolderViewProps {
-  data: TreeNode[];
+  data: FileNode[];
   branch: string;
   owner: string;
   repository: string;
@@ -31,24 +36,8 @@ export function FolderView({
   repository,
   hardnav = false,
 }: FolderViewProps) {
-  const trpc = api.useUtils();
   const pathname = usePathname();
-
-  useEffect(() => {
-    trpc.github.getRepoTree
-      .prefetch({
-        branch: branch,
-        owner: owner,
-        repository: repository,
-        recursive: true,
-      })
-      .then((res) => {
-        console.log("Prefetched data:", res);
-      })
-      .catch((err) => {
-        console.error("Error prefetching data:", err);
-      });
-  }, [branch, owner, repository, trpc]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Get path segments from pathname
   const pathSegments = pathname ? pathname.split("/").slice(5) : [];
@@ -64,6 +53,18 @@ export function FolderView({
   const parentPath = isRoot
     ? folderBasePath
     : folderBasePath + currentRelativePath.split("/").slice(0, -1).join("/");
+
+  // Prefetch file content for better UX
+  const prefetchFileContent = async (path: string) => {
+    try {
+      setIsLoading(true);
+      await fetch(`/api/repositories/${owner}/${repository}/raw?branch=${branch}&path=${path}`);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error prefetching file content:", error);
+      setIsLoading(false);
+    }
+  };
 
   if (!data) {
     return <div>No data available.</div>; // Handle case where data might be null/undefined initially
@@ -125,15 +126,7 @@ export function FolderView({
                       href={href} // Use constructed href
                       onMouseOver={
                         node.type === "blob"
-                          ? () => {
-                              // Use props for prefetching
-                              trpc.github.getFileContent.prefetch({
-                                branch: branch,
-                                owner: owner,
-                                repository: repository,
-                                path: node.path,
-                              });
-                            }
+                          ? () => prefetchFileContent(node.path)
                           : undefined
                       }
                     >

@@ -1,14 +1,8 @@
-import { api } from "@/trpc/server";
 import { Badge } from "@/components/ui/badge";
-import { BranchSelector } from "./(explorer)/_components/branch-selector";
-
 import FolderView from "./_components/repository-file-list";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import StarButton from "./_components/star-button";
-import { TRPCError } from "@trpc/server";
 import { notFound } from "next/navigation";
+import { RepositoryHeader } from "./_components/repository-header";
+import RepositoryMarkdown from "./_components/repository-markdown";
 
 export const dynamic = "force-dynamic";
 
@@ -19,48 +13,78 @@ interface PageProps {
   }>;
 }
 
-// Add a helper function to transform image URLs.
-function transformImgUrl(
-  src: string | undefined,
-  owner: string,
-  repository: string,
-  branch?: string
-): string {
-  // Your logic to change the image URL.
-  if (!src) return "";
+// Define the types for repository data
+interface RepositoryData {
+  id: string;
+  name: string;
+  description: string;
+  isPrivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  owner: {
+    id: string;
+    name: string | null;
+    username: string;
+  };
+  defaultBranchRef: {
+    name: string;
+    id: string;
+  } | null;
+  repositoryTopics?: {
+    nodes: Array<{
+      topic: {
+        name: string;
+      };
+    }>;
+  };
+  mentionableUsers?: {
+    nodes: Array<{
+      id: string;
+      username?: string;
+      name?: string;
+      avatarUrl?: string;
+    }>;
+  };
+}
 
-  if (src.startsWith("http")) {
-    return src;
-  }
-
-  const baseUrl = `https://raw.githubusercontent.com/${owner}/${repository}/`;
-
-  return `${baseUrl}${branch ? `${branch}/` : ""}${src}`;
+// Define the type for file/folder contents
+interface FileNode {
+  name: string;
+  path: string;
+  type: "tree" | "blob";
+  size: number;
 }
 
 export default async function Page({ params }: PageProps) {
   const { owner, repository } = await params;
-  const repoOverviewPromise = api.github.getRepositoryOverview({
-    owner,
-    repository,
+  
+  // Fetch repository overview using REST API
+  const repoOverviewPromise = fetch(
+    `/api/repositories/${owner}/${repository}`
+  ).then(res => {
+    if (!res.ok) throw new Error('Failed to fetch repository overview');
+    return res.json() as Promise<RepositoryData>;
   });
 
-  const folderDataPromise = api.github.getFolderView({
-    owner,
-    repository,
-    branch: "HEAD",
-    path: "",
+  // Fetch folder contents using REST API
+  const folderDataPromise = fetch(
+    `/api/repositories/${owner}/${repository}/contents?branch=main&path=`
+  ).then(res => {
+    if (!res.ok) throw new Error('Failed to fetch folder contents');
+    return res.json() as Promise<FileNode[]>;
   });
 
-  const readmeDataPromise = api.github.getRepositoryReadme({
-    owner,
-    repository,
-    branch: "HEAD",
+  // Fetch README content using REST API
+  const readmeDataPromise = fetch(
+    `/api/repositories/${owner}/${repository}/readme?branch=main`
+  ).then(res => {
+    if (!res.ok) return null;
+    return res.text();
   });
 
-  let data;
-  let folderData;
-  let readmeData;
+  let data: RepositoryData;
+  let folderData: FileNode[];
+  let readmeData: string | null;
 
   try {
     [data, folderData, readmeData] = await Promise.all([
@@ -69,9 +93,8 @@ export default async function Page({ params }: PageProps) {
       readmeDataPromise,
     ]);
   } catch (error) {
-    if (error instanceof TRPCError && error.code === "NOT_FOUND") {
-      notFound();
-    }
+    console.error('Error fetching repository data:', error);
+    notFound();
   }
 
   if (!data || !folderData) {
@@ -82,18 +105,12 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <div className="p-4 mx-auto md:max-w-7xl w-full flex flex-col gap-4">
-      {/* Branch selector and repo name row */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold text-foreground ">{repository}</h1>
-        <div className="flex items-center justify-between">
-          <div className="w-64 bg-white dark:bg-transparent rounded-md border">
-            <BranchSelector />
-          </div>
-          <div className="">
-            {/* <StarButton owner={owner} repository={repository} /> */}
-          </div>
-        </div>
-      </div>
+      {/* Repository header with name and branch selector */}
+      <RepositoryHeader 
+        owner={owner} 
+        repository={repository}
+        description={data.description}
+      />
 
       <div className="w-full grid grid-cols-4 gap-8">
         {/* File Browser and README */}
@@ -110,23 +127,12 @@ export default async function Page({ params }: PageProps) {
 
           {readmeData && (
             <div className="border-t p-4 w-full border-x border-b">
-              <div className="prose dark:prose-invert max-w-none">
-                <Markdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={{
-                    img: ({ src, alt, ...props }) => (
-                      <img
-                        src={transformImgUrl(src, owner, repository, branch)}
-                        alt={alt}
-                        {...props}
-                      />
-                    ),
-                  }}
-                >
-                  {readmeData}
-                </Markdown>
-              </div>
+              <RepositoryMarkdown
+                content={readmeData}
+                owner={owner}
+                repository={repository}
+                branch={branch}
+              />
             </div>
           )}
         </div>
@@ -139,7 +145,7 @@ export default async function Page({ params }: PageProps) {
               {data.description && <p>{data.description}</p>}
             </div>
             <div>
-              {data.repositoryTopics.nodes.length > 0 && (
+              {data.repositoryTopics?.nodes && data.repositoryTopics.nodes.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {data.repositoryTopics.nodes.map((topic) => (
                     <Badge key={topic.topic.name}>{topic.topic.name}</Badge>
@@ -147,30 +153,20 @@ export default async function Page({ params }: PageProps) {
                 </div>
               )}
             </div>
-
-            {/* {data.licenseInfo && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span>
-                    <strong>{data.licenseInfo.name}</strong> license
-                  </span>
-                </div>
-              )} */}
-
-            {/* Topics */}
           </section>
 
           {/* Contributors */}
-          {data.mentionableUsers.nodes.length > 0 && (
+          {data.mentionableUsers?.nodes && data.mentionableUsers.nodes.length > 0 && (
             <section className="space-y-2">
               <h3 className="font-semibold">Contributors</h3>
               <div className="flex flex-wrap gap-1">
                 {data.mentionableUsers.nodes.map((user) => (
                   <img
-                    key={user.login}
-                    src={user.avatarUrl}
-                    alt={user.login}
+                    key={user.username || user.id}
+                    src={user.avatarUrl || `/api/avatar/${user.username}`}
+                    alt={user.username || user.name || ""}
                     className="h-8 w-8 rounded-full"
-                    title={user.login}
+                    title={user.username || user.name || ""}
                   />
                 ))}
               </div>

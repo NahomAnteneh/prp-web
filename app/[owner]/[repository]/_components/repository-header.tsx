@@ -5,63 +5,50 @@ import { Menu, Github, GitGraph, GitBranchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RepositoryNav } from "./repository-nav";
 import ShallowLink from "@/components/shallow-link";
-
-import { api } from "@/trpc/react";
-import type { Session } from "next-auth";
-import { SignOut } from "@/app/_components/sign-in-button";
+import { BranchSelector } from "../(explorer)/_components/branch-selector";
 
 interface RepositoryHeaderProps {
   owner: string;
   repository: string;
-  session: Session | null;
+  description?: string;
+  session?: {
+    user: {
+      name?: string;
+    };
+  } | null;
 }
 
 export function RepositoryHeader({
   owner,
   repository,
+  description,
   session,
 }: RepositoryHeaderProps) {
-  const { data } = api.github.getRepositoryOverview.useQuery({
-    owner,
-    repository,
-  });
-
   return (
-    <header className="border-b bg-background border-foreground/20">
-      <div className="border-b flex justify-between h-12">
-        <Link
-          className="p-4 border-r bg-transparent rounded-none hover:bg-foreground hover:text-background cursor-pointer flex items-center justify-center gap-2 transition-all w-32"
-          href={"/"}
-          prefetch={true}
-        >
-          <GitBranchIcon className="h-4 w-4 text-[#f0883e]" />
-          <span className="text-sm font-medium">gitfaster</span>
-        </Link>
-
-        <div className="font-mono text-sm flex">
-          <div className="flex items-center justify-center p-4 border-x">
-            Hi, {session?.user.name}
+    <header className="bg-background">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center">
+          <h1 className="text-xl font-semibold text-foreground">{repository}</h1>
+          {description && (
+            <p className="text-sm text-muted-foreground ml-4">{description}</p>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="w-64 bg-white dark:bg-transparent rounded-md border">
+            <BranchSelector />
           </div>
-          <SignOut />
+          <div className="">
+            {/* Star button can be added here if needed */}
+          </div>
         </div>
       </div>
-      <div className="px-4">
-        <div className="flex items-center py-4 gap-2">
-          <div className="flex items-center text-md">
-            {owner}
-            <span className="mx-1">/</span>
-            <Link
-              href={`/${owner}/${repository}`}
-              className="hover:underline text-foreground"
-              prefetch={true}
-            >
-              {repository}
-            </Link>
-          </div>
-        </div>
-        {/* Navigation tabs - now using the client component */}
+      
+      {/* Navigation tabs */}
+      <div className="mt-4">
         <RepositoryNav owner={owner} repository={repository} />
       </div>
     </header>
   );
 }
+
+export default RepositoryHeader;

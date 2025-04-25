@@ -1,10 +1,8 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { SearchBar } from "@/components/search-bar";
 import { StateFilter } from "@/components/state-filter";
-import { api } from "@/trpc/react";
-import type { PullRequest } from "@/server/api/routers/pull-requests";
 import {
   Table,
   TableBody,
@@ -29,10 +27,32 @@ interface PageProps {
   }>;
 }
 
-interface PullRequestsResponse {
-  items: PullRequest[];
-  nextCursor: number | undefined;
-  total: number;
+interface PullRequest {
+  id: string;
+  title: string;
+  description: string;
+  status: 'OPEN' | 'CLOSED' | 'MERGED';
+  createdAt: string;
+  updatedAt: string;
+  creator: {
+    id: string;
+    name: string | null;
+    username: string;
+  };
+  sourceBranch: {
+    id: string;
+    name: string;
+  };
+  targetBranch: {
+    id: string;
+    name: string;
+  };
+  reviewCount: number;
+  reviewers: Array<{
+    id: string;
+    name: string | null;
+    username: string;
+  }>;
 }
 
 export default function Page({ params, searchParams }: PageProps) {
@@ -79,18 +99,51 @@ function PullRequestsList({
     search?: string;
   };
 }) {
-  const { data } = api.pullRequests.list.useQuery<PullRequestsResponse>({
-    owner,
-    repository,
-    state: searchParams.state ?? "open",
-    search: searchParams.search,
-  });
+  const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const pullRequests = data?.items ?? [];
+  useEffect(() => {
+    async function fetchPullRequests() {
+      try {
+        setLoading(true);
+        // Convert the UI state to API state
+        const apiState = searchParams.state === 'closed' ? 'CLOSED' : 
+                         searchParams.state === 'all' ? 'ALL' : 'OPEN';
+        
+        const response = await fetch(
+          `/api/repositories/${owner}/${repository}/pull-requests?status=${apiState}` + 
+          (searchParams.search ? `&search=${encodeURIComponent(searchParams.search)}` : '')
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch pull requests');
+        }
+        
+        const data = await response.json();
+        setPullRequests(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        console.error('Error fetching pull requests:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchPullRequests();
+  }, [owner, repository, searchParams.state, searchParams.search]);
+
+  if (loading) {
+    return <div className="text-center p-4">Loading pull requests...</div>;
+  }
+  
+  if (error) {
+    return <div className="text-center text-red-500 p-4">Error: {error}</div>;
+  }
 
   if (pullRequests.length === 0) {
     return (
-      <div className="text-center text-muted-foreground">
+      <div className="text-center text-muted-foreground p-8">
         No pull requests found
       </div>
     );
@@ -103,10 +156,10 @@ function PullRequestsList({
           <TableRow>
             <TableHead>Title</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Labels</TableHead>
+            <TableHead>Branches</TableHead>
             <TableHead>Author</TableHead>
             <TableHead>Created</TableHead>
-            <TableHead>Comments</TableHead>
+            <TableHead>Reviews</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -114,38 +167,27 @@ function PullRequestsList({
             <TableRow key={pr.id}>
               <TableCell>
                 <Link
-                  href={`/${owner}/${repository}/pulls/${pr.number}`}
+                  href={`/${owner}/${repository}/pull-requests/${pr.id}`}
                   className="font-medium hover:underline"
                 >
                   {pr.title}
                 </Link>
               </TableCell>
               <TableCell>
-                <Badge variant={pr.state === "open" ? "default" : "secondary"}>
-                  {pr.state}
+                <Badge variant={pr.status === "OPEN" ? "default" : "secondary"}>
+                  {pr.status === 'OPEN' ? 'Open' : 
+                   pr.status === 'MERGED' ? 'Merged' : 'Closed'}
                 </Badge>
               </TableCell>
               <TableCell>
-                <div className="flex flex-wrap gap-1">
-                  {pr.labels.map((label) => (
-                    <Badge
-                      key={label.name}
-                      variant="outline"
-                      style={{ backgroundColor: `#${label.color}` }}
-                    >
-                      {label.name}
-                    </Badge>
-                  ))}
+                <div className="text-xs">
+                  <span className="block">{pr.sourceBranch.name}</span>
+                  <span className="block text-muted-foreground">→ {pr.targetBranch.name}</span>
                 </div>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <img
-                    src={pr.author.avatarUrl}
-                    alt={pr.author.login}
-                    className="h-5 w-5 rounded-full"
-                  />
-                  <span>{pr.author.login}</span>
+                  <span>{pr.creator.name || pr.creator.username}</span>
                 </div>
               </TableCell>
               <TableCell>
@@ -153,7 +195,7 @@ function PullRequestsList({
                   addSuffix: true,
                 })}
               </TableCell>
-              <TableCell>{pr.comments}</TableCell>
+              <TableCell>{pr.reviewCount}</TableCell>
             </TableRow>
           ))}
         </TableBody>
