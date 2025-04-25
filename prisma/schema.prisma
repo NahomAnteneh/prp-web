@@ -43,6 +43,8 @@ model User {
   evaluatedProjects    ProjectEvaluator[]
   tasksAssigned        Task[]               @relation("TaskAssignee")
   tasksCreated         Task[]               @relation("TaskCreator")
+  repositoriesOwned    Repository[]         @relation("RepositoryOwner")
+  /// Each repository belongs to one user
 
   @@index([username])
 }
@@ -124,18 +126,22 @@ model Repository {
   id            String         @id @default(cuid())
   /// Repository name, likely derived from project/group
   name          String
+  ownerId       String         // required after backfill
   isPrivate     Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   /// Each repository belongs to one project
   projectId     String         @unique
+  owner         User           @relation("RepositoryOwner", fields: [ownerId], references: [id])
+  project       Project        @relation(fields: [projectId], references: [id])
   branches      Branch[]
   commits       Commit[]
   mergeRequests MergeRequest[]
   remotes       Remote[]
-  project       Project        @relation(fields: [projectId], references: [id])
+  feedback      Feedback[]
 
   @@index([name])
+  @@unique([ownerId, name])
 }
 
 /// Represents a commit in the Vec repository
@@ -292,7 +298,9 @@ model Task {
 /// Represents feedback provided on a project or merge request
 model Feedback {
   id             String        @id @default(cuid())
+  title          String
   content        String
+  status         FeedbackStatus @default(OPEN)
   createdAt      DateTime      @default(now())
   /// User (Advisor/Evaluator) providing feedback
   authorId       String
@@ -300,13 +308,16 @@ model Feedback {
   projectId      String?
   /// Feedback linked to a specific merge request
   mergeRequestId String?
+  repositoryId   String?
   author         User          @relation("FeedbackAuthor", fields: [authorId], references: [id])
   mergeRequest   MergeRequest? @relation(fields: [mergeRequestId], references: [id])
   project        Project?      @relation(fields: [projectId], references: [id])
+  repository     Repository?   @relation(fields: [repositoryId], references: [id])
 
   @@index([authorId])
   @@index([projectId])
   @@index([mergeRequestId])
+  @@index([repositoryId])
 }
 
 /// Represents an evaluation submitted for a project
@@ -482,4 +493,10 @@ model GroupInvite {
   @@index([code])
   @@index([groupId])
   @@index([expiresAt])
+}
+
+/// Represents the status of feedback
+enum FeedbackStatus {
+  OPEN
+  CLOSED
 }
