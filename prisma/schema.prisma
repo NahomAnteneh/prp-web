@@ -45,6 +45,11 @@ model User {
   evaluatedProjects    ProjectEvaluator[]
   tasksAssigned        Task[]               @relation("TaskAssignee")
   tasksCreated         Task[]               @relation("TaskCreator")
+  repositories         Repository[]         @relation("RepositoryOwner")
+  contributions        Repository[]         @relation("RepositoryContributor")
+  stars                Star[]
+  feedbacks            Feedback[]           @relation("FeedbackAuthor")
+  comments             Comment[]            @relation("CommentAuthor")
 
   @@index([username])
 }
@@ -121,20 +126,23 @@ model ProjectEvaluator {
 
 /// Represents the Vec repository for a project
 model Repository {
-  id            String         @id @default(cuid())
-  /// Repository name, likely derived from project/group
-  name          String
-  isPrivate     Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  projectId     String
-  branches      Branch[]
-  commits       Commit[]
-  mergeRequests MergeRequest[]
-  remotes       Remote[]
-  project       Project        @relation("ProjectRepositories", fields: [projectId], references: [id])
+  id             String     @id @default(cuid())
+  name           String
+  ownerName      String
+  description    String?
+  isPrivate      Boolean    @default(false)
+  defaultBranch  String     @default("main")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  owner          User         @relation("RepositoryOwner", fields: [ownerName], references: [username])
+  contributors   User[]       @relation("RepositoryContributor")
+  stars          Star[]
+  files          File[]
+  topics         Topic[]
+  feedbacks      Feedback[]
+  projects       Project[]    @relation("ProjectRepositories")
 
-  @@index([name])
+  @@unique([ownerName, name])
 }
 
 /// Represents a commit in the Vec repository
@@ -291,8 +299,12 @@ model Task {
 /// Represents feedback provided on a project or merge request
 model Feedback {
   id             String        @id @default(cuid())
-  content        String
-  createdAt      DateTime      @default(now())
+  number         Int
+  title          String
+  body           String
+  state          String       @default("open") // 'open' or 'closed'
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   /// User (Advisor/Evaluator) providing feedback
   authorId       String
   /// Feedback linked to the overall project
@@ -302,10 +314,14 @@ model Feedback {
   author         User          @relation("FeedbackAuthor", fields: [authorId], references: [id])
   mergeRequest   MergeRequest? @relation(fields: [mergeRequestId], references: [id])
   project        Project?      @relation(fields: [projectId], references: [id])
+  repository     Repository      @relation(fields: [repositoryId], references: [id])
+  comments       Comment[]
+  tags           Tag[]
 
   @@index([authorId])
   @@index([projectId])
   @@index([mergeRequestId])
+  @@index([number])
 }
 
 /// Represents an evaluation submitted for a project
@@ -480,4 +496,63 @@ model GroupInvite {
   @@index([code])
   @@index([groupId])
   @@index([expiresAt])
+}
+
+/// Represents repository contents
+model File {
+  id           String     @id @default(cuid())
+  repositoryId String
+  path         String
+  name         String
+  parentPath   String
+  type         String // 'file' or 'directory'
+  size         Int?       // Size in bytes, only for files
+  content      String?    // Content, only for files
+  branch       String     @default("main")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, path, branch])
+}
+
+/// Represents repository classification
+model Topic {
+  id           String       @id @default(cuid())
+  name         String       @unique
+  color        String       @default("cccccc")
+  description  String?
+  repositories Repository[]
+}
+
+/// Represents feedback discussion
+model Comment {
+  id         String   @id @default(cuid())
+  body       String
+  feedbackId String
+  authorId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  feedback   Feedback   @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  author     User       @relation("CommentAuthor", fields: [authorId], references: [id])
+}
+
+/// Represents categorizing feedback
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  color     String     @default("cccccc")
+  feedback  Feedback[]
+}
+
+/// Represents repository stars
+model Star {
+  id           String     @id @default(cuid())
+  repositoryId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, userId])
 }

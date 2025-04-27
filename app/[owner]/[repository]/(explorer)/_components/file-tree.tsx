@@ -1,0 +1,353 @@
+"use client";
+
+import React, { useState, useMemo, useEffect } from "react";
+import { ChevronDown, ChevronRight, File, Folder } from "lucide-react";
+import { useParams, usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+import type { TreeNode } from "@/app/api/repositories/[owner]/[repo]/tree/route";
+
+// ----------- Types -----------
+type TreeData = {
+  tree: TreeNode[];
+  truncated: boolean;
+};
+
+interface ProcessedTreeNode {
+  name: string;
+  type: "file" | "folder";
+  path: string;
+  children: Record<string, ProcessedTreeNode>;
+}
+
+interface FileTreeProps {
+  className?: string;
+  initialData?: TreeData;
+}
+
+// ----------- Helper to build hierarchical tree -----------
+
+function buildTree(nodes: TreeNode[]): ProcessedTreeNode {
+  const root: ProcessedTreeNode = {
+    name: "root",
+    type: "folder",
+    path: "",
+    children: {},
+  };
+
+  // Sort so folders appear before files, then alphabetical
+  const sortedNodes = [...nodes].sort((a, b) => {
+    if (a.type !== b.type) return a.type === "tree" ? -1 : 1;
+    return a.path.localeCompare(b.path);
+  });
+
+  for (const node of sortedNodes) {
+    const pathParts = node.path.split("/");
+    let currentLevel = root;
+    let currentPath = "";
+
+    for (let i = 0; i < pathParts.length; i++) {
+      const part = pathParts[i];
+      if (!part) continue;
+
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const isLastPart = i === pathParts.length - 1;
+
+      if (!currentLevel.children[part]) {
+        currentLevel.children[part] = {
+          name: part,
+          type: isLastPart && node.type === "blob" ? "file" : "folder",
+          path: currentPath,
+          children: {},
+        };
+      }
+
+      currentLevel = currentLevel.children[part];
+    }
+  }
+
+  return root;
+}
+
+// ----------- Recursive Tree Node Component -----------
+
+interface TreeNodeProps {
+  node: ProcessedTreeNode;
+  level: number;
+  expandedFolders: Record<string, boolean>;
+  toggleFolder: (path: string) => void;
+  selectedFile: string | null;
+  setSelectedFile: (path: string) => void;
+}
+
+function TreeNode({
+  node,
+  level,
+  expandedFolders,
+  toggleFolder,
+  selectedFile,
+  setSelectedFile,
+}: TreeNodeProps) {
+  const { owner, repository, branch } = useParams();
+  const pathname = usePathname();
+
+  const isFolder = node.type === "folder";
+  const isExpanded = expandedFolders[node.path];
+  const hasChildren = Object.keys(node.children).length > 0;
+  const childrenArray = Object.values(node.children);
+
+  // Construct link path for the node
+  const linkBase = `/${owner}/${repository}/${
+    isFolder ? "tree" : "blob"
+  }/${branch}`;
+  const linkPath = `${linkBase}/${node.path}`;
+  const isSelected = pathname === linkPath;
+
+  // Prefetch file content on hover
+  const prefetchFileContent = async () => {
+    if (isFolder) return;
+    
+    try {
+      await fetch(`/api/repositories/${owner}/${repository}/file`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          path: node.path,
+          branch,
+        }),
+      });
+    } catch (error) {
+      console.error("Error prefetching file content:", error);
+    }
+  };
+
+  // Skip the "root" node and just render its children
+  if (node.name === "root") {
+    return (
+      <>
+        {childrenArray.map((child, index) => (
+          <TreeNode
+            key={child.path}
+            node={child}
+            level={0}
+            expandedFolders={expandedFolders}
+            toggleFolder={toggleFolder}
+            selectedFile={selectedFile}
+            setSelectedFile={setSelectedFile}
+          />
+        ))}
+      </>
+    );
+  }
+
+  if (isFolder) {
+    return (
+      <div className="select-none group">
+        {/* FOLDER ROW */}
+        <div
+          className={cn(
+            "flex items-center py-1 px-2 relative"
+            // isSelected &&
+            //   "bg-accent-foreground/20 border-r-2 border-r-[#0078d4]",
+            // !isSelected && "hover:bg-accent-foreground/10"
+          )}
+          // Dynamic left padding for indentation
+          style={{ paddingLeft: `${level * 16 + 8}px` }}
+        >
+          {/* Guide lines on hover */}
+          {level > 0 && (
+            <div
+              className="absolute left-0 top-0 h-full group-hover:border-l"
+              style={{ left: `${(level - 1) * 16 + 8}px` }}
+            />
+          )}
+          {level > 0 && (
+            <div
+              className="absolute top-1/2 h-0 group-hover:border-t"
+              style={{
+                left: `${(level - 1) * 16 + 8}px`,
+                width: "8px",
+                transform: "translateY(-50%)",
+              }}
+            />
+          )}
+
+          {/* Chevron toggle */}
+          {hasChildren ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(node.path);
+              }}
+              className="mr-1 h-4 w-4 flex items-center justify-center text-gray-400 hover:text-gray-600"
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+          ) : (
+            <span className="mr-1 h-4 w-4" />
+          )}
+
+          {/* Folder link */}
+          <Link
+            href={linkPath}
+            className="flex items-center flex-1 no-underline cursor-pointer"
+          >
+            <Folder className="h-4 w-4 text-[#6b9eff] mr-2" />
+            <span className="text-sm">{node.name}</span>
+          </Link>
+        </div>
+
+        {/* CHILDREN */}
+        {isExpanded && hasChildren && (
+          <div className="relative">
+            {childrenArray.map((child, index) => (
+              <TreeNode
+                key={child.path}
+                node={child}
+                level={level + 1}
+                expandedFolders={expandedFolders}
+                toggleFolder={toggleFolder}
+                selectedFile={selectedFile}
+                setSelectedFile={setSelectedFile}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // FILE NODE
+  return (
+    <Link
+      href={linkPath}
+      className={cn(
+        "flex items-center py-1 px-2 relative no-underline group"
+        // isSelected && "bg-accent-foreground/10 border-l-2 border-l-blue-500",
+        // !isSelected && "hover:bg-accent-foreground/20"
+      )}
+      style={{ paddingLeft: `${level * 16 + 8}px` }}
+      onMouseOver={prefetchFileContent}
+    >
+      {/* Guide lines on hover */}
+      {level > 0 && (
+        <div
+          className="absolute left-0 top-0 h-full group-hover:border-l"
+          style={{ left: `${(level - 1) * 16 + 8}px` }}
+        />
+      )}
+      {level > 0 && (
+        <div
+          className="absolute top-1/2 h-0 group-hover:border-t"
+          style={{
+            left: `${(level - 1) * 16 + 8}px`,
+            width: "8px",
+            transform: "translateY(-50%)",
+          }}
+        />
+      )}
+
+      <span className="mr-1 h-4 w-4" />
+      <File className="h-4 w-4 text-gray-400 mr-2" />
+      <span className="text-sm hover:underline">{node.name}</span>
+    </Link>
+  );
+}
+
+// ----------- Main FileTree Component -----------
+
+export function FileTree({ className, initialData }: FileTreeProps) {
+  const { owner, repository, branch } = useParams();
+  const pathname = usePathname();
+
+  const [treeData, setTreeData] = useState<TreeData | null>(initialData || null);
+  const [isLoading, setIsLoading] = useState(!initialData);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<
+    Record<string, boolean>
+  >({});
+
+  useEffect(() => {
+    const fetchTreeData = async () => {
+      if (!owner || !repository || !branch) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await fetch(
+          `/api/repositories/${owner}/${repository}/tree?branch=${branch}&recursive=true`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch repository tree');
+        }
+        
+        const data = await response.json();
+        setTreeData(data);
+      } catch (err) {
+        console.error('Error fetching repository tree:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (!initialData) {
+      fetchTreeData();
+    }
+  }, [owner, repository, branch, initialData]);
+
+  const processedTree = useMemo(() => {
+    if (!treeData || !treeData.tree) return null;
+    return buildTree(treeData.tree);
+  }, [treeData]);
+
+  useEffect(() => {
+    if (!processedTree || !pathname) return;
+    const splitted = pathname.split("/");
+    const index = splitted.findIndex(
+      (part) => part === "blob" || part === "tree"
+    );
+    if (index === -1 || splitted.length <= index + 2) return;
+    // Expand each segment in the path
+    const subPath = splitted.slice(index + 2).join("/");
+    if (!subPath) return;
+    let currentPath = "";
+    for (const segment of subPath.split("/")) {
+      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+      setExpandedFolders((prev) => ({ ...prev, [currentPath]: true }));
+    }
+  }, [pathname, processedTree]);
+
+  if (error) {
+    return <div className="text-red-500 p-2">Error: {error}</div>;
+  }
+
+  if (isLoading || !processedTree) {
+    return <div className="text-center">Loading file tree...</div>;
+  }
+
+  const toggleFolder = (path: string) => {
+    setExpandedFolders((prev) => ({ ...prev, [path]: !prev[path] }));
+  };
+
+  return (
+    <div className={cn("overflow-auto", className)}>
+      <TreeNode
+        node={processedTree}
+        level={0}
+        expandedFolders={expandedFolders}
+        toggleFolder={toggleFolder}
+        selectedFile={selectedFile}
+        setSelectedFile={setSelectedFile}
+      />
+    </div>
+  );
+}
