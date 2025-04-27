@@ -55,19 +55,19 @@ export default function LoginPage() {
     // If user is already authenticated, redirect to dashboard
     if (isAuthenticated && user) {
       // Redirect based on user role
-      const userRole = user.role;
-      let targetPath = "/"; // Default dashboard
+      // const userRole = user.role;
+      // let targetPath = "/"; // Default dashboard
       
-      // Check user role to determine the appropriate dashboard
-      if (userRole === "ADVISOR") {
-        targetPath = "/advisor-dashboard";  
-      } else if (userRole === "EVALUATOR") {
-        targetPath = "/evaluator-dashboard";
-      } else if (userRole === "ADMINISTRATOR") {
-        targetPath = "/admin-dashboard";
-      }
+      // // Check user role to determine the appropriate dashboard
+      // if (userRole === "ADVISOR") {
+      //   targetPath = "/advisor-dashboard";  
+      // } else if (userRole === "EVALUATOR") {
+      //   targetPath = "/evaluator-dashboard";
+      // } else if (userRole === "ADMINISTRATOR") {
+      //   targetPath = "/admin-dashboard";
+      // }
       
-      router.push(targetPath);
+      router.push("/");
     }
   }, [searchParams, router, isAuthenticated, user]);
 

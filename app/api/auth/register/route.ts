@@ -33,7 +33,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username, idNumber, email, password, department, batchYear } = body;
+    const { username, idNumber, email, password, department, batchYear, firstName, lastName } = body;
 
     // Basic validation
     if (!username || !email || !password || !department || !batchYear) {
@@ -82,11 +82,13 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.create({
       data: {
         username,
+        firstName,
+        lastName,
         passwordHash,
         role: Role.STUDENT,
+        email,
         profileInfo: {
           idNumber,
-          email,
           department,
           batchYear,
         }

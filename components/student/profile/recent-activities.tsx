@@ -25,67 +25,24 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
   const [activities, setActivities] = useState<Activity[]>([])
 
   useEffect(() => {
-    // In a real implementation, fetch activities data from an API
     const fetchActivities = async () => {
       try {
-        // Simulating API call with a timeout
-        setTimeout(() => {
-          setActivities([
-            {
-              id: "activity-1",
-              type: "commit",
-              title: "Added profile components",
-              description: "Created student profile components with responsive design",
-              timestamp: "2 hours ago",
-              project: "Project Repository Platform",
-              relatedTo: "feature/student-profile"
-            },
-            {
-              id: "activity-2",
-              type: "pull_request",
-              title: "Merge: Group Dashboard UI",
-              description: "Implemented UI components for group dashboard view",
-              timestamp: "Yesterday",
-              project: "Project Repository Platform",
-              relatedTo: "PR #42"
-            },
-            {
-              id: "activity-3",
-              type: "comment",
-              title: "Comment on Task",
-              description: "Added implementation details for the authentication system",
-              timestamp: "3 days ago",
-              project: "Project Repository Platform",
-              relatedTo: "Task #15"
-            },
-            {
-              id: "activity-4",
-              type: "task",
-              title: "Completed Task",
-              description: "Finalized database schema for user profiles",
-              timestamp: "1 week ago",
-              project: "Project Repository Platform",
-              relatedTo: "Task #8"
-            },
-            {
-              id: "activity-5",
-              type: "milestone",
-              title: "Milestone Reached",
-              description: "Completed Phase 1: Project Setup and Architecture",
-              timestamp: "2 weeks ago",
-              project: "Project Repository Platform"
-            }
-          ])
-          setIsLoading(false)
-        }, 1000)
+        setIsLoading(true);
+        const response = await fetch(`/api/activities/${userId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch activities data");
+        }
+        const data = await response.json();
+        setActivities(data);
       } catch (error) {
-        console.error("Error fetching activities:", error)
-        setIsLoading(false)
+        console.error("Error fetching activities:", error);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchActivities()
-  }, [])
+    fetchActivities();
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -215,4 +172,4 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
       </CardContent>
     </Card>
   )
-} 
+}

@@ -77,6 +77,14 @@ export const authOptions: NextAuthOptions = {
 
         const user = await db.user.findUnique({
           where: { username: credentials.username },
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            passwordHash: true,
+          },
         });
 
         if (!user) {
@@ -89,9 +97,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Construct full name from firstName and lastName
+        const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username;
+
         return {
           id: user.id,
-          name: user.name || '',
+          name: fullName,
           username: user.username,
           role: user.role,
         };
@@ -102,7 +113,8 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string;
-        session.user.name = token.name as string;
+        session.user.firstName = token.firstName as string;
+        session.user.lastName = token.lastName as string;
         session.user.username = token.username as string;
         session.user.role = token.role as string;
       }
@@ -111,6 +123,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.firstName = user.firstName;
         token.username = user.username;
         token.role = user.role as Role;
       }
@@ -123,8 +136,10 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      name: string;
+      firstName: string;
+      lastName: string;
       username: string;
+      email: string;
       role: string;
     };
   }
@@ -135,4 +150,4 @@ declare module 'next-auth' {
     username: string;
     role: string;
   }
-} 
+}

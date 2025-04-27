@@ -15,6 +15,8 @@ export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
     username: "",
     idNumber: "",
     institutionalEmail: "",
@@ -24,6 +26,8 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
   const [formErrors, setFormErrors] = useState({
+    firstName: "",
+    lastName: "",
     username: "",
     idNumber: "",
     institutionalEmail: "",
@@ -35,27 +39,12 @@ export default function RegisterPage() {
   });
 
   useEffect(() => {
-    // // Check if user is already authenticated
-    // const checkAuth = async () => {
-    //   try {
-    //     const response = await fetch('/api/auth/me');
-    //     if (response.ok) {
-    //       // User is already logged in, redirect to dashboard or onboarding
-    //       router.push("/group-onboarding");
-    //     }
-    //   } catch (error) {
-    //     console.error('Error checking authentication:', error);
-    //   }
-    // };
-
-    // checkAuth();
+    // Check if user is already authenticated (commented out in original code)
   }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing again
     if (formErrors[name as keyof typeof formErrors]) {
       setFormErrors(prev => ({ ...prev, [name]: "" }));
     }
@@ -63,8 +52,6 @@ export default function RegisterPage() {
 
   const handleSelectChange = (name: string, value: string): void => {
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user selects an option
     if (formErrors[name as keyof typeof formErrors]) {
       setFormErrors(prev => ({ ...prev, [name]: "" }));
     }
@@ -73,6 +60,8 @@ export default function RegisterPage() {
   const validateForm = () => {
     let isValid = true;
     const errors = {
+      firstName: "",
+      lastName: "",
       username: "",
       idNumber: "",
       institutionalEmail: "",
@@ -82,6 +71,18 @@ export default function RegisterPage() {
       confirmPassword: "",
       general: "",
     };
+
+    // First Name validation
+    if (!formData.firstName) {
+      errors.firstName = "First name is required";
+      isValid = false;
+    }
+
+    // Last Name validation
+    if (!formData.lastName) {
+      errors.lastName = "Last name is required";
+      isValid = false;
+    }
 
     // Username validation
     if (!formData.username) {
@@ -156,6 +157,8 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           username: formData.username,
           idNumber: formData.idNumber,
           email: formData.institutionalEmail,
@@ -173,7 +176,6 @@ export default function RegisterPage() {
       const data = await response.json();
       console.log("Registration successful", data);
       
-      // After successful registration, redirect to login page with success message
       router.push("/login?registered=true");
     } catch (error) {
       console.error("Registration error:", error);
@@ -186,7 +188,6 @@ export default function RegisterPage() {
     }
   };
 
-  // Computing departments at BiT
   const departments = [
     { value: "computer-science", label: "Computer Science" },
     { value: "information-technology", label: "Information Technology" },
@@ -195,7 +196,6 @@ export default function RegisterPage() {
     { value: "computer-engineering", label: "Computer Engineering" },
   ];
 
-  // Generate batch years (current year - 5 to current year + 1)
   const currentYear = new Date().getFullYear();
   const batchYears = Array.from({ length: 7 }, (_, i) => (currentYear - 5 + i).toString());
 
@@ -233,6 +233,39 @@ export default function RegisterPage() {
               </div>
             )}
             
+            {/* First Name and Last Name Group */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-gray-700">First Name</Label>
+                <Input 
+                  id="firstName"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="Your first name"
+                  className={`border-0 bg-gray-50 shadow-sm ${formErrors.firstName ? "ring-2 ring-red-500" : ""}`}
+                />
+                {formErrors.firstName && (
+                  <p className="text-sm text-red-500">{formErrors.firstName}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-gray-700">Last Name</Label>
+                <Input 
+                  id="lastName"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Your last name"
+                  className={`border-0 bg-gray-50 shadow-sm ${formErrors.lastName ? "ring-2 ring-red-500" : ""}`}
+                />
+                {formErrors.lastName && (
+                  <p className="text-sm text-red-500">{formErrors.lastName}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Existing Fields */}
             <div className="space-y-2">
               <Label htmlFor="username" className="text-gray-700">Username</Label>
               <Input 
@@ -387,7 +420,6 @@ export default function RegisterPage() {
       
       {/* Right Column - Hero/Info Section */}
       <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-500 to-sky-500 relative overflow-hidden">
-        {/* Decorative elements */}
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -452,4 +484,4 @@ export default function RegisterPage() {
       </div>
     </div>
   );
-} 
+}

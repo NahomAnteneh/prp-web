@@ -6,35 +6,38 @@ import { db } from "@/lib/db"
 
 export default async function UserPage({ params }: { params: { userId: string } }) {
   // Check authentication (might be needed for future enhancements)
-  await isAuthenticated()
-  
+  await isAuthenticated();
+
+  // Await params to ensure proper handling of dynamic routes
+  const { userId } = await params;
+
   // Fetch user from database
   const user = await db.user.findFirst({
     where: {
       OR: [
-        { id: params.userId },
-        { username: params.userId }
+        { id: userId },
+        { username: userId }
       ]
     }
-  })
-  
+  });
+
   // If user not found, return 404
   if (!user) {
-    notFound()
+    notFound();
   }
-  
+
   // If user is a student, display the student profile
   if (user.role === Role.STUDENT) {
-    return <StudentProfilePage userId={params.userId} />
+    return <StudentProfilePage userId={userId} />;
   }
-  
+
   // Default profile page for other user types (can be expanded later)
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold">Profile Page for {user.name || user.username}</h1>
+      <h1 className="text-3xl font-bold">Profile Page for {user.username}</h1>
       <p className="mt-4 text-muted-foreground">
         This is a {user.role.toLowerCase()} profile. Full profile details coming soon.
       </p>
     </div>
-  )
+  );
 }

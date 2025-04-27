@@ -16,7 +16,9 @@ model User {
   id                   String               @id @default(cuid())
   /// Institutional email address
   username             String               @unique
-  name                 String?
+  email                String               @unique
+  firstName            String
+  lastName             String
   /// Store hashed passwords only
   passwordHash         String
   role                 Role                 @default(STUDENT)
@@ -39,7 +41,7 @@ model User {
   mergeRequestsCreated MergeRequest[]       @relation("MergeRequestCreator")
   mergeRequestsReviews MergeRequestReview[]
   notifications        Notification[]       @relation("NotificationRecipient")
-  advisedProjects      Project[]            @relation("ProjectAdvisor")
+  advisedGroups        Group[]              @relation("GroupAdvisor")
   evaluatedProjects    ProjectEvaluator[]
   tasksAssigned        Task[]               @relation("TaskAssignee")
   tasksCreated         Task[]               @relation("TaskCreator")
@@ -56,10 +58,12 @@ model Group {
   updatedAt       DateTime        @updatedAt
   /// ID of the student who is the group leader
   leaderId        String
+  advisorId       String?
   advisorRequests AdvisorRequest?
   leader          User            @relation("GroupLeader", fields: [leaderId], references: [id])
+  advisor         User?           @relation("GroupAdvisor", fields: [advisorId], references: [id])
   members         GroupMember[]
-  project         Project?
+  projects        Project[]
   invites         GroupInvite[]
 
   @@index([name])
@@ -89,21 +93,17 @@ model Project {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   /// Each project belongs to one group
-  groupId           String             @unique
-  /// Assigned advisor
-  advisorId         String?
+  groupId           String
   /// To store milestones and deadlines
   milestones        Json?
   evaluationReports Evaluation[]
   feedback          Feedback[]
-  advisor           User?              @relation("ProjectAdvisor", fields: [advisorId], references: [id])
   group             Group              @relation(fields: [groupId], references: [id])
   evaluations       ProjectEvaluator[]
-  repository        Repository?
+  repositories      Repository[]       @relation("ProjectRepositories")
   tasks             Task[]
 
   @@index([title])
-  @@index([advisorId])
 }
 
 /// Join table for Project Evaluators (Many-to-Many between Project and User (Evaluator role))
@@ -127,13 +127,12 @@ model Repository {
   isPrivate     Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  /// Each repository belongs to one project
-  projectId     String         @unique
+  projectId     String
   branches      Branch[]
   commits       Commit[]
   mergeRequests MergeRequest[]
   remotes       Remote[]
-  project       Project        @relation(fields: [projectId], references: [id])
+  project       Project        @relation("ProjectRepositories", fields: [projectId], references: [id])
 
   @@index([name])
 }
@@ -367,7 +366,6 @@ model AdvisorRequest {
 }
 
 /// Represents a remote repository link for distributed Vec operations
-/// Added based on user request for distributed Vec schema.
 model Remote {
   id           String     @id @default(cuid())
   /// e.g., "origin"

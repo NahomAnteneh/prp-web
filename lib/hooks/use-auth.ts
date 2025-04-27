@@ -22,7 +22,7 @@ export function useAuth() {
   }, [status]);
   
   // Sign in with our custom API endpoint
-  const login = async (identifier: string, password: string, callbackUrl = "/dashboard") => {
+  const login = async (identifier: string, password: string, callbackUrl = "/") => {
     try {
       setAuthError(null);
       

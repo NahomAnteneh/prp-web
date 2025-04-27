@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: { groupId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -17,7 +17,9 @@ export async function GET(
       );
     }
 
-    const { groupId } = params;
+    const { params } = context;
+    const awaitedParams = await params;
+    const { groupId } = awaitedParams;
 
     // Check if user is a member of the group
     const membership = await db.groupMember.findFirst({
@@ -54,4 +56,61 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get request data
+    const { groupId, title, description } = await req.json();
+
+    // Validate required fields
+    if (!groupId || !title) {
+      return NextResponse.json(
+        { message: 'Group ID and title are required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is member of the group
+    const membership = await db.groupMember.findFirst({
+      where: {
+        groupId: groupId,
+        userId: session.user.id,
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json(
+        { message: 'You are not a member of this group' },
+        { status: 403 }
+      );
+    }
+
+    // Create the project in the database
+    const newProject = await db.project.create({
+      data: {
+        title,
+        description: description || null,
+        status: 'ACTIVE',
+        groupId,
+      },
+    });
+    
+    return NextResponse.json({ 
+      message: 'Project created successfully',
+      project: newProject 
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating project:', error);
+    return NextResponse.json(
+      { message: 'Error creating project' },
+      { status: 500 }
+    );
+  }
+}

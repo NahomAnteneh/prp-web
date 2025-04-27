@@ -5,7 +5,6 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// Define options for NextAuth
 export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
@@ -15,38 +14,49 @@ export const authOptions: AuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        if (!credentials?.identifier || !credentials?.password) {
+        // Input validation
+        if (!credentials?.identifier?.trim() || !credentials?.password?.trim()) {
           return null;
         }
 
-        // Find user by username (identifier can be username)
-        const user = await prisma.user.findUnique({
-          where: { username: credentials.identifier }
+        // Find user by username OR email
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { username: credentials.identifier.trim() },
+              { email: credentials.identifier.trim() },
+            ],
+          },
         });
 
+        // User not found
         if (!user) {
-          // If user not found by username, could be using email in the profileInfo JSON
-          // NOTE: This is just a fallback in case the user is using email instead of username
-          // In a proper implementation, you might want to add an email field to the User model
+          if (process.env.NODE_ENV === 'development') {
+            console.log('User not found for identifier:', credentials.identifier);
+          }
           return null;
         }
 
-        // Check if passwords match
+        // Check password match
         const passwordMatch = await bcrypt.compare(
-          credentials.password,
+          credentials.password.trim(),
           user.passwordHash
         );
 
         if (!passwordMatch) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Password does not match for user:', user.username);
+          }
           return null;
         }
 
-        // Return user object without password
+        // Return user object with full name constructed from firstName and lastName
         return {
           id: user.id,
-          name: user.name || user.username,
+          name: `${user.firstName} ${user.lastName}`,
           username: user.username,
           role: user.role,
+          email: user.email,
         };
       }
     })
@@ -60,16 +70,18 @@ export const authOptions: AuthOptions = {
         token.id = user.id;
         token.name = user.name;
         token.username = user.username;
-        token.role = user.role;
+        token.role = user.role as Role;
+        token.email = user.email;
       }
       return token;
     },
     session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.name = token.name as string;
+        session.user.firstName = token.firstName as string;
         session.user.username = token.username as string;
         session.user.role = token.role as Role;
+        session.user.email = token.email as string;
       }
       return session;
     }
@@ -81,9 +93,6 @@ export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || 'fallback-secret',
 };
 
-// Properly bind the NextAuth handler for App Router
 const handler = NextAuth(authOptions);
 
-// Export handler functions for App Router
-// These functions receive the req object and route params
-export { handler as GET, handler as POST }; 
+export { handler as GET, handler as POST };

@@ -115,7 +115,7 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
 
     try {
       setLoading(true);
-      const response = await fetch('/api/projects', {
+      const response = await fetch(`/api/groups/${groupId}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

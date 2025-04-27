@@ -36,36 +36,23 @@ export default function GroupOverview({ userId }: GroupOverviewProps) {
   const [groupData, setGroupData] = useState<GroupData | null>(null)
 
   useEffect(() => {
-    // In a real implementation, fetch the group data from an API
     const fetchGroupData = async () => {
       try {
-        // Simulating API call with a timeout
-        setTimeout(() => {
-          setGroupData({
-            id: "group-123",
-            name: "Team Innovate",
-            description: "Building the next generation of software solutions for sustainable development",
-            progress: 65,
-            status: "In Progress",
-            projectTitle: "Project Repository Platform",
-            advisor: "Dr. Jane Smith",
-            members: [
-              { id: "member-1", name: "John Doe", role: "Leader", imageUrl: "/placeholder-avatar.jpg" },
-              { id: "member-2", name: "Alice Johnson", role: "Member", imageUrl: "/placeholder-avatar.jpg" },
-              { id: "member-3", name: "Robert Brown", role: "Member", imageUrl: "/placeholder-avatar.jpg" },
-              { id: "member-4", name: "Emily Davis", role: "Member", imageUrl: "/placeholder-avatar.jpg" },
-            ]
-          })
-          setIsLoading(false)
-        }, 1000)
+        const response = await fetch(`/api/groups/${userId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch group data");
+        }
+        const data = await response.json();
+        setGroupData(data);
       } catch (error) {
-        console.error("Error fetching group data:", error)
-        setIsLoading(false)
+        console.error("Error fetching group data:", error);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchGroupData()
-  }, [])
+    fetchGroupData();
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -182,4 +169,4 @@ export default function GroupOverview({ userId }: GroupOverviewProps) {
       </CardContent>
     </Card>
   )
-} 
+}
