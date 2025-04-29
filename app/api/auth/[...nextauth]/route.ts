@@ -44,7 +44,7 @@ export const authOptions: AuthOptions = {
         // Return user object without password
         return {
           id: user.id,
-          name: user.name || user.username,
+          name: `${user.firstName} ${user.lastName}`,
           username: user.username,
           role: user.role,
         };
@@ -60,7 +60,7 @@ export const authOptions: AuthOptions = {
         token.id = user.id;
         token.name = user.name;
         token.username = user.username;
-        token.role = user.role;
+        token.role = user.role as Role;
       }
       return token;
     },

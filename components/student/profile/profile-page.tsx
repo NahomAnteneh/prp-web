@@ -41,39 +41,26 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      if (!userId) return
+      if (!userId) return;
 
       try {
-        setIsLoading(true)
-        // In a real implementation, this would call your API
-        // e.g., const response = await fetch(`/api/users/${userId}`)
-        
-        // For now, using mock data
-        setTimeout(() => {
-          setProfileData({
-            id: userId,
-            username: "student123",
-            name: "John Doe",
-            role: "STUDENT",
-            profileInfo: {
-              idNumber: "BDU1234/12",
-              email: "john.doe@bdu.edu.et",
-              department: "Software Engineering",
-              batchYear: "2021",
-              bio: "Final year Software Engineering student passionate about web development and AI."
-            }
-          })
-          setIsLoading(false)
-        }, 1000)
+        setIsLoading(true);
+        const response = await fetch(`/api/users/${userId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch profile data");
+        }
+        const data = await response.json();
+        setProfileData(data);
       } catch (err) {
-        console.error("Error fetching profile data:", err)
-        setError("Failed to load profile data. Please try again later.")
-        setIsLoading(false)
+        console.error("Error fetching profile data:", err);
+        setError("Failed to load profile data. Please try again later.");
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchProfileData()
-  }, [userId])
+    fetchProfileData();
+  }, [userId]);
 
   if (error) {
     return (
@@ -178,4 +165,4 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
       <Footer />
     </div>
   )
-} 
+}

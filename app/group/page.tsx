@@ -4,31 +4,27 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, Calendar, MessageSquare, CheckCircle } from 'lucide-react';
+import { Loader2, Users, CheckCircle, Settings } from 'lucide-react';
 import GroupOverview from '@/components/group/GroupOverview';
 import ProjectsList from '@/components/group/ProjectsList';
 import AdvisorSection from '@/components/group/AdvisorSection';
-import TasksOverview from '@/components/group/TasksOverview';
-import FeedbackList from '@/components/group/FeedbackList';
 import CreateGroupModal from '@/components/group/CreateGroupModal';
 import JoinGroupModal from '@/components/group/JoinGroupModal';
 import RequestToJoinModal from '@/components/group/RequestToJoinModal';
-import MessageAdvisor from '@/components/group/MessageAdvisor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/student/navbar';
 import Footer from '@/components/student/footer';
+import { Group } from '@/types/types';
 
 export default function GroupPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [groupData, setGroupData] = useState<any>(null);
+  const [groupData, setGroupData] = useState<Group | null>(null);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [showRequestToJoinModal, setShowRequestToJoinModal] = useState(false);
-  const [maxGroupSize, setMaxGroupSize] = useState(5); // Default, will be updated from rules
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [maxGroupSize, setMaxGroupSize] = useState(4); // Default, will be updated from rules
   
   useEffect(() => {
     // If user not authenticated, redirect to login
@@ -42,28 +38,8 @@ export default function GroupPage() {
       fetchGroupData();
       // Fetch rules including max group size
       fetchMaxGroupSize();
-      // Fetch notifications count
-      fetchNotifications();
     }
-  }, [status, session]);
-
-  // Function to fetch unread notifications count
-  const fetchNotifications = async () => {
-    try {
-      const response = await fetch('/api/notifications/unread');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
-      }
-      
-      const data = await response.json();
-      setUnreadNotifications(data.count);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-      // Set to 0 as fallback in case of error
-      setUnreadNotifications(0);
-    }
-  };
+  }, [status, session, router]);
 
   const fetchGroupData = async () => {
     try {
@@ -72,7 +48,9 @@ export default function GroupPage() {
       const data = await response.json();
       
       if (response.ok) {
-        setGroupData(data);
+        setGroupData({
+          ...data,
+        });
       } else {
         // User doesn't have a group
         setGroupData(null);
@@ -110,7 +88,7 @@ export default function GroupPage() {
   if (!groupData) {
     return (
       <>
-        <Navbar unreadNotifications={unreadNotifications} userName={session?.user?.name || ""} />
+        <Navbar userName={session?.user?.username || ""} />
         <div className="container mx-auto py-8 max-w-5xl">
           <div className="bg-muted/30 rounded-lg p-8 text-center">
             <h1 className="text-2xl font-bold mb-4">You are not part of any group</h1>
@@ -174,42 +152,42 @@ export default function GroupPage() {
   // User has a group - show group dashboard
   return (
     <>
-      <Navbar unreadNotifications={unreadNotifications} userName={session?.user?.name || ""} />
+      <Navbar userName={session?.user?.username || ""} />
       <div className="container mx-auto py-6 max-w-6xl">
-        <Tabs defaultValue="projects" className="mb-8">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs defaultValue="overview" className="mb-8">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
             <TabsTrigger value="projects" className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               <span>Projects</span>
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span>Tasks</span>
             </TabsTrigger>
             <TabsTrigger value="advisor" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span>Advisor</span>
             </TabsTrigger>
-            <TabsTrigger value="feedback" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              <span>Feedback</span>
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              <span>Messages</span>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              <span>Settings</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="overview" className="mt-6">
+            <h2 className="text-xl font-bold mb-4">Group Overview</h2>
+            <GroupOverview 
+              group={groupData}
+              maxGroupSize={maxGroupSize}
+              isLeader={session?.user?.id === groupData.leaderId}
+              onUpdate={fetchGroupData}
+            />
+          </TabsContent>
 
           <TabsContent value="projects" className="mt-6">
             <ProjectsList 
               groupId={groupData.id}
               isLeader={session?.user?.id === groupData.leaderId}
-            />
-          </TabsContent>
-
-          <TabsContent value="tasks" className="mt-6">
-            <TasksOverview 
-              groupId={groupData.id}
             />
           </TabsContent>
 
@@ -221,28 +199,11 @@ export default function GroupPage() {
             />
           </TabsContent>
 
-          <TabsContent value="feedback" className="mt-6">
-            <FeedbackList 
-              groupId={groupData.id}
-            />
-          </TabsContent>
-
-          <TabsContent value="messages" className="mt-6">
-            <MessageAdvisor 
-              group={groupData}
-            />
+          <TabsContent value="settings" className="mt-6">
+            <h2 className="text-xl font-bold mb-4">Settings</h2>
+            <p>Settings content goes here...</p>
           </TabsContent>
         </Tabs>
-
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Group Overview</h2>
-          <GroupOverview 
-            group={groupData}
-            maxGroupSize={maxGroupSize}
-            isLeader={session?.user?.id === groupData.leaderId}
-            onUpdate={fetchGroupData}
-          />
-        </div>
       </div>
       <Footer />
     </>

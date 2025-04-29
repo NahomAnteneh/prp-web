@@ -16,30 +16,52 @@ import {
 } from "@/components/ui/navigation-menu"
 
 export interface NavbarProps {
-  unreadNotifications: number
   userName?: string
 }
 
-export default function Navbar({ unreadNotifications = 0, userName }: NavbarProps) {
+export default function Navbar({ userName }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [displayName, setDisplayName] = useState<string>("Student")
-  const [unreadCount, setUnreadCount] = useState(unreadNotifications)
-  
-  // Set display name with fallback to "Student" if userName is undefined or empty
+  const [unreadCount, setUnreadCount] = useState(0)
+
   useEffect(() => {
-    console.log("Navbar received userName:", userName)
-    setDisplayName(userName && userName.trim() !== "" ? userName : "Student")
+    async function fetchNavbarData() {
+      try {
+        const response = await fetch("/api/notifications")
+        if (response.ok) {
+          const data = await response.json()
+          setUnreadCount(data.unreadCount || 0)
+        } else {
+          console.error("Failed to fetch navbar data")
+        }
+        setDisplayName(userName || "Student")
+      } catch (error) {
+        console.error("Error fetching navbar data:", error)
+      }
+    }
+
+    fetchNavbarData()
   }, [userName])
 
-  // Update unread count when prop changes
-  useEffect(() => {
-    setUnreadCount(unreadNotifications)
-  }, [unreadNotifications])
+  const handleMarkAllAsRead = async () => {
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ notificationIds: [] }),
+      })
 
-  const handleMarkAllAsRead = () => {
-    setUnreadCount(0)
-    // In a real app, this would call an API endpoint to mark notifications as read
-    console.log("Marked all notifications as read")
+      if (response.ok) {
+        setUnreadCount(0)
+        console.log("Marked all notifications as read")
+      } else {
+        console.error("Failed to mark notifications as read")
+      }
+    } catch (error) {
+      console.error("Error marking notifications as read:", error)
+    }
   }
 
   return (
@@ -228,4 +250,4 @@ export default function Navbar({ unreadNotifications = 0, userName }: NavbarProp
       )}
     </nav>
   )
-} 
+}

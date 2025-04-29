@@ -16,7 +16,7 @@ export async function GET() {
 
     // Find the user's group membership
     const membership = await db.groupMember.findFirst({
-      where: { userId: session.user.id },
+      where: { userId : session.user.id },
       include: {
         group: {
           include: {
@@ -25,7 +25,8 @@ export async function GET() {
                 user: {
                   select: {
                     id: true,
-                    name: true,
+                    firstName: true,
+                    lastName: true,
                     username: true,
                   },
                 },
@@ -39,7 +40,8 @@ export async function GET() {
                 advisor: {
                   select: {
                     id: true,
-                    name: true, 
+                    firstName: true,
+                    lastName: true, 
                     username: true,
                     profileInfo: true,
                   },
@@ -56,7 +58,8 @@ export async function GET() {
                 requestedAdvisor: {
                   select: {
                     id: true,
-                    name: true,
+                    firstName: true,
+                    lastName: true,
                     username: true,
                   },
                 },

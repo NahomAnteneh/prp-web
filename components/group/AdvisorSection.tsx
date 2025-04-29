@@ -25,6 +25,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
+// Unified Group type definition
+import { Group } from '@/types/types'; // Assuming a centralized type definition file exists
+
 interface Advisor {
   id: string;
   name: string;
@@ -32,25 +35,6 @@ interface Advisor {
   profileInfo?: {
     expertise?: string[];
     bio?: string;
-  };
-}
-
-interface AdvisorRequest {
-  id: string;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
-  createdAt: string;
-  advisorId: string | null;
-  message: string | null;
-  advisor: Advisor | null;
-}
-
-interface Group {
-  id: string;
-  name: string;
-  advisorRequests: AdvisorRequest | null;
-  project?: {
-    advisorId: string | null;
-    advisor: Advisor | null;
   };
 }
 
@@ -68,13 +52,13 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
   const [isLoadingAdvisors, setIsLoadingAdvisors] = useState(false);
 
   const hasAdvisor = group.project?.advisor !== null;
-  const hasPendingRequest = group.advisorRequests?.status === 'PENDING';
-  const hasRejectedRequest = group.advisorRequests?.status === 'REJECTED';
+  const hasPendingRequest = group.advisorRequests?.find(request => request.status === 'PENDING');
+  const hasRejectedRequest = group.advisorRequests?.find(request => request.status === 'REJECTED');
 
   const fetchAvailableAdvisors = async () => {
     try {
       setIsLoadingAdvisors(true);
-      const response = await fetch('/api/advisors/available');
+      const response = await fetch('/api/advisor/available');
       const data = await response.json();
       
       if (!response.ok) {
@@ -95,7 +79,7 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
   const handleSubmitRequest = async () => {
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/advisor-requests', {
+      const response = await fetch('/api/advisor/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -128,7 +112,7 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
   const requestSpecificAdvisor = async (advisorId: string) => {
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/advisor-requests', {
+      const response = await fetch('/api/advisor/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,11 +145,11 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
   };
 
   const cancelRequest = async () => {
-    if (!group.advisorRequests?.id) return;
+    if (!group.advisorRequests?.find(request => request.id)) return;
     
     try {
       setIsSubmitting(true);
-      const response = await fetch(`/api/advisor-requests/${group.advisorRequests.id}`, {
+      const response = await fetch(`/api/advisor/requests/${group.advisorRequests.find(request => request.id)}`, {
         method: 'DELETE',
       });
 
@@ -209,11 +193,11 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
                 <AvatarImage src={`https://avatar.vercel.sh/${advisor.username}`} />
-                <AvatarFallback>{advisor.name?.[0] || advisor.username[0]}</AvatarFallback>
+                <AvatarFallback>{advisor.firstName?.[0] || advisor.username[0]}</AvatarFallback>
               </Avatar>
               
               <div>
-                <h3 className="text-lg font-medium">{advisor.name}</h3>
+                <h3 className="text-lg font-medium">{advisor.firstName} {advisor.lastName}</h3>
                 <p className="text-sm text-muted-foreground">{advisor.username}</p>
                 
                 {advisor.profileInfo?.expertise && (
@@ -256,9 +240,9 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
         <CardContent>
           <div className="bg-muted/30 rounded-lg p-4">
             <p className="text-sm">
-              {group.advisorRequests?.advisor ? (
+              {group.advisorRequests?.find(request => request.requestedAdvisor) ? (
                 <>
-                  You have requested <strong>{group.advisorRequests.advisor.name}</strong> to be your advisor.
+                  You have requested <strong>{group.advisorRequests?.find(request => request.requestedAdvisor?.username)?.requestedAdvisor?.username || 'an advisor'}</strong> to be your advisor.
                 </>
               ) : (
                 <>
@@ -267,15 +251,15 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
               )}
             </p>
             
-            {group.advisorRequests?.message && (
+            {group.advisorRequests?.find(request => request.requestMessage) && (
               <div className="mt-4 bg-background p-3 rounded-md">
                 <h4 className="text-xs font-semibold text-muted-foreground mb-1">Your Message:</h4>
-                <p className="text-sm italic">&ldquo;{group.advisorRequests.message}&rdquo;</p>
+                <p className="text-sm italic">&ldquo;{group.advisorRequests.find(request => request.requestMessage)?.requestMessage}&rdquo;</p>
               </div>
             )}
             
             <p className="text-xs text-muted-foreground mt-4">
-              Request submitted on {new Date(group.advisorRequests?.createdAt || '').toLocaleDateString()}
+              Request submitted on {group.advisorRequests?.find(request => request.createdAt)?.createdAt ? new Date(group.advisorRequests.find(request => request.createdAt)?.createdAt || '').toLocaleDateString() : 'Unknown date'}
             </p>
           </div>
         </CardContent>
@@ -313,9 +297,9 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
         <CardContent>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-sm">
-              {group.advisorRequests?.advisor ? (
+              {group.advisorRequests?.find(request => request.requestedAdvisor) ? (
                 <>
-                  Your request for <strong>{group.advisorRequests.advisor.name}</strong> to be your advisor was rejected.
+                  Your request for <strong>{group.advisorRequests.find(request => request.requestedAdvisor?.username)?.requestedAdvisor?.username}</strong> to be your advisor was rejected.
                 </>
               ) : (
                 <>
@@ -566,4 +550,4 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
       )}
     </Card>
   );
-} 
+}

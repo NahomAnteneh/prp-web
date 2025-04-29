@@ -1,3 +1,4 @@
+import { AuthProvider } from "@/components/providers/auth-provider";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,5 +11,9 @@ export default function LoginLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <>
+  <AuthProvider>
+    {children}
+  </AuthProvider>
+  </>;
 } 

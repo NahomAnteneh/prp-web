@@ -33,10 +33,10 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username, idNumber, email, password, department, batchYear } = body;
+    const { firstName, lastName, username, idNumber, email, password, department, batchYear } = body;
 
     // Basic validation
-    if (!username || !email || !password || !department || !batchYear) {
+    if (!firstName || !lastName || !username || !email || !password || !department || !batchYear) {
       const response = NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -81,15 +81,17 @@ export async function POST(req: NextRequest) {
     // Create user
     const user = await prisma.user.create({
       data: {
+        firstName,
+        lastName,
         username,
+        email, // Moved email to the top level
         passwordHash,
         role: Role.STUDENT,
         profileInfo: {
           idNumber,
-          email,
           department,
           batchYear,
-        }
+        },
       },
     });
 
@@ -114,4 +116,4 @@ export async function POST(req: NextRequest) {
     );
     return addCorsHeaders(response);
   }
-} 
+}
