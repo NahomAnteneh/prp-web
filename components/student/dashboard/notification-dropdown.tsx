@@ -43,7 +43,7 @@ export default function NotificationDropdown({
     setError(null)
     
     try {
-      const response = await fetch('/api/notifications/recent')
+      const response = await fetch('/api/notifications')
       
       if (!response.ok) {
         throw new Error(`Failed to fetch notifications: ${response.statusText}`)

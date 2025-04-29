@@ -14,13 +14,13 @@ import RequestToJoinModal from '@/components/group/RequestToJoinModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/student/navbar';
 import Footer from '@/components/student/footer';
-import { Group } from '@/types/types';
+import { Group } from '@prisma/client'
 
 export default function GroupPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [groupData, setGroupData] = useState<Group | null>(null);
+  const [groupData, setGroupData] = useState<Group>({} as Group);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [showRequestToJoinModal, setShowRequestToJoinModal] = useState(false);
@@ -53,7 +53,7 @@ export default function GroupPage() {
         });
       } else {
         // User doesn't have a group
-        setGroupData(null);
+        setGroupData({} as Group);
       }
     } catch (error) {
       console.error('Failed to fetch group data:', error);
@@ -88,7 +88,7 @@ export default function GroupPage() {
   if (!groupData) {
     return (
       <>
-        <Navbar userName={session?.user?.username || ""} />
+        <Navbar />
         <div className="container mx-auto py-8 max-w-5xl">
           <div className="bg-muted/30 rounded-lg p-8 text-center">
             <h1 className="text-2xl font-bold mb-4">You are not part of any group</h1>
@@ -152,7 +152,7 @@ export default function GroupPage() {
   // User has a group - show group dashboard
   return (
     <>
-      <Navbar userName={session?.user?.username || ""} />
+      <Navbar/>
       <div className="container mx-auto py-6 max-w-6xl">
         <Tabs defaultValue="overview" className="mb-8">
           <TabsList className="grid w-full grid-cols-4">

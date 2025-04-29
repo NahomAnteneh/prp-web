@@ -15,7 +15,6 @@ interface ProfileInfoProps {
       email: string
       department: string
       batchYear: string
-      bio?: string
     }
   } | null
 }
@@ -33,7 +32,7 @@ export default function ProfileInfo({ user }: ProfileInfoProps) {
   }
   
   const { name, username, role, profileInfo } = user
-  const { idNumber, email, department, batchYear, bio } = profileInfo
+  const { idNumber, email, department, batchYear} = profileInfo
   
   return (
     <Card className="h-full">
@@ -47,12 +46,12 @@ export default function ProfileInfo({ user }: ProfileInfoProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div>
+        {/* <div>
           <h3 className="text-lg font-semibold mb-2">Bio</h3>
           <p className="text-muted-foreground">
             {bio || "No bio available."}
           </p>
-        </div>
+        </div> */}
         
         <div>
           <h3 className="text-lg font-semibold mb-3">Student Information</h3>
@@ -80,7 +79,7 @@ export default function ProfileInfo({ user }: ProfileInfoProps) {
           </dl>
         </div>
         
-        <div>
+        {/* <div>
           <h3 className="text-lg font-semibold mb-3">Skills</h3>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">Web Development</Badge>
@@ -90,7 +89,7 @@ export default function ProfileInfo({ user }: ProfileInfoProps) {
             <Badge variant="secondary">Python</Badge>
             <Badge variant="secondary">UI/UX</Badge>
           </div>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   )

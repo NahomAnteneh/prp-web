@@ -14,15 +14,15 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu"
+import { useSession } from "next-auth/react"
 
-export interface NavbarProps {
-  userName?: string
-}
-
-export default function Navbar({ userName }: NavbarProps) {
+export default function Navbar() {
+  const { data: session } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [displayName, setDisplayName] = useState<string>("Student")
   const [unreadCount, setUnreadCount] = useState(0)
+
+  const userName = session?.user.username;
 
   useEffect(() => {
     async function fetchNavbarData() {

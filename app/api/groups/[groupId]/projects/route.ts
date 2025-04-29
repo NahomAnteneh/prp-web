@@ -83,13 +83,13 @@ export async function GET() {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins/evaluators should see all projects
-    if (session.user.role !== 'ADMIN' && session.user.role !== 'EVALUATOR') {
-      return NextResponse.json(
-        { message: 'Forbidden' },
-        { status: 403 }
-      );
-    }
+    // // Only admins/evaluators should see all projects
+    // if (session.user.role !== 'ADMIN' && session.user.role !== 'EVALUATOR') {
+    //   return NextResponse.json(
+    //     { message: 'Forbidden' },
+    //     { status: 403 }
+    //   );
+    // }
 
     // Fetch projects from database
     const projects = await db.project.findMany({

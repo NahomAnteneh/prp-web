@@ -65,7 +65,7 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
   if (error) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Navbar unreadNotifications={0} userName={profileData?.name} />
+        <Navbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-8">
             <h2 className="text-2xl font-bold text-red-500 mb-2">Error</h2>
@@ -79,7 +79,7 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Navbar unreadNotifications={0} userName={profileData?.name} />
+      <Navbar />
       
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-8 md:px-6">
         {isLoading ? (
@@ -101,19 +101,6 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Profile Header */}
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/3">
-                <ProfileAvatar 
-                  name={profileData?.name || "Student"} 
-                  department={profileData?.profileInfo.department || ""}
-                  imageUrl="/placeholder-avatar.jpg"
-                />
-              </div>
-              <div className="md:w-2/3">
-                <ProfileInfo user={profileData} />
-              </div>
-            </div>
             
             {/* Tabs for different sections */}
             <Tabs defaultValue="overview" className="w-full">
@@ -133,11 +120,26 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
               </TabsList>
               
               <TabsContent value="overview" className="mt-6">
-                <GroupOverview userId={userId} />
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4 h-fit">
+                    <ProfileAvatar user={profileData} />
+                  </div>
+                  <div className="md:w-3/4 space-y-6">
+                    <GroupOverview userId={userId} />
+                    <RecentActivities userId={userId} />
+                  </div>
+                </div>
               </TabsContent>
               
               <TabsContent value="projects" className="mt-6">
-                <ProjectsList userId={userId} />
+              <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4">
+                    <ProfileAvatar user={profileData} />
+                  </div>
+                  <div className="md:w-3/4">
+                    <ProjectsList userId={userId} />
+                  </div>
+                </div>
               </TabsContent>
               
               <TabsContent value="activities" className="mt-6">

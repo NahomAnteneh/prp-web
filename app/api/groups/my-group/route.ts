@@ -32,7 +32,7 @@ export async function GET() {
                 },
               },
             },
-            project: {
+            projects: {
               select: {
                 id: true,
                 title: true,
@@ -65,6 +65,15 @@ export async function GET() {
                 },
               },
             },
+            repositories: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
           },
         },
       },
@@ -85,4 +94,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-} 
+}

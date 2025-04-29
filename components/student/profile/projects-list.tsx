@@ -26,41 +26,20 @@ export default function ProjectsList({ userId }: ProjectsListProps) {
   const [projects, setProjects] = useState<Project[]>([])
 
   useEffect(() => {
-    // In a real implementation, fetch projects data from an API
     const fetchProjects = async () => {
       try {
-        // Simulating API call with a timeout
-        setTimeout(() => {
-          setProjects([
-            {
-              id: "project-1",
-              title: "Project Repository Platform",
-              description: "A collaborative platform for managing student projects, enabling version control, task management, and advisor feedback.",
-              status: "Active",
-              lastUpdated: "2023-05-15",
-              advisor: "Dr. Jane Smith",
-              technologies: ["Next.js", "TypeScript", "PostgreSQL", "Prisma"]
-            },
-            {
-              id: "project-2",
-              title: "Academic Resource Sharing App",
-              description: "Mobile-first web application for sharing academic resources among students in the department.",
-              status: "Completed",
-              lastUpdated: "2022-12-10",
-              advisor: "Dr. Michael Johnson",
-              technologies: ["React Native", "Firebase", "Node.js"]
-            }
-          ])
-          setIsLoading(false)
-        }, 1000)
+        const response = await fetch(`/api/users/${userId}/projects`);
+        const data = await response.json();
+        setProjects(data);
       } catch (error) {
-        console.error("Error fetching projects:", error)
-        setIsLoading(false)
+        console.error("Error fetching projects:", error);
+      } finally {
+        setIsLoading(false);
       }
     }
 
-    fetchProjects()
-  }, [])
+    fetchProjects();
+  }, [userId])
 
   if (isLoading) {
     return (
@@ -163,4 +142,4 @@ export default function ProjectsList({ userId }: ProjectsListProps) {
       </CardContent>
     </Card>
   )
-} 
+}

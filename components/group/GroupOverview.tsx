@@ -2,8 +2,9 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Group } from '@prisma/client';
 import Link from 'next/link';
-import { Group } from '@/types/types'; // Adjusted the path to match the relative location
+
 
 export default function GroupOverview({
   group,
@@ -33,19 +34,66 @@ export default function GroupOverview({
         </Card>
 
         {/* Repositories Section */}
-        <h3 className="text-lg font-medium mb-3">Top Repositories and Projects</h3>
-        <div className="space-y-2">
-          {group.repositories?.map((repo) => (
-            <Link key={repo.id} href={`/repositories/${repo.id}`} passHref>
-              <Card className="hover:bg-gray-100 transition-colors cursor-pointer">
-                <CardContent className="p-4">
-                  <p className="font-medium text-black">{repo.name}</p>
-                  <p className="text-sm text-gray-500">{repo.description}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+    {/* Heading */}
+    <h3 className="text-base font-semibold mb-2 px-1">Repositories & Projects</h3>
+
+    {/* Conditional Rendering: Check if there's anything to display */}
+    {(!group.repositories || group.repositories.length === 0) &&
+     (!group.projects || group.projects.length === 0) ? (
+        // --- Empty State ---
+        <Card className="border-dashed mt-1 bg-muted/20">
+            <CardContent className="p-4 text-center">
+            <p className="text-sm text-muted-foreground italic">
+                No repositories or projects found.
+            </p>
+            </CardContent>
+        </Card>
+     ) : (
+        // --- Grid Container using Tailwind (Shadcn uses Tailwind) ---
+        <div className="grid grid-cols-2 gap-2.5 mt-1"> {/* 2 columns, adjust gap as needed */}
+
+            {/* Map over Repositories and render cards directly */}
+            {group.repositories?.map((repo) => (
+                <Link key={`repo-${repo.id}`} href={`/repositories/${repo.id}`} passHref legacyBehavior>
+                  {/* legacyBehavior needed for Card to correctly receive the click via <a> */}
+                  <a className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
+                      <CardContent className="p-3 flex-grow flex flex-col justify-center"> {/* Small padding, center content */}
+                        <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
+                          {repo.name}
+                        </p>
+                        {repo.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 text-center">
+                            {repo.description}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </a>
+                </Link>
+            ))}
+
+            {/* Map over Projects and render cards directly */}
+            {group.projects?.map((project) => (
+                <Link key={`proj-${project.id}`} href={`/projects/${project.id}`} passHref legacyBehavior>
+                  <a className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
+                       <CardContent className="p-3 flex-grow flex flex-col justify-center">
+                        <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
+                          {project.title} {/* Use project.title */}
+                        </p>
+                        {project.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 text-center">
+                            {project.description}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </a>
+                </Link>
+            ))}
         </div>
+     )}
       </div>
 
       {/* Right Section: Members */}
