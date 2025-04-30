@@ -3,9 +3,9 @@ import { CTA } from "@/components/landing/cta";
 import { Features } from "@/components/landing/features";
 import { Hero } from "@/components/landing/hero";
 import type { Metadata } from "next";
-import { Navbar } from "@/components/landing/navbar";
+import { Navbar } from "@/components/navbar";
 import StudentDashboard from "@/components/student/dashboard/student-dashboard";
-import { Footer } from "@/components/landing/footer";
+import { Footer } from "@/components/footer";
 import { Role } from "@prisma/client";
 import AdvisorDashboard from "@/components/advisor/dashboard/AdvisorDashboard";
 

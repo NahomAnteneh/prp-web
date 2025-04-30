@@ -88,16 +88,12 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
       try {
         setIsLoading(true)
         
-        // Determine what status to filter by based on active tab
-        const status = activeTab === "all" ? "ALL" : 
-                      activeTab === "todo" ? "TODO" : 
-                      activeTab === "in-progress" ? "IN_PROGRESS" : 
-                      activeTab === "done" ? "DONE" : "BLOCKED"
-        
         const origin = process.env.NEXT_PUBLIC_API_URL || "";
         
+        // All tasks will be fetched regardless of active tab
+        // We'll filter on the client side in the TasksTabContent component
         const response = await fetch(
-          `${origin}/api/users/${encodeURIComponent(userId)}/tasks`
+          `${origin}/api/users/${encodeURIComponent(userId)}/tasks?limit=20&sortBy=updatedAt&sortOrder=desc`
         )
         
         if (!response.ok) {
@@ -115,7 +111,7 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
     }
 
     fetchTasks()
-  }, [userId, activeTab])
+  }, [userId])
 
   // Helper to get status badge styling
   const getStatusBadge = (status: Task['status']) => {
@@ -332,7 +328,25 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
 
   // Inner component to render tasks list in each tab
   function TasksTabContent({ tasks }: { tasks: Task[] }) {
-    if (tasks.length === 0) {
+    // Filter tasks based on the active tab
+    const filteredTasks = activeTab === "all" 
+      ? tasks 
+      : tasks.filter(task => {
+          switch (activeTab) {
+            case "todo":
+              return task.status === "TODO";
+            case "in-progress":
+              return task.status === "IN_PROGRESS";
+            case "done":
+              return task.status === "DONE";
+            case "blocked":
+              return task.status === "BLOCKED";
+            default:
+              return true;
+          }
+        });
+
+    if (filteredTasks.length === 0) {
       return (
         <div className="text-center py-6">
           <p className="text-muted-foreground">No tasks found</p>
@@ -342,7 +356,7 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
 
     return (
       <div className="space-y-4">
-        {tasks.map(task => {
+        {filteredTasks.map(task => {
           const statusBadge = getStatusBadge(task.status)
           const priorityBadge = getPriorityBadge(task.priority)
           
