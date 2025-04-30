@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { User, Users, BookOpen, Clock, Folder } from "lucide-react"
+import { User, Users, BookOpen, Clock, Folder, ListChecks } from "lucide-react"
 import Image from "next/image"
 import Navbar from "../navbar"
 import Footer from "../footer"
@@ -12,6 +12,7 @@ import ProfileAvatar from "./profile-avatar"
 import ProfileOverview from "./profile-overview"
 import ProjectsList from "./projects-list"
 import RecentActivities from "./recent-activities"
+import TasksList from "./tasks-list"
 
 interface UserProfile {
   id: string
@@ -103,12 +104,15 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
             
             {/* Tabs for different sections */}
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview" className="flex items-center gap-2">
                   <Users className="h-4 w-4" /> Overview
                 </TabsTrigger>
                 <TabsTrigger value="projects" className="flex items-center gap-2">
                   <Folder className="h-4 w-4" /> Projects
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4" /> Tasks
                 </TabsTrigger>
                 <TabsTrigger value="activities" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" /> Activities
@@ -136,6 +140,17 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
                   </div>
                   <div className="md:w-3/4">
                     <ProjectsList userId={userId} />
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="tasks" className="mt-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4">
+                    <ProfileAvatar user={profileData} />
+                  </div>
+                  <div className="md:w-3/4">
+                    <TasksList userId={userId} />
                   </div>
                 </div>
               </TabsContent>
