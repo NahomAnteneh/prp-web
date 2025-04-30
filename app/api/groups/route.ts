@@ -2,7 +2,104 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { z } from 'zod';
 
+// Schema for group creation
+const createGroupSchema = z.object({
+  name: z.string().trim().min(1, 'Group name is required'),
+  description: z.string().optional(),
+});
+
+// GET: Retrieve all groups (with filtering capabilities)
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // URL query parameters for filtering
+    const url = new URL(req.url);
+    const nameFilter = url.searchParams.get('name');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const skip = (page - 1) * limit;
+
+    // Build filter condition
+    const whereCondition: any = {};
+    if (nameFilter) {
+      whereCondition.name = {
+        contains: nameFilter,
+        mode: 'insensitive', // Case-insensitive search
+      };
+    }
+
+    // Get total count for pagination
+    const totalGroups = await db.group.count({
+      where: whereCondition,
+    });
+
+    // Query groups with filtering, pagination, and data relations
+    const groups = await db.group.findMany({
+      where: whereCondition,
+      include: {
+        leader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            projects: true,
+            repositories: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+      skip: skip,
+    });
+
+    return NextResponse.json({
+      groups,
+      pagination: {
+        total: totalGroups,
+        pages: Math.ceil(totalGroups / limit),
+        currentPage: page,
+        limit
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching groups:', error);
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: Create a new group
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -39,15 +136,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await req.json();
-    const { name, description } = data;
-
-    if (!name || typeof name !== 'string' || name.trim() === '') {
+    // Parse and validate request data
+    const rawData = await req.json();
+    const validationResult = createGroupSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
       return NextResponse.json(
-        { message: 'Group name is required' },
+        { message: 'Invalid input', errors: validationResult.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+    
+    const { name, description } = validationResult.data;
 
     // Check if the group name is already taken
     const existingGroup = await db.group.findUnique({
@@ -105,7 +205,7 @@ export async function POST(req: NextRequest) {
       message: 'Group created successfully',
       group,
       maxGroupSize,
-    });
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating group:', error);
     return NextResponse.json(
