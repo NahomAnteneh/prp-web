@@ -44,7 +44,7 @@ export async function GET(
       )
     }
 
-    const userId = params.userId
+    const username = params.userId
 
     // Parse query parameters
     const url = new URL(request.url)
@@ -55,6 +55,20 @@ export async function GET(
         { status: 400 }
       )
     }
+
+    // Find user by username
+    const user = await prisma.user.findUnique({
+      where: { username }
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
+    }
+
+    const userId = user.id
 
     const queryParams = queryResult.data || {}
     const limit = queryParams.limit || 20
@@ -77,7 +91,7 @@ export async function GET(
 
     // Check authorization (users can only see their own tasks, or admins can see any)
     const isAuthorized = 
-      session.user.id === userId || 
+      session.user.username === username || 
       session.user.role === "ADMINISTRATOR"
     
     if (!isAuthorized) {
@@ -104,7 +118,22 @@ export async function GET(
 
     // If neither created nor assigned is true, return empty array
     if (whereCondition.OR.length === 0) {
-      return NextResponse.json([])
+      return NextResponse.json({
+        tasks: [],
+        pagination: {
+          total: 0,
+          limit,
+          offset,
+          hasMore: false,
+        },
+        counts: {
+          total: 0,
+          todo: 0,
+          inProgress: 0,
+          done: 0,
+          blocked: 0,
+        }
+      })
     }
 
     // Filter by status if provided
@@ -149,19 +178,7 @@ export async function GET(
     // Fetch tasks with related data
     const tasks = await prisma.task.findMany({
       where: whereCondition,
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        deadline: true,
-        technologies: true,
-        createdAt: true,
-        updatedAt: true,
-        creatorId: true,
-        assigneeId: true,
-        projectId: true,
+      include: {
         creator: {
           select: {
             id: true,

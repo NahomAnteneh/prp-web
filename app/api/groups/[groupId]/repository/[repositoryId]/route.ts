@@ -18,52 +18,13 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { groupId, repositoryId } = params;
 
-    // Find the group to verify it exists and check permissions
-    const group = await db.group.findUnique({
-      where: { id: groupId },
-      include: {
-        members: {
-          select: {
-            userId: true,
-          },
-        },
-      },
-    });
-
-    if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if user has access to this group
-    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.id);
-    const isGroupLeader = group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupMember && !isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to view this repository' },
-        { status: 403 }
-      );
-    }
-
-    // Find the repository
+    // Find the repository first to check privacy
     const repository = await db.repository.findUnique({
       where: {
         id: repositoryId,
-        groupId, // Ensure repository belongs to the specified group
+        groupId,
       },
       include: {
         owner: {
@@ -78,6 +39,12 @@ export async function GET(
           select: {
             id: true,
             name: true,
+            members: {
+              select: {
+                userId: true,
+              },
+            },
+            leaderId: true,
           },
         },
         branches: {
@@ -106,6 +73,32 @@ export async function GET(
       return NextResponse.json(
         { message: 'Repository not found' },
         { status: 404 }
+      );
+    }
+
+    // If repository is public, no authentication needed
+    if (!repository.isPrivate) {
+      return NextResponse.json(repository);
+    }
+    
+    // For private repositories, check authentication
+    if (!session?.user) {
+      return NextResponse.json(
+        { message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has access to this private repository
+    const isGroupMember = repository.group?.members.some((member: { userId: string }) => member.userId === session.user.id) || false;
+    const isGroupLeader = repository.group?.leaderId === session.user.id || false;
+    const isRepoOwner = repository.ownerId === session.user.id;
+    const isAdmin = session.user.role === 'ADMINISTRATOR';
+
+    if (!isGroupMember && !isGroupLeader && !isRepoOwner && !isAdmin) {
+      return NextResponse.json(
+        { message: 'You do not have permission to view this private repository' },
+        { status: 403 }
       );
     }
 
@@ -213,7 +206,7 @@ export async function PATCH(
       }
     }
 
-    // Update the repository
+    // Update the repository (including privacy setting if provided)
     const updatedRepository = await db.repository.update({
       where: {
         id: repositoryId,

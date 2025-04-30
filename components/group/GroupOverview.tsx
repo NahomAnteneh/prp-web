@@ -2,14 +2,41 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Group } from '@prisma/client';
 import Link from 'next/link';
 
+// Extended group interface to include the nested properties
+interface ExtendedGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  leaderId: string;
+  repositories?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+  projects?: Array<{
+    id: string;
+    title: string;
+    description?: string;
+  }>;
+  members?: Array<{
+    userId: string;
+    user?: {
+      id: string;
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+    };
+  }>;
+}
 
 export default function GroupOverview({
   group,
 }: {
-  group: Group;
+  group: ExtendedGroup;
   maxGroupSize?: number;
   isLeader?: boolean;
   onUpdate?: () => void;
@@ -54,42 +81,45 @@ export default function GroupOverview({
 
             {/* Map over Repositories and render cards directly */}
             {group.repositories?.map((repo) => (
-                <Link key={`repo-${repo.id}`} href={`/repositories/${repo.id}`} passHref legacyBehavior>
-                  {/* legacyBehavior needed for Card to correctly receive the click via <a> */}
-                  <a className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
-                      <CardContent className="p-3 flex-grow flex flex-col justify-center"> {/* Small padding, center content */}
-                        <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
-                          {repo.name}
+                <Link 
+                  key={`repo-${repo.id}`} 
+                  href={`/repositories/${repo.id}`}
+                  className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
+                    <CardContent className="p-3 flex-grow flex flex-col justify-center"> {/* Small padding, center content */}
+                      <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
+                        {repo.name}
+                      </p>
+                      {repo.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 text-center">
+                          {repo.description}
                         </p>
-                        {repo.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 text-center">
-                            {repo.description}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </a>
+                      )}
+                    </CardContent>
+                  </Card>
                 </Link>
             ))}
 
             {/* Map over Projects and render cards directly */}
             {group.projects?.map((project) => (
-                <Link key={`proj-${project.id}`} href={`/projects/${project.id}`} passHref legacyBehavior>
-                  <a className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
-                       <CardContent className="p-3 flex-grow flex flex-col justify-center">
-                        <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
-                          {project.title} {/* Use project.title */}
+                <Link 
+                  key={`proj-${project.id}`} 
+                  href={`/projects/${project.id}`}
+                  className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
+                    <CardContent className="p-3 flex-grow flex flex-col justify-center">
+                      <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
+                        {project.title} {/* Use project.title */}
+                      </p>
+                      {project.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 text-center">
+                          {project.description}
                         </p>
-                        {project.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 text-center">
-                            {project.description}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </a>
+                      )}
+                    </CardContent>
+                  </Card>
                 </Link>
             ))}
         </div>
@@ -104,17 +134,15 @@ export default function GroupOverview({
           </CardHeader>
           <CardContent className="flex gap-2 flex-wrap">
             {group.members?.map((member) => (
-              <Link key={member.userId} href={`/${member.user?.username || '#'}`} passHref>
-                <div className="group relative">
-                  <Avatar className="h-10 w-10 cursor-pointer">
-                    <AvatarFallback>
-                      {member.user?.firstName ? member.user.firstName.charAt(0).toUpperCase() : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                    {member.user?.firstName} {member.user?.lastName}
-                  </span>
-                </div>
+              <Link key={member.userId} href={`/${member.user?.username || '#'}`} className="group relative">
+                <Avatar className="h-10 w-10 cursor-pointer">
+                  <AvatarFallback>
+                    {member.user?.firstName ? member.user.firstName.charAt(0).toUpperCase() : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                  {member.user?.firstName} {member.user?.lastName}
+                </span>
               </Link>
             ))}
           </CardContent>

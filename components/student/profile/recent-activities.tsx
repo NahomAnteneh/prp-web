@@ -9,6 +9,7 @@ import Link from "next/link"
 
 interface RecentActivitiesProps {
   userId: string
+  isOwner?: boolean
 }
 
 interface Activity {
@@ -21,7 +22,7 @@ interface Activity {
   relatedTo?: string
 }
 
-export default function RecentActivities({ userId }: RecentActivitiesProps) {
+export default function RecentActivities({ userId, isOwner = false }: RecentActivitiesProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [activities, setActivities] = useState<Activity[]>([])
 
@@ -175,9 +176,11 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" /> Recent Activities
             </CardTitle>
-            <CardDescription>Your recent activities across projects</CardDescription>
+            <CardDescription>
+              {isOwner ? "Your recent activities across projects" : "Recent activities across projects"}
+            </CardDescription>
           </div>
-          <Button size="sm" variant="outline">View All</Button>
+          {isOwner && <Button size="sm" variant="outline">View All</Button>}
         </div>
       </CardHeader>
       <CardContent>

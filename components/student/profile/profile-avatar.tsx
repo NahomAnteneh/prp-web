@@ -19,9 +19,10 @@ interface ProfileAvatarProps {
       batchYear: string
     }
   } | null
+  isOwner?: boolean
 }
 
-export default function ProfileAvatar({ user}: ProfileAvatarProps) {
+export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarProps) {
   if (!user) {
     return (
       <Card>
@@ -56,11 +57,13 @@ export default function ProfileAvatar({ user}: ProfileAvatarProps) {
         </div>
       </CardHeader>
       <CardContent className="p-6 flex flex-col items-center">
-        <div className="flex flex-wrap gap-2 w-full mb-4">
-          <Button variant="outline" size="sm" className="w-full gap-2 mt-2">
-            <Edit className="h-4 w-4" /> Edit Profile
-          </Button>
-        </div>
+        {isOwner && (
+          <div className="flex flex-wrap gap-2 w-full mb-4">
+            <Button variant="outline" size="sm" className="w-full gap-2 mt-2">
+              <Edit className="h-4 w-4" /> Edit Profile
+            </Button>
+          </div>
+        )}
 
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center gap-2">

@@ -23,6 +23,7 @@ import { format } from 'date-fns'
 
 interface TasksListProps {
   userId: string
+  isOwner?: boolean
 }
 
 interface Task {
@@ -76,7 +77,7 @@ interface TaskResponse {
   }
 }
 
-export default function TasksList({ userId }: TasksListProps) {
+export default function TasksList({ userId, isOwner = false }: TasksListProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("all")
@@ -93,8 +94,10 @@ export default function TasksList({ userId }: TasksListProps) {
                       activeTab === "in-progress" ? "IN_PROGRESS" : 
                       activeTab === "done" ? "DONE" : "BLOCKED"
         
+        const origin = process.env.NEXT_PUBLIC_API_URL || "";
+        
         const response = await fetch(
-          `/api/users/${userId}/tasks?status=${status}&limit=20&sortBy=updatedAt&sortOrder=desc`
+          `${origin}/api/users/${encodeURIComponent(userId)}/tasks`
         )
         
         if (!response.ok) {

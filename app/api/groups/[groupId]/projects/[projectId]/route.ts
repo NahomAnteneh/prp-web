@@ -124,7 +124,7 @@ export async function GET(
           },
         },
         repositories: {
-          include: {
+              include: {
             repository: {
               select: {
                 id: true,
@@ -248,7 +248,7 @@ export async function PATCH(
         { status: 403 }
       );
     }
-
+    
     // Validate input data
     const rawData = await req.json();
     const validationResult = updateProjectSchema.safeParse(rawData);
@@ -273,8 +273,8 @@ export async function PATCH(
         return NextResponse.json(
           { message: 'Advisor not found' },
           { status: 404 }
-        );
-      }
+      );
+    }
 
       if (advisor.role !== 'ADVISOR') {
         return NextResponse.json(

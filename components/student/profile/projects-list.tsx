@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress"
 
 interface ProjectsListProps {
   userId: string
+  isOwner?: boolean
 }
 
 interface Project {
@@ -24,7 +25,7 @@ interface Project {
   views?: number
 }
 
-export default function ProjectsList({ userId }: ProjectsListProps) {
+export default function ProjectsList({ userId, isOwner = false }: ProjectsListProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [projects, setProjects] = useState<Project[]>([])
 
@@ -118,8 +119,10 @@ export default function ProjectsList({ userId }: ProjectsListProps) {
         </CardHeader>
         <CardContent>
           <div className="text-center py-6">
-            <p className="mb-4 text-muted-foreground">You haven't started any projects yet.</p>
-            <Button>Create New Project</Button>
+            <p className="mb-4 text-muted-foreground">
+              {isOwner ? "You haven't started any projects yet." : "This user hasn't started any projects yet."}
+            </p>
+            {isOwner && <Button>Create New Project</Button>}
           </div>
         </CardContent>
       </Card>
@@ -148,9 +151,11 @@ export default function ProjectsList({ userId }: ProjectsListProps) {
             <CardTitle className="flex items-center gap-2">
               <Folder className="h-5 w-5 text-primary" /> Projects
             </CardTitle>
-            <CardDescription>Your current and past projects</CardDescription>
+            <CardDescription>
+              {isOwner ? "Your current and past projects" : "Current and past projects"}
+            </CardDescription>
           </div>
-          <Button size="sm">New Project</Button>
+          {isOwner && <Button size="sm">New Project</Button>}
         </div>
       </CardHeader>
       <CardContent>

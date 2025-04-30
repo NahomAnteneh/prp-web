@@ -9,6 +9,7 @@ import Link from "next/link"
 
 interface ProfileOverviewProps {
   userId: string
+  isOwner?: boolean
 }
 
 interface Group {
@@ -30,7 +31,7 @@ interface ProjectSummary {
   status: string
 }
 
-export default function ProfileOverview({ userId }: ProfileOverviewProps) {
+export default function ProfileOverview({ userId, isOwner = false }: ProfileOverviewProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [groupInfo, setGroupInfo] = useState<Group | null>(null)
   const [topRepositories, setTopRepositories] = useState<Repository[]>([])
