@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, GitCommit, GitPullRequest, MessageSquare, CheckCircle, Circle } from "lucide-react"
+import Link from "next/link"
 
 interface RecentActivitiesProps {
   userId: string
@@ -25,11 +26,18 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
   const [activities, setActivities] = useState<Activity[]>([])
 
   useEffect(() => {
-    // In a real implementation, fetch activities data from an API
     const fetchActivities = async () => {
       try {
-        // Simulating API call with a timeout
-        setTimeout(() => {
+        // In a real implementation, fetch from the API
+        const response = await fetch(`/api/users/${userId}/activities`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch activities");
+        }
+        const data = await response.json();
+        setActivities(data);
+      } catch (error) {
+        console.error("Error fetching activities:", error);
+        // Fallback to mock data if API fails
           setActivities([
             {
               id: "activity-1",
@@ -75,17 +83,15 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
               timestamp: "2 weeks ago",
               project: "Project Repository Platform"
             }
-          ])
-          setIsLoading(false)
-        }, 1000)
-      } catch (error) {
-        console.error("Error fetching activities:", error)
-        setIsLoading(false)
+        ]);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchActivities()
-  }, [])
+    // For now use mock data, in a real app you'd use fetchActivities()
+    fetchActivities();
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -147,17 +153,17 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
   const getActivityColor = (type: Activity["type"]) => {
     switch (type) {
       case "commit":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
       case "pull_request":
-        return "bg-purple-100 text-purple-800"
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400"
       case "comment":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
       case "task":
-        return "bg-amber-100 text-amber-800"
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400"
       case "milestone":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400"
     }
   }
 

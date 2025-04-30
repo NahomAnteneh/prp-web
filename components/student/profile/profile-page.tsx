@@ -9,8 +9,7 @@ import Footer from "../footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProfileAvatar from "./profile-avatar"
-import ProfileInfo from "./profile-info"
-import GroupOverview from "./group-overview"
+import ProfileOverview from "./profile-overview"
 import ProjectsList from "./projects-list"
 import RecentActivities from "./recent-activities"
 
@@ -125,14 +124,13 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
                     <ProfileAvatar user={profileData} />
                   </div>
                   <div className="md:w-3/4 space-y-6">
-                    <GroupOverview userId={userId} />
-                    <RecentActivities userId={userId} />
+                    <ProfileOverview userId={userId} />
                   </div>
                 </div>
               </TabsContent>
               
               <TabsContent value="projects" className="mt-6">
-              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex flex-col md:flex-row gap-6">
                   <div className="md:w-1/4">
                     <ProfileAvatar user={profileData} />
                   </div>
@@ -143,7 +141,14 @@ export default function StudentProfilePage({ userId: propUserId }: StudentProfil
               </TabsContent>
               
               <TabsContent value="activities" className="mt-6">
-                <RecentActivities userId={userId} />
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4">
+                    <ProfileAvatar user={profileData} />
+                  </div>
+                  <div className="md:w-3/4">
+                    <RecentActivities userId={userId} />
+                  </div>
+                </div>
               </TabsContent>
               
               <TabsContent value="documents" className="mt-6">
