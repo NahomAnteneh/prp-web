@@ -6,14 +6,15 @@ import { MegaphoneIcon, ChevronRight, ChevronDown } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Announcement } from "@prisma/client"
 
-export interface Announcement {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  priority: number
-}
+// export interface Announcement {
+//   id: string
+//   title: string
+//   content: string
+//   createdAt: Date
+//   priority: number
+// }
 
 interface AnnouncementsProps {
   announcements: Announcement[]

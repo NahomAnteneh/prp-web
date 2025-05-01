@@ -25,7 +25,8 @@ export default function GroupPage() {
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [showRequestToJoinModal, setShowRequestToJoinModal] = useState(false);
   const [maxGroupSize, setMaxGroupSize] = useState(4); // Default, will be updated from rules
-  
+  const [unreadNotifications, setUnreadNotifications] = useState(0); // State for unread notifications
+
   useEffect(() => {
     // If user not authenticated, redirect to login
     if (status === 'unauthenticated') {
@@ -34,12 +35,16 @@ export default function GroupPage() {
     }
 
     if (status === 'authenticated') {
-      // Fetch current user's group informationput the GroupOverviewon the left side as a side bar and also make it smaller and 
+      // Fetch current user's group information
       fetchGroupData();
       // Fetch rules including max group size
       fetchMaxGroupSize();
+      // Fetch unread notifications
+      fetchUnreadNotifications();
     }
   }, [status, session, router]);
+
+  const username = session?.user.username;
 
   const fetchGroupData = async () => {
     try {
@@ -75,6 +80,21 @@ export default function GroupPage() {
     }
   };
 
+  const fetchUnreadNotifications = async () => {
+    try {
+      const response = await fetch('/api/notifications');
+      const data = await response.json();
+
+      if (response.ok) {
+        setUnreadNotifications(data.unreadCount);
+      } else {
+        console.error('Failed to fetch unread notifications:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
@@ -88,7 +108,7 @@ export default function GroupPage() {
   if (!groupData) {
     return (
       <>
-        <Navbar />
+        <Navbar unreadNotifications={unreadNotifications} userName={username} />
         <div className="container mx-auto py-8 max-w-5xl">
           <div className="bg-muted/30 rounded-lg p-8 text-center">
             <h1 className="text-2xl font-bold mb-4">You are not part of any group</h1>
@@ -152,7 +172,7 @@ export default function GroupPage() {
   // User has a group - show group dashboard
   return (
     <>
-      <Navbar/>
+      <Navbar unreadNotifications={unreadNotifications} userName={username} />
       <div className="container mx-auto py-6 max-w-6xl">
         <Tabs defaultValue="overview" className="mb-8">
           <TabsList className="grid w-full grid-cols-4">

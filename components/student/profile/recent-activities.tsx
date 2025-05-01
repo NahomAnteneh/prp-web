@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, GitCommit, GitPullRequest, MessageSquare, CheckCircle, Circle } from "lucide-react"
-import Link from "next/link"
+// import Link from "next/link"
 
 interface RecentActivitiesProps {
   userId: string
@@ -29,7 +29,6 @@ export default function RecentActivities({ userId, isOwner = false }: RecentActi
   useEffect(() => {
     const fetchActivities = async () => {
       try {
-        // In a real implementation, fetch from the API
         const response = await fetch(`/api/users/${userId}/activities`);
         if (!response.ok) {
           throw new Error("Failed to fetch activities");
@@ -38,59 +37,11 @@ export default function RecentActivities({ userId, isOwner = false }: RecentActi
         setActivities(data);
       } catch (error) {
         console.error("Error fetching activities:", error);
-        // Fallback to mock data if API fails
-          setActivities([
-            {
-              id: "activity-1",
-              type: "commit",
-              title: "Added profile components",
-              description: "Created student profile components with responsive design",
-              timestamp: "2 hours ago",
-              project: "Project Repository Platform",
-              relatedTo: "feature/student-profile"
-            },
-            {
-              id: "activity-2",
-              type: "pull_request",
-              title: "Merge: Group Dashboard UI",
-              description: "Implemented UI components for group dashboard view",
-              timestamp: "Yesterday",
-              project: "Project Repository Platform",
-              relatedTo: "PR #42"
-            },
-            {
-              id: "activity-3",
-              type: "comment",
-              title: "Comment on Task",
-              description: "Added implementation details for the authentication system",
-              timestamp: "3 days ago",
-              project: "Project Repository Platform",
-              relatedTo: "Task #15"
-            },
-            {
-              id: "activity-4",
-              type: "task",
-              title: "Completed Task",
-              description: "Finalized database schema for user profiles",
-              timestamp: "1 week ago",
-              project: "Project Repository Platform",
-              relatedTo: "Task #8"
-            },
-            {
-              id: "activity-5",
-              type: "milestone",
-              title: "Milestone Reached",
-              description: "Completed Phase 1: Project Setup and Architecture",
-              timestamp: "2 weeks ago",
-              project: "Project Repository Platform"
-            }
-        ]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    // For now use mock data, in a real app you'd use fetchActivities()
     fetchActivities();
   }, [userId]);
 
@@ -224,4 +175,4 @@ export default function RecentActivities({ userId, isOwner = false }: RecentActi
       </CardContent>
     </Card>
   )
-} 
+}

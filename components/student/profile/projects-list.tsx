@@ -7,22 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Folder, ExternalLink, Calendar, User, GitBranch, Eye } from "lucide-react"
 import Link from "next/link"
 import { Progress } from "@/components/ui/progress"
+import { Project } from "@prisma/client"
 
 interface ProjectsListProps {
   userId: string
   isOwner?: boolean
-}
-
-interface Project {
-  id: string
-  title: string
-  description: string
-  status: "Active" | "Completed" | "Draft"
-  lastUpdated: string
-  advisor: string
-  technologies: string[]
-  progress?: number
-  views?: number
 }
 
 export default function ProjectsList({ userId, isOwner = false }: ProjectsListProps) {
@@ -34,60 +23,16 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
       try {
         const response = await fetch(`/api/users/${userId}/projects`);
         const data = await response.json();
-        
-        // Add some mock data for visualization if needed
-        const enhancedData = data.map((project: any) => ({
-          ...project,
-          progress: Math.floor(Math.random() * 100),
-          views: Math.floor(Math.random() * 100) + 10
-        }));
-        
-        setProjects(enhancedData);
+        setProjects(data);
       } catch (error) {
         console.error("Error fetching projects:", error);
-        // Mock data as fallback
-        setProjects([
-          {
-            id: "project-1",
-            title: "Project Repository Platform",
-            description: "A web application for managing student projects with version control integration",
-            status: "Active",
-            lastUpdated: "2 days ago",
-            advisor: "Dr. Sarah Johnson",
-            technologies: ["React", "Next.js", "TypeScript", "Prisma"],
-            progress: 65,
-            views: 87
-          },
-          {
-            id: "project-2",
-            title: "AI Study Assistant",
-            description: "An AI-powered assistant to help students with research and study materials",
-            status: "Draft",
-            lastUpdated: "1 week ago",
-            advisor: "Prof. Michael Chen",
-            technologies: ["Python", "TensorFlow", "React", "Node.js"],
-            progress: 30,
-            views: 45
-          },
-          {
-            id: "project-3",
-            title: "Smart Campus Navigation",
-            description: "Mobile application for campus navigation and resource finding",
-            status: "Completed",
-            lastUpdated: "3 months ago",
-            advisor: "Dr. Emily Rodriguez",
-            technologies: ["Flutter", "Firebase", "Google Maps API"],
-            progress: 100,
-            views: 120
-          }
-        ]);
       } finally {
         setIsLoading(false);
       }
-    }
+    };
 
     fetchProjects();
-  }, [userId])
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -105,7 +50,7 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (projects.length === 0) {
@@ -126,7 +71,7 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   // Helper function to get appropriate color for status badge

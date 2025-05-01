@@ -32,9 +32,13 @@ const querySchema = z.object({
 
 export async function GET(
   request: Request,
-  { params }: { params: { userId: string } }
+  context: { params: { userId: string } }
 ) {
   try {
+    // Await params before accessing its properties
+    const { params } = context;
+    const username = params.userId;
+
     // Validate userId
     const parsedParams = userIdSchema.safeParse(params.userId)
     if (!parsedParams.success) {
@@ -43,8 +47,6 @@ export async function GET(
         { status: 400 }
       )
     }
-
-    const username = params.userId
 
     // Parse query parameters
     const url = new URL(request.url)
@@ -68,7 +70,7 @@ export async function GET(
       )
     }
 
-    const userId = user.id
+    const userId = user.username
 
     const queryParams = queryResult.data || {}
     const limit = queryParams.limit || 20
@@ -136,7 +138,7 @@ export async function GET(
       })
     }
 
-    // Filter by status if provided
+    // Filter by status if providedid
     if (queryParams.status && queryParams.status !== "ALL") {
       whereCondition.status = queryParams.status
     }

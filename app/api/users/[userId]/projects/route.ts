@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { z } from "zod"
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
 
-const userIdSchema = z.string().min(1)
+// const userIdSchema = z.string().min(1)
 
 // Query parameter schema
 const querySchema = z.object({
@@ -20,16 +18,17 @@ export async function GET(
   { params }: { params: { userId: string } }
 ) {
   try {
-    // Validate userId
-    const parsedParams = userIdSchema.safeParse(params.userId)
-    if (!parsedParams.success) {
-      return NextResponse.json(
-        { error: "Invalid user ID format" },
-        { status: 400 }
-      )
-    }
+    // Await params before accessing its properties
+    const { userId } = await params
 
-    const userId = params.userId
+    // Validate userId
+    // const parsedParams = userIdSchema.safeParse(userId)
+    // if (!parsedParams.success) {
+    //   return NextResponse.json(
+    //     { error: "Invalid user ID format" },
+    //     { status: 400 }
+    //   )
+    // }
 
     // Parse query parameters
     const url = new URL(request.url)
@@ -44,35 +43,14 @@ export async function GET(
     const queryParams = queryResult.data || {}
     const limit = queryParams.limit || 10
 
-    // Get the authenticated user session
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      )
-    }
-
-    // Check authorization (users can only see their own data, or admins can see any)
-    const isAuthorized = 
-      session.user.id === userId || 
-      session.user.role === "ADMINISTRATOR"
-    
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Not authorized to view this user's projects" },
-        { status: 403 }
-      )
-    }
-
     // Get user's groups
     const userGroups = await prisma.groupMember.findMany({
       where: { userId },
       select: { groupId: true }
     })
-    
+
     const groupIds = userGroups.map((ug: { groupId: string }) => ug.groupId)
-    
+
     if (groupIds.length === 0) {
       return NextResponse.json([]) // Return empty array if user is not in any group
     }
@@ -131,7 +109,6 @@ export async function GET(
             id: true,
             title: true,
             description: true,
-            technologies: true,
           },
           take: 5,
         },
@@ -144,26 +121,9 @@ export async function GET(
 
     // Extract technologies from tasks and format the response
     const formattedProjects = projects.map((project: any) => {
-      // Extract unique technologies from tasks (if they exist)
-      const allTechnologies: string[] = [];
-      
-      // Collect all technologies from tasks
-      project.tasks.forEach((task: any) => {
-        if (task.technologies && Array.isArray(task.technologies)) {
-          task.technologies.forEach((tech: string) => {
-            if (!allTechnologies.includes(tech)) {
-              allTechnologies.push(tech);
-            }
-          });
-        }
-      });
-      
-      // Limit to 5 technologies
-      const technologies = allTechnologies.slice(0, 5);
-
       // Determine if the user is the group leader
       const isGroupLeader = project.group.leaderId === userId
-      
+
       // Get last updated time in human-readable format
       const lastUpdated = formatTimeAgo(project.updatedAt)
 
@@ -187,7 +147,6 @@ export async function GET(
         } : null,
         isGroupLeader,
         isAdvisor: project.advisorId === userId,
-        technologies,
         milestones: project.milestones,
         stats: {
           tasks: project._count.tasks,

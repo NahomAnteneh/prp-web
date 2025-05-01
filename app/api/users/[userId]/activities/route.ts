@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { z } from "zod"
 
 // Initialize Prisma client
@@ -44,27 +42,6 @@ export async function GET(
     const queryParams = queryResult.data || {}
     const limit = queryParams.limit || 10
     const offset = queryParams.offset || 0
-
-    // Get the authenticated user session
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      )
-    }
-
-    // Check authorization (users can only see their own data, or admins can see any)
-    const isAuthorized = 
-      session.user.id === userId || 
-      session.user.role === "ADMINISTRATOR"
-    
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Not authorized to view this user's activities" },
-        { status: 403 }
-      )
-    }
 
     // 1. Get recent commits
     const commits = await prisma.commit.findMany({
@@ -313,4 +290,4 @@ function formatTimeAgo(date: Date): string {
 function truncateMessage(message: string, maxLength: number = 100): string {
   if (message.length <= maxLength) return message;
   return message.substring(0, maxLength) + '...';
-} 
+}

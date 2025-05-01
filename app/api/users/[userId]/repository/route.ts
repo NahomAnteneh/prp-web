@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { z } from "zod"
 
 // Initialize Prisma client
@@ -17,19 +15,21 @@ const querySchema = z.object({
 
 export async function GET(
   request: Request,
-  { params }: { params: { userId: string } }
+  context: { params: { userId: string } }
 ) {
   try {
+    // Await params before accessing its properties
+    const { params } = context;
+    const userId = params.userId;
+
     // Validate userId
-    const parsedParams = userIdSchema.safeParse(params.userId)
+    const parsedParams = userIdSchema.safeParse(userId);
     if (!parsedParams.success) {
       return NextResponse.json(
         { error: "Invalid user ID format" },
         { status: 400 }
-      )
+      );
     }
-
-    const userId = params.userId
 
     // Parse query parameters
     const url = new URL(request.url)
@@ -44,27 +44,6 @@ export async function GET(
     const queryParams = queryResult.data || {}
     const limit = queryParams.limit || 10
     const includeGroupRepos = queryParams.includeGroupRepos ?? true
-
-    // Get the authenticated user session
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      )
-    }
-
-    // Check authorization (users can only see their own data, or admins can see any)
-    const isAuthorized = 
-      session.user.id === userId || 
-      session.user.role === "ADMINISTRATOR"
-    
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Not authorized to view this user's repositories" },
-        { status: 403 }
-      )
-    }
 
     // Get user's groups for group repository lookup
     let groupIds: string[] = []

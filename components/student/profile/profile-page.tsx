@@ -34,13 +34,14 @@ interface UserProfile {
 
 interface StudentProfilePageProps {
   userId?: string
-  username?: string
+  username: string
+  owner: boolean
 }
 
-export default function StudentProfilePage({ userId: propUserId, username: propUsername }: StudentProfilePageProps) {
-  const params = useParams()
+export default function StudentProfilePage({ userId: propUserId, username: propUsername, owner: propOwner }: StudentProfilePageProps) {
   const userId = propUserId 
-  const username = propUsername || userId || (params?.userId as string)
+  const username = propUsername
+  const owner = propOwner
   const [isLoading, setIsLoading] = useState(true)
   const [profileData, setProfileData] = useState<UserProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -58,9 +59,8 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
 
       try {
         setIsLoading(true);
-        const origin = process.env.NEXT_PUBLIC_API_URL || "";
         
-        const response = await fetch(`${origin}/api/users/${encodeURIComponent(username)}`, {
+        const response = await fetch(`/api/users/${username}`, {
           credentials: 'include',
         });
         

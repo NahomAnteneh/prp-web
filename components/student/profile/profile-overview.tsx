@@ -7,22 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Github, GitBranch, Users, Folder, BarChart3 } from "lucide-react"
 import Link from "next/link"
 
+import { Group, Repository, Project } from "@prisma/client"
+
 interface ProfileOverviewProps {
   userId: string
   isOwner?: boolean
-}
-
-interface Group {
-  id: string
-  name: string
-  memberCount: number
-}
-
-interface Repository {
-  id: string
-  name: string
-  description: string
-  lastActivity: string
 }
 
 interface ProjectSummary {
@@ -53,7 +42,16 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
         // Fetch repositories
         const reposResponse = await fetch(`/api/users/${userId}/repository`);
         const reposData = await reposResponse.json();
-        setTopRepositories(reposData.slice(0, 3)); // Get top 3 repositories
+
+        // Handle cases where the response is an object with a `repositories` property
+        const repositories = Array.isArray(reposData) ? reposData : reposData.repositories;
+
+        if (Array.isArray(repositories)) {
+          setTopRepositories(repositories.slice(0, 3)); // Get top 3 repositories
+        } else {
+          console.error("Unexpected repositories data format:", reposData);
+          setTopRepositories([]); // Fallback to an empty array
+        }
 
         // Fetch projects
         const projectsResponse = await fetch(`/api/users/${userId}/projects`);
@@ -65,10 +63,9 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
         })));
 
         // Fetch stats
-        // In a real app, this might be a dedicated endpoint
         setStats({
-          commits: 47,
-          repositories: reposData.length || 0,
+          commits: repositories.reduce((sum: number, repo: any) => sum + (repo.commits || 0), 0),
+          repositories: repositories.length || 0,
           projects: projectsData.length || 0,
         });
       } catch (error) {
@@ -78,54 +75,7 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
       }
     };
 
-    // Mock data for development
-    const mockData = () => {
-      setGroupInfo({
-        id: "group-1",
-        name: "Team Innovators",
-        memberCount: 4
-      });
-
-      setTopRepositories([
-        {
-          id: "repo-1",
-          name: "project-repo-platform",
-          description: "A web platform for managing student projects",
-          lastActivity: "2 days ago"
-        },
-        {
-          id: "repo-2",
-          name: "ai-study-assistant",
-          description: "AI-powered study assistant for students",
-          lastActivity: "1 week ago"
-        }
-      ]);
-
-      setRecentProjects([
-        {
-          id: "project-1",
-          title: "Project Repository Platform",
-          status: "Active"
-        },
-        {
-          id: "project-2",
-          title: "AI Study Assistant",
-          status: "Draft"
-        }
-      ]);
-
-      setStats({
-        commits: 47,
-        repositories: 3,
-        projects: 2
-      });
-
-      setIsLoading(false);
-    };
-
-    // Use mock data for now, replace with fetchData in production
-    mockData();
-    // fetchData();
+    fetchData();
   }, [userId]);
 
   if (isLoading) {
@@ -219,7 +169,7 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
               <div>
                 <h3 className="font-medium text-lg">{groupInfo.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {groupInfo.memberCount} members
+                  {groupInfo.members} members
                 </p>
               </div>
               <Button size="sm" variant="outline" className="mt-2 md:mt-0">

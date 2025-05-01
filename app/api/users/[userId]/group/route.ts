@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { z } from "zod"
 
 // Initialize Prisma client
@@ -24,27 +22,6 @@ export async function GET(
     }
 
     const userId = params.userId
-
-    // Get the authenticated user session
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      )
-    }
-
-    // Check authorization (users can only see their own data, or admins can see any)
-    const isAuthorized = 
-      session.user.id === userId || 
-      session.user.role === "ADMINISTRATOR"
-    
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Not authorized to view this user's group information" },
-        { status: 403 }
-      )
-    }
 
     // Find the user's groups
     const userGroups = await prisma.groupMember.findMany({
@@ -117,4 +94,4 @@ export async function GET(
       { status: 500 }
     )
   }
-} 
+}

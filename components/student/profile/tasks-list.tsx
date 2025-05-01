@@ -87,13 +87,10 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
     const fetchTasks = async () => {
       try {
         setIsLoading(true)
-        
-        const origin = process.env.NEXT_PUBLIC_API_URL || "";
-        
         // All tasks will be fetched regardless of active tab
         // We'll filter on the client side in the TasksTabContent component
         const response = await fetch(
-          `${origin}/api/users/${encodeURIComponent(userId)}/tasks?limit=20&sortBy=updatedAt&sortOrder=desc`
+          `/api/users/${userId}/tasks`
         )
         
         if (!response.ok) {
