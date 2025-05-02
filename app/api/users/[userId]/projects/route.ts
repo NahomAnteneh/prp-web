@@ -1,47 +1,15 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { z } from "zod"
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
-
-// const userIdSchema = z.string().min(1)
-
-// Query parameter schema
-const querySchema = z.object({
-  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
-  status: z.enum(["ACTIVE", "SUBMITTED", "COMPLETED", "ARCHIVED"]).optional(),
-}).optional()
 
 export async function GET(
   request: Request,
   { params }: { params: { userId: string } }
 ) {
   try {
-    // Await params before accessing its properties
-    const { userId } = await params
-
-    // Validate userId
-    // const parsedParams = userIdSchema.safeParse(userId)
-    // if (!parsedParams.success) {
-    //   return NextResponse.json(
-    //     { error: "Invalid user ID format" },
-    //     { status: 400 }
-    //   )
-    // }
-
-    // Parse query parameters
-    const url = new URL(request.url)
-    const queryResult = querySchema.safeParse(Object.fromEntries(url.searchParams))
-    if (!queryResult.success) {
-      return NextResponse.json(
-        { error: "Invalid query parameters" },
-        { status: 400 }
-      )
-    }
-
-    const queryParams = queryResult.data || {}
-    const limit = queryParams.limit || 10
+        const { userId } = params
 
     // Get user's groups
     const userGroups = await prisma.groupMember.findMany({
@@ -61,11 +29,6 @@ export async function GET(
         { groupId: { in: groupIds } }, // Projects from user's groups
         { advisorId: userId }         // Projects the user advises
       ]
-    }
-
-    // Add status filter if provided
-    if (queryParams.status) {
-      whereCondition.status = queryParams.status
     }
 
     // Fetch projects - both from user's groups and those they advise
@@ -103,8 +66,7 @@ export async function GET(
             evaluations: true,
           },
         },
-        // Include technologies through tasks (if any task contains technologies field)
-        tasks: {
+                tasks: {
           select: {
             id: true,
             title: true,
@@ -116,18 +78,13 @@ export async function GET(
       orderBy: [
         { updatedAt: "desc" }
       ],
-      take: limit,
-    })
+          })
 
-    // Extract technologies from tasks and format the response
+    // Format the response
     const formattedProjects = projects.map((project: any) => {
-      // Determine if the user is the group leader
-      const isGroupLeader = project.group.leaderId === userId
+            const isGroupLeader = project.group.leaderId === userId
 
-      // Get last updated time in human-readable format
-      const lastUpdated = formatTimeAgo(project.updatedAt)
-
-      return {
+            return {
         id: project.id,
         title: project.title,
         description: project.description || "",
@@ -136,8 +93,7 @@ export async function GET(
         archived: project.archived,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-        lastUpdated,
-        group: {
+                group: {
           id: project.group.id,
           name: project.group.name,
         },

@@ -26,17 +26,8 @@ import {
 } from '@/components/ui/dialog';
 
 // Unified Group type definition
-import { Group } from '@/types/types'; // Assuming a centralized type definition file exists
+import { Group } from '@prisma/client';
 
-interface Advisor {
-  id: string;
-  name: string;
-  username: string;
-  profileInfo?: {
-    expertise?: string[];
-    bio?: string;
-  };
-}
 
 interface AdvisorSectionProps {
   group: Group;
@@ -51,7 +42,7 @@ export default function AdvisorSection({ group, isLeader, onUpdate }: AdvisorSec
   const [availableAdvisors, setAvailableAdvisors] = useState<Advisor[]>([]);
   const [isLoadingAdvisors, setIsLoadingAdvisors] = useState(false);
 
-  const hasAdvisor = group.project?.advisor !== null;
+  const hasAdvisor = group.projects?.advisor !== null;
   const hasPendingRequest = group.advisorRequests?.find(request => request.status === 'PENDING');
   const hasRejectedRequest = group.advisorRequests?.find(request => request.status === 'REJECTED');
 

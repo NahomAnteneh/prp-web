@@ -1,18 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { z } from 'zod';
-
-// Schema for adding members
-const addMemberSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-});
-
-// Schema for removing members
-const removeMemberSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-});
 
 // GET: List all members of a group
 export async function GET(
@@ -20,15 +7,6 @@ export async function GET(
   { params }: { params: { groupId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const groupId = params.groupId;
 
     // Check if the group exists
@@ -97,15 +75,6 @@ export async function POST(
   { params }: { params: { groupId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const groupId = params.groupId;
 
     // Check if the group exists
@@ -123,29 +92,9 @@ export async function POST(
       );
     }
 
-    // Check permissions: Only group leader or admin can add members
-    const isGroupLeader = group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to add members to this group' },
-        { status: 403 }
-      );
-    }
-
     // Validate input data
     const rawData = await req.json();
-    const validationResult = addMemberSchema.safeParse(rawData);
-
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { message: 'Invalid input', errors: validationResult.error.flatten().fieldErrors },
-        { status: 400 }
-      );
-    }
-
-    const { userId } = validationResult.data;
+    const { userId } = rawData;
 
     // Check if the user exists
     const user = await db.user.findUnique({
@@ -167,39 +116,6 @@ export async function POST(
     if (existingMembership) {
       return NextResponse.json(
         { message: 'User is already a member of this group' },
-        { status: 400 }
-      );
-    }
-
-    // Check if the user is already a member of another group
-    const otherGroupMembership = await db.groupMember.findFirst({
-      where: { userId },
-    });
-
-    if (otherGroupMembership) {
-      return NextResponse.json(
-        { message: 'User is already a member of another group' },
-        { status: 400 }
-      );
-    }
-
-    // Get the maximum group size from rules
-    let maxGroupSize = 5; // Default to 5
-    
-    try {
-      const rules = await db.rule.findFirst();
-      if (rules) {
-        maxGroupSize = rules.maxGroupSize;
-      }
-    } catch (error) {
-      console.error('Error fetching rules:', error);
-      // Continue with default maxGroupSize
-    }
-
-    // Check if adding this member would exceed the maximum group size
-    if (group.members.length >= maxGroupSize) {
-      return NextResponse.json(
-        { message: `Cannot add more members. Maximum group size (${maxGroupSize}) reached.` },
         { status: 400 }
       );
     }
@@ -248,15 +164,6 @@ export async function DELETE(
   { params }: { params: { groupId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const groupId = params.groupId;
 
     // Parse the URL to get the userId to remove
@@ -282,27 +189,6 @@ export async function DELETE(
       return NextResponse.json(
         { message: 'Group not found' },
         { status: 404 }
-      );
-    }
-
-    // Check if user to remove is the group leader
-    if (userId === group.leaderId) {
-      return NextResponse.json(
-        { message: 'Cannot remove the group leader. Transfer leadership first.' },
-        { status: 400 }
-      );
-    }
-
-    // Check permissions: Only group leader or admin can remove members
-    // (or the member can remove themselves)
-    const isGroupLeader = group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-    const isSelfRemoval = userId === session.user.id;
-
-    if (!isGroupLeader && !isAdmin && !isSelfRemoval) {
-      return NextResponse.json(
-        { message: 'You do not have permission to remove members from this group' },
-        { status: 403 }
       );
     }
 
@@ -338,4 +224,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}

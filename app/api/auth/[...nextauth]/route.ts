@@ -11,7 +11,7 @@ export const authOptions: AuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        identifier: { label: 'Username or Email', type: 'text' },
+        identifier: { label: 'ID or Email', type: 'text' },
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
@@ -19,15 +19,12 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // Find user by username (identifier can be username)
+        // Find user by id
         const user = await prisma.user.findUnique({
-          where: { username: credentials.identifier }
+          where: { id: credentials.identifier }
         });
 
         if (!user) {
-          // If user not found by username, could be using email in the profileInfo JSON
-          // NOTE: This is just a fallback in case the user is using email instead of username
-          // In a proper implementation, you might want to add an email field to the User model
           return null;
         }
 
@@ -45,7 +42,6 @@ export const authOptions: AuthOptions = {
         return {
           id: user.id,
           name: `${user.firstName} ${user.lastName}`,
-          username: user.username,
           role: user.role,
         };
       }
@@ -59,7 +55,6 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.id = user.id;
         token.name = user.name;
-        token.username = user.username;
         token.role = user.role as Role;
       }
       return token;
@@ -68,7 +63,6 @@ export const authOptions: AuthOptions = {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.name = token.name as string;
-        session.user.username = token.username as string;
         session.user.role = token.role as Role;
       }
       return session;
@@ -86,4 +80,4 @@ const handler = NextAuth(authOptions);
 
 // Export handler functions for App Router
 // These functions receive the req object and route params
-export { handler as GET, handler as POST }; 
+export { handler as GET, handler as POST };

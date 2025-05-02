@@ -1,29 +1,18 @@
-// datasource block specifies the database connection details
 datasource db {
-  provider = "postgresql" // Specifies the database provider (PostgreSQL)
-  url      = env("DATABASE_URL") // Database connection URL from environment variables
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// generator block specifies the Prisma client generator
 generator client {
-  provider = "prisma-client-js" // Generates Prisma Client for JavaScript/TypeScript
+  provider = "prisma-client-js"
 }
 
-// generator block for generating JSON types (optional but useful)
 generator json {
   provider = "prisma-json-types-generator"
 }
 
-// -----------------------------------------------------
-// Core Models (User, Group, Project)
-// -----------------------------------------------------
-
-/// Represents a user in the system (Student, Advisor, Evaluator, Admin)
-/// Note: Application logic must ensure a user isn't assigned as both Advisor and Evaluator *for the same project*.
-model User {
-  id                   String    @id @default(cuid())
-  /// Unique identifier for the user (e.g., student ID, staff ID)
-  username             String    @unique
+model User {  
+  id                   String  @unique
   firstName            String
   lastName             String
   /// Institutional email address
@@ -31,12 +20,10 @@ model User {
   /// Store hashed passwords only
   passwordHash         String
   role                 Role      @default(STUDENT)
-  emailVerified        Boolean   @default(false)
-  verificationToken    String?   @unique
   passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
-  /// For additional info like advisor expertise, department, etc. Stored as JSON.
-  profileInfo          Json?
+  profileInfo          Json? 
+/// Note: Application logic must ensure a user isn't assigned as both Advisor and Evaluator *for the same project*.: string; expertise?: string[]; bio?: string }
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -58,19 +45,20 @@ model User {
   tasksCreated         Task[]               @relation("TaskCreator")
   repositoriesOwned    Repository[]         @relation("RepositoryOwner") // Repositories created/managed by this user
 
-  @@index([username]) // Index for faster username lookups
+  @@index([id]) // Index for faster username lookups
   @@index([email])    // Index for faster email lookups
 }
 
 /// Represents a project group formed by students
 model Group {
   id          String   @id @default(cuid())
-  name        String   @unique
+  uniqueName  String   @unique
+  name        String   
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   /// ID of the student who is the group leader
-  leaderId    String
+  leaderId        String
   leader          User              @relation("GroupLeader", fields: [leaderId], references: [id], onDelete: Restrict)
   members         GroupMember[]
   projects        Project[]         @relation("GroupProjects") // A group can have multiple projects
@@ -107,12 +95,8 @@ model Project {
   archived       Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-  /// Each project belongs to one group. A group can have multiple projects.
-  groupId        String // REMOVED @unique
-  /// Assigned advisor ID (optional, max 1 per project)
+  groupId        String
   advisorId      String?
-  /// To store milestones, deadlines, or other structured project data
-  milestones     Json?
 
   // --- Relations ---
   group             Group              @relation("GroupProjects", fields: [groupId], references: [id], onDelete: Cascade) // UPDATED relation name
@@ -143,10 +127,6 @@ model ProjectEvaluator {
   @@index([evaluatorId])
 }
 
-/// Join table for Project and Repository (Many-to-Many relationship)
-/// IMPORTANT: Application logic MUST ensure that the Repository linked (repositoryId)
-/// belongs to the same Group as the Project (Project.groupId == Repository.groupId).
-/// The groupId field here helps represent this link but doesn't enforce it across tables.
 model ProjectRepository {
   projectId    String
   repositoryId String
@@ -163,10 +143,6 @@ model ProjectRepository {
   @@index([repositoryId])
   @@index([groupId]) // Index on group for potential filtering
 }
-
-// -----------------------------------------------------
-// Version Control (Vec) Models
-// -----------------------------------------------------
 
 /// Represents the Vec repository. Can be owned by a User (groupId=null) or a Group (groupId!=null).
 model Repository {
@@ -350,9 +326,6 @@ model Task {
   @@index([status])
 }
 
-/// Represents feedback provided on a project, merge request, or repository.
-/// IMPORTANT: Application logic must ensure that for each Feedback record,
-/// exactly ONE of projectId, mergeRequestId, or repositoryId is set.
 model Feedback {
   id             String         @id @default(cuid())
   title          String?        // Optional title

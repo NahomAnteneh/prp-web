@@ -51,7 +51,6 @@ export async function GET() {
         id: true,
         firstName: true,
         lastName: true,
-        username: true,
         role: true,
       },
     });
@@ -265,7 +264,8 @@ export async function GET() {
           author: {
             select: {
               id: true,
-              username: true,
+              firstName: true,
+              lastName: true,
             },
           },
           project: {
@@ -304,7 +304,7 @@ export async function GET() {
           type: "feedback" as const,
           title: fb.author.id === userId 
             ? `Feedback provided on ${fb.project?.title || 'project'}`
-            : `Feedback received from ${fb.author?.username || 'Anonymous'}`,
+            : `Feedback received from ${fb.author?.firstName + ' ' + fb.author?.firstName || 'Anonymous'}`,
           description: fb.content.length > 60 ? fb.content.substring(0, 57) + '...' : fb.content,
           timestamp: fb.createdAt,
           link: `/feedback/${fb.id}`,
@@ -315,8 +315,7 @@ export async function GET() {
       // Ensure name is included in the user data
       const userData = {
         id: user.id,
-        username: user.username,
-        name: `${user.firstName} ${user.lastName}` || session.user.username || "Student", // Fallback to session name or default
+        name: `${user.firstName} ${user.lastName}` || session.user.id || "Student",
         unreadNotifications: unreadNotificationsCount,
         hasGroup: hasGroup,
         groupName: groupName,
@@ -343,8 +342,7 @@ export async function GET() {
       // Ensure name is included in the user data
       const userData = {
         id: user.id,
-        username: user.username,
-        name: `${user.firstName} ${user.lastName}` || session.user.username || "Student", // Fallback to session name or default
+        name: `${user.firstName} ${user.lastName}` || session.user.id || "Student", // Fallback to session name or default
         unreadNotifications: unreadNotificationsCount,
         hasGroup: hasGroup,
         groupName: groupName,

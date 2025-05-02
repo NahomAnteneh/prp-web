@@ -67,16 +67,16 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        username: { label: 'Username', type: 'text' },
+        id: { label: 'Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.username || !credentials?.password) {
+        if (!credentials?.id || !credentials?.password) {
           return null;
         }
 
         const user = await db.user.findUnique({
-          where: { username: credentials.username },
+          where: { id: credentials.id },
         });
 
         if (!user) {
@@ -91,8 +91,7 @@ export const authOptions: NextAuthOptions = {
 
         return {
           id: user.id,
-          name: user.name || '',
-          username: user.username,
+          name: user.firstName + ' ' + user.lastName || '',
           role: user.role,
         };
       },
@@ -103,7 +102,6 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id as string;
         session.user.name = token.name as string;
-        session.user.username = token.username as string;
         session.user.role = token.role as string;
       }
       return session;
@@ -111,7 +109,6 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.username = user.username;
         token.role = user.role as Role;
       }
       return token;
@@ -124,7 +121,6 @@ declare module 'next-auth' {
     user: {
       id: string;
       name: string;
-      username: string;
       role: string;
     };
   }
@@ -132,7 +128,6 @@ declare module 'next-auth' {
   interface User {
     id: string;
     name: string;
-    username: string;
     role: string;
   }
 } 

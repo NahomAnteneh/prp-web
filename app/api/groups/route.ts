@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -13,15 +11,6 @@ const createGroupSchema = z.object({
 // GET: Retrieve all groups (with filtering capabilities)
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     // URL query parameters for filtering
     const url = new URL(req.url);
     const nameFilter = url.searchParams.get('name');
@@ -52,7 +41,6 @@ export async function GET(req: NextRequest) {
             id: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         members: {
@@ -62,7 +50,6 @@ export async function GET(req: NextRequest) {
                 id: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -102,40 +89,6 @@ export async function GET(req: NextRequest) {
 // POST: Create a new group
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Only students can create groups
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true, role: true },
-    });
-
-    if (!user || user.role !== 'STUDENT') {
-      return NextResponse.json(
-        { message: 'Only students can create groups' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is already in a group
-    const existingMembership = await db.groupMember.findFirst({
-      where: { userId: user.id },
-    });
-
-    if (existingMembership) {
-      return NextResponse.json(
-        { message: 'You are already a member of a group' },
-        { status: 400 }
-      );
-    }
-
     // Parse and validate request data
     const rawData = await req.json();
     const validationResult = createGroupSchema.safeParse(rawData);
@@ -173,16 +126,13 @@ export async function POST(req: NextRequest) {
       // Continue with default maxGroupSize
     }
 
-    // Create the group and add the user as both leader and member
+    // Create the group
     const group = await db.group.create({
       data: {
         name,
         description,
-        leaderId: user.id,
         members: {
-          create: {
-            userId: user.id,
-          },
+          create: {},
         },
       },
       include: {
@@ -193,7 +143,6 @@ export async function POST(req: NextRequest) {
                 id: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -213,4 +162,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

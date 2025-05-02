@@ -17,9 +17,8 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    username: "",
-    idNumber: "",
-    institutionalEmail: "",
+    id: "",
+    email: "",
     department: "",
     batchYear: "",
     password: "",
@@ -28,9 +27,8 @@ export default function RegisterPage() {
   const [formErrors, setFormErrors] = useState({
     firstName: "",
     lastName: "",
-    username: "",
-    idNumber: "",
-    institutionalEmail: "",
+    id: "",
+    email: "",
     department: "",
     batchYear: "",
     password: "",
@@ -62,9 +60,8 @@ export default function RegisterPage() {
     const errors = {
       firstName: "",
       lastName: "",
-      username: "",
-      idNumber: "",
-      institutionalEmail: "",
+      id: "",
+      email: "",
       department: "",
       batchYear: "",
       password: "",
@@ -85,30 +82,33 @@ export default function RegisterPage() {
     }
 
     // Username validation
-    if (!formData.username) {
-      errors.username = "Username is required";
-      isValid = false;
-    } else if (formData.username.length < 3) {
-      errors.username = "Username must be at least 3 characters";
-      isValid = false;
-    }
+    // if (!formData.username) {
+    //   errors.username = "Username is required";
+    //   isValid = false;
+    // } else if (formData.username.length < 3) {
+    //   errors.username = "Username must be at least 3 characters";
+    //   isValid = false;
+    // }
 
     // ID Number validation
-    if (!formData.idNumber) {
-      errors.idNumber = "ID number is required";
+    if (!formData.id) {
+      errors.id = "ID number is required";
+      isValid = false;
+    } else if (!formData.id.startsWith("BDU")) {
+      errors.id = "ID number must start with 'BDU'";
       isValid = false;
     }
 
     // Institutional Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.institutionalEmail) {
-      errors.institutionalEmail = "Institutional email is required";
+    if (!formData.email) {
+      errors.email = "Institutional email is required";
       isValid = false;
-    } else if (!emailRegex.test(formData.institutionalEmail)) {
-      errors.institutionalEmail = "Please enter a valid email address";
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = "Please enter a valid email address";
       isValid = false;
-    } else if (!formData.institutionalEmail.endsWith('bdu.edu.et')) {
-      errors.institutionalEmail = "Please use your BiT institutional email";
+    } else if (!formData.email.endsWith('bdu.edu.et')) {
+      errors.email = "Please use your BiT institutional email";
       isValid = false;
     }
 
@@ -159,9 +159,9 @@ export default function RegisterPage() {
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
-          username: formData.username,
-          idNumber: formData.idNumber,
-          email: formData.institutionalEmail,
+          // username: formData.username,
+          id: formData.id,
+          email: formData.email,
           password: formData.password,
           department: formData.department,
           batchYear: formData.batchYear
@@ -266,7 +266,7 @@ export default function RegisterPage() {
             </div>
 
             {/* Existing Fields */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="username" className="text-gray-700">Username</Label>
               <Input 
                 id="username"
@@ -279,36 +279,36 @@ export default function RegisterPage() {
               {formErrors.username && (
                 <p className="text-sm text-red-500">{formErrors.username}</p>
               )}
-            </div>
+            </div> */}
             
             <div className="space-y-2">
-              <Label htmlFor="idNumber" className="text-gray-700">Student ID</Label>
+              <Label htmlFor="id" className="text-gray-700">Student ID</Label>
               <Input 
-                id="idNumber"
-                name="idNumber"
-                value={formData.idNumber}
+                id="id"
+                name="id"
+                value={formData.id}
                 onChange={handleChange}
                 placeholder="Your BiT student ID number"
-                className={`border-0 bg-gray-50 shadow-sm ${formErrors.idNumber ? "ring-2 ring-red-500" : ""}`}
+                className={`border-0 bg-gray-50 shadow-sm ${formErrors.id ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.idNumber && (
-                <p className="text-sm text-red-500">{formErrors.idNumber}</p>
+              {formErrors.id && (
+                <p className="text-sm text-red-500">{formErrors.id}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="institutionalEmail" className="text-gray-700">Institutional Email</Label>
+              <Label htmlFor="email" className="text-gray-700">Institutional Email</Label>
               <Input 
-                id="institutionalEmail"
-                name="institutionalEmail"
+                id="email"
+                name="email"
                 type="email"
-                value={formData.institutionalEmail}
+                value={formData.email}
                 onChange={handleChange}
                 placeholder="your.name@bdu.edu.et"
-                className={`border-0 bg-gray-50 shadow-sm ${formErrors.institutionalEmail ? "ring-2 ring-red-500" : ""}`}
+                className={`border-0 bg-gray-50 shadow-sm ${formErrors.email ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.institutionalEmail && (
-                <p className="text-sm text-red-500">{formErrors.institutionalEmail}</p>
+              {formErrors.email && (
+                <p className="text-sm text-red-500">{formErrors.email}</p>
               )}
             </div>
             
