@@ -1,75 +1,129 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Github, GitBranch, Users, Folder, BarChart3 } from "lucide-react"
-import Link from "next/link"
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Github, GitBranch, Users, Folder, BarChart3, Lock, Globe } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
-import { Group, Repository, Project } from "@prisma/client"
+interface Group {
+  id: string;
+  name: string;
+  groupUserName: string;
+  members: number;
+}
 
-interface ProfileOverviewProps {
-  userId: string
-  isOwner?: boolean
+interface Repository {
+  id: string;
+  name: string;
+  description: string | null;
+  isPrivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastActivity: string;
+  group: {
+    id: string;
+    name: string;
+  } | null;
+  stats: {
+    commits: number;
+    branches: number;
+    projects: number;
+  };
 }
 
 interface ProjectSummary {
-  id: string
-  title: string
-  status: string
+  id: string;
+  title: string;
+  description: string;
+  status: 'ACTIVE' | 'SUBMITTED' | 'COMPLETED' | 'ARCHIVED';
+  group: {
+    id: string;
+    name: string;
+    groupUserName: string;
+  };
+  updatedAt: string;
+  stats: {
+    tasks: number;
+    repositories: number;
+    evaluations: number;
+    feedback: number;
+  };
+}
+
+interface ProfileOverviewProps {
+  userId: string;
+  isOwner?: boolean;
 }
 
 export default function ProfileOverview({ userId, isOwner = false }: ProfileOverviewProps) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [groupInfo, setGroupInfo] = useState<Group | null>(null)
-  const [topRepositories, setTopRepositories] = useState<Repository[]>([])
-  const [recentProjects, setRecentProjects] = useState<ProjectSummary[]>([])
+  const [isLoading, setIsLoading] = useState(true);
+  const [groupInfo, setGroupInfo] = useState<Group | null>(null);
+  const [topRepositories, setTopRepositories] = useState<Repository[]>([]);
+  const [recentProjects, setRecentProjects] = useState<ProjectSummary[]>([]);
   const [stats, setStats] = useState({
     commits: 0,
     repositories: 0,
     projects: 0,
-  })
+  });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
+
         // Fetch group info
         const groupResponse = await fetch(`/api/users/${userId}/group`);
         const groupData = await groupResponse.json();
+        if (!groupResponse.ok) {
+          throw new Error(groupData.message || 'Failed to fetch group info');
+        }
         setGroupInfo(groupData);
 
         // Fetch repositories
-        const reposResponse = await fetch(`/api/users/${userId}/repository`);
+        const reposResponse = await fetch(`/api/users/${userId}/repository?limit=10&includeGroupRepos=true`);
         const reposData = await reposResponse.json();
-
-        // Handle cases where the response is an object with a `repositories` property
-        const repositories = Array.isArray(reposData) ? reposData : reposData.repositories;
-
-        if (Array.isArray(repositories)) {
-          setTopRepositories(repositories.slice(0, 3)); // Get top 3 repositories
-        } else {
-          console.error("Unexpected repositories data format:", reposData);
-          setTopRepositories([]); // Fallback to an empty array
+        if (!reposResponse.ok) {
+          throw new Error(reposData.message || 'Failed to fetch repositories');
         }
+        const repositories = Array.isArray(reposData) ? reposData : reposData.repositories || [];
+        setTopRepositories(repositories.slice(0, 3));
 
         // Fetch projects
         const projectsResponse = await fetch(`/api/users/${userId}/projects`);
         const projectsData = await projectsResponse.json();
-        setRecentProjects(projectsData.slice(0, 3).map((p: any) => ({
+        if (!projectsResponse.ok) {
+          throw new Error(projectsData.message || 'Failed to fetch projects');
+        }
+        const projectsArray = Array.isArray(projectsData) ? projectsData : projectsData.projects || [];
+        setRecentProjects(projectsArray.slice(0, 3).map((p: any) => ({
           id: p.id,
           title: p.title,
+          description: p.description || '',
           status: p.status,
+          group: p.group,
+          updatedAt: p.updatedAt,
+          stats: p.stats,
         })));
 
-        // Fetch stats
+        // Calculate stats
+        const totalCommits = repositories.reduce((sum: number, repo: Repository) => sum + (repo.stats.commits || 0), 0);
         setStats({
-          commits: repositories.reduce((sum: number, repo: any) => sum + (repo.commits || 0), 0),
-          repositories: repositories.length || 0,
-          projects: projectsData.length || 0,
+          commits: totalCommits,
+          repositories: repositories.length,
+          projects: projectsArray.length,
         });
       } catch (error) {
-        console.error("Error fetching profile overview data:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
+        toast.error('Error fetching profile data', {
+          description: errorMessage,
+        });
+        setGroupInfo(null);
+        setTopRepositories([]);
+        setRecentProjects([]);
+        setStats({ commits: 0, repositories: 0, projects: 0 });
       } finally {
         setIsLoading(false);
       }
@@ -113,6 +167,43 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
       </div>
     );
   }
+
+  const getStatusDisplay = (status: ProjectSummary['status']) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'Active';
+      case 'COMPLETED':
+        return 'Completed';
+      case 'SUBMITTED':
+        return 'Submitted';
+      case 'ARCHIVED':
+        return 'Archived';
+      default:
+        return status;
+    }
+  };
+
+  const getStatusVariant = (status: ProjectSummary['status']) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'default';
+      case 'COMPLETED':
+        return 'outline';
+      case 'SUBMITTED':
+      case 'ARCHIVED':
+        return 'secondary';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -169,7 +260,9 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
               <div>
                 <h3 className="font-medium text-lg">{groupInfo.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {groupInfo.members} members
+                  <Link href={`/groups/${groupInfo.id}`} className="hover:text-primary">
+                    @{groupInfo.groupUserName}
+                  </Link> • {groupInfo.members} members
                 </p>
               </div>
               <Button size="sm" variant="outline" className="mt-2 md:mt-0">
@@ -211,17 +304,35 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
                           {repo.name}
                         </Link>
                       </h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2.5 line-clamp-2">
-                      {repo.description}
-                    </p>
-                    <div className="flex items-center justify-between">
                       <Badge variant="outline" className="text-xs">
-                        <GitBranch className="h-3 w-3 mr-1" />
-                        main
+                        {repo.isPrivate ? (
+                          <Lock className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Globe className="h-3 w-3 mr-1" />
+                        )}
+                        {repo.isPrivate ? 'Private' : 'Public'}
                       </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-1.5 line-clamp-2">
+                      {repo.description || 'No description provided'}
+                    </p>
+                    {repo.group && (
+                      <p className="text-xs text-muted-foreground mb-1.5">
+                        Group: <Link href={`/groups/${repo.group.id}`} className="hover:text-primary">@{repo.group.name}</Link>
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          <GitBranch className="h-3 w-3 mr-1" />
+                          main
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {repo.stats.commits} commits
+                        </span>
+                      </div>
                       <span className="text-xs text-muted-foreground">
-                        Updated {repo.lastActivity}
+                        {repo.lastActivity}
                       </span>
                     </div>
                   </div>
@@ -260,15 +371,25 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
                         </Link>
                       </h4>
                       <Badge 
-                        variant={
-                          project.status === "Active" ? "default" : 
-                          project.status === "Completed" ? "outline" : 
-                          "secondary"
-                        }
+                        variant={getStatusVariant(project.status)}
                         className="text-xs"
                       >
-                        {project.status}
+                        {getStatusDisplay(project.status)}
                       </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-1.5 line-clamp-2">
+                      {project.description || 'No description provided'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      Group: <Link href={`/groups/${project.group.id}`} className="hover:text-primary">@{project.group.groupUserName}</Link>
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {project.stats.tasks} tasks
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Updated {formatDate(project.updatedAt)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -278,5 +399,5 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
         </Card>
       </div>
     </div>
-  )
+  );
 }

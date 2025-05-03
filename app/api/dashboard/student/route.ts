@@ -36,19 +36,19 @@ export async function GET() {
     
     // Get the authenticated user session
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user?.userId) {
       console.log("Dashboard API: User not authenticated")
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const userId = session.user.id
+    const userId = session.user.userId
     console.log(`Dashboard API: Processing request for user ${userId}`)
 
     // Get user data
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { userId: userId },
       select: {
-        id: true,
+        userId: true,
         firstName: true,
         lastName: true,
         role: true,
@@ -263,7 +263,7 @@ export async function GET() {
           createdAt: true,
           author: {
             select: {
-              id: true,
+              userId: true,
               firstName: true,
               lastName: true,
             },
@@ -302,7 +302,7 @@ export async function GET() {
         ...recentFeedback.map((fb) => ({
           id: `feedback-${fb.id}`,
           type: "feedback" as const,
-          title: fb.author.id === userId 
+          title: fb.author.userId === userId 
             ? `Feedback provided on ${fb.project?.title || 'project'}`
             : `Feedback received from ${fb.author?.firstName + ' ' + fb.author?.firstName || 'Anonymous'}`,
           description: fb.content.length > 60 ? fb.content.substring(0, 57) + '...' : fb.content,
@@ -314,8 +314,8 @@ export async function GET() {
       
       // Ensure name is included in the user data
       const userData = {
-        id: user.id,
-        name: `${user.firstName} ${user.lastName}` || session.user.id || "Student",
+        id: user.userId,
+        name: `${user.firstName} ${user.lastName}` || session.user.userId || "Student",
         unreadNotifications: unreadNotificationsCount,
         hasGroup: hasGroup,
         groupName: groupName,
@@ -341,8 +341,8 @@ export async function GET() {
       
       // Ensure name is included in the user data
       const userData = {
-        id: user.id,
-        name: `${user.firstName} ${user.lastName}` || session.user.id || "Student", // Fallback to session name or default
+        id: user.userId,
+        name: `${user.firstName} ${user.lastName}` || session.user.userId || "Student", // Fallback to session name or default
         unreadNotifications: unreadNotificationsCount,
         hasGroup: hasGroup,
         groupName: groupName,

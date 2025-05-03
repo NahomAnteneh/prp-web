@@ -10,10 +10,10 @@ import router from "next/router";
 
 // Define an interface for the user data structure
 interface UserData {
-  id: string;
-  username: string;
+  userId: string;
   role: Role;
   firstName?: string;
+  lastName?: string;
   // Add other potential user fields if needed
 }
 
@@ -29,15 +29,15 @@ export default function UserPage() {
 
   // useEffect hook for data fetching on component mount or when ownerId changes
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-      return;
-    }
+    // if (status === 'unauthenticated') {
+    //   router.push('/login');
+    //   return;
+    // }
     
-    if (status === 'authenticated') {
+    // if (status === 'authenticated') {
       // Fetch current user's group information
       findUserByUsername(ownerId);
-    }
+    // }
   }, [ownerId, status]); // Re-run effect if ownerId changes
 
   // Handle the not found case - calling notFound() directly doesn't work in Client Components
@@ -54,20 +54,20 @@ export default function UserPage() {
     }
   }, [isNotFound]);
 
-  async function findUserByUsername(username: string) {
+  async function findUserByUsername(userId: string) {
     setIsNotFound(false); // Reset not found state
     setUserData(null); // Reset user data
 
     try {
 
 
-      const response = await fetch(`/api/users/${username}`);
+      const response = await fetch(`/api/users/${userId}`);
 
       if (response.ok) {
         const data: UserData = await response.json();
         setUserData(data); // Set user data on success
       } else if (response.status === 404) {
-        console.log(`User not found for username: ${username}`);
+        console.log(`User not found for username: ${userId}`);
         setIsNotFound(true); // Set not found state
       } else {
         // Handle other non-OK responses
@@ -84,7 +84,7 @@ export default function UserPage() {
   // If user data exists, render the profile based on role
   if (userData) {
     if (userData.role === Role.STUDENT) {
-      return <StudentProfilePage userId={userData.id} username={userData.username} owner={ownerId === userData.username} />;
+      return <StudentProfilePage userId={userData.userId} username={userData.userId} owner={ownerId === userData.userId} />;
     }
 
     // Default profile page for other user types

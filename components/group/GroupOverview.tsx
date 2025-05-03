@@ -50,7 +50,7 @@ export default function GroupOverview({
           <CardContent className="flex items-start pt-6">
             <Avatar className="h-20 w-20 mr-4 bg-blue-100">
               <AvatarFallback>
-                {group.name.charAt(0).toUpperCase()}
+                {group.name?.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div>

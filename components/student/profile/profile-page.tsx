@@ -18,17 +18,15 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
 interface UserProfile {
-  id: string
-  username: string
-  name: string
-  role: string
-  profileInfo: {
-    idNumber: string
+  userId: string
+    name: string
     email: string
-    department: string
-    batchYear: string
-    bio?: string
-  }
+    role: string
+    imageUrl?: string
+    profileInfo: {
+      department: string
+      batchYear: string
+    }
   viewerHasFullAccess?: boolean
 }
 
@@ -48,19 +46,19 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
   const { data: session } = useSession()
   
   // Check if the current user is the profile owner or an admin
-  const isOwner = session?.user?.id === userId || session?.user?.username === username
+  const isOwner = session?.user?.userId === userId;
   const isAdmin = session?.user?.role === "ADMINISTRATOR"
   // Use viewerHasFullAccess from API response when available, otherwise fallback to session check
   const canEdit = profileData?.viewerHasFullAccess || isOwner || isAdmin
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      if (!username) return;
+      if (!userId) return;
 
       try {
         setIsLoading(true);
         
-        const response = await fetch(`/api/users/${username}`, {
+        const response = await fetch(`/api/users/${userId}`, {
           credentials: 'include',
         });
         
@@ -88,7 +86,7 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
     };
 
     fetchProfileData();
-  }, [username]);
+  }, [userId]);
 
   if (error) {
     return (

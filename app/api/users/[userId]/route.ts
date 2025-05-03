@@ -1,46 +1,57 @@
-// get all data for any specific user
-import { NextResponse } from "next/server"
-import { PrismaClient, Prisma } from "@prisma/client"
-import { z } from "zod"
-import bcrypt from "bcryptjs"
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient, Prisma, Role } from '@prisma/client';
+import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 
-// Initialize Prisma client
-const prisma = new PrismaClient()
-
-const userIdSchema = z.string().min(1)
-
-// Define interface for profile info to help with type safety
+// Define interface for profile info
 interface ProfileInfo {
-  idNumber?: string;
   department?: string;
   batchYear?: string;
-  bio?: string;
-  [key: string]: any; // Allow for other fields that might be in the JSON
+  [key: string]: any; // Allow additional fields
 }
 
+// Validation schemas
+const userIdSchema = z.string().min(1, 'User ID is required');
+
+const updateUserSchema = z.object({
+  firstName: z.string().min(1, 'First name is required').optional(),
+  lastName: z.string().min(1, 'Last name is required').optional(),
+  email: z.string().email('Invalid email format').optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  profileInfo: z.record(z.any()).optional(), // Allow any JSON object
+  role: z.enum(['STUDENT', 'ADVISOR', 'EVALUATOR', 'ADMINISTRATOR']).optional(),
+});
+
 export async function GET(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
+  const prisma = new PrismaClient();
   try {
-    // Retrieve and await the params
-    const { userId } = await params
+    // Handle params as either direct object or promise
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
 
     // Validate userId
-    const parsedParams = userIdSchema.safeParse(userId)
+    const parsedParams = userIdSchema.safeParse(userId);
     if (!parsedParams.success) {
       return NextResponse.json(
-        { error: "Invalid user ID format" },
+        { error: 'Invalid user ID format' },
         { status: 400 }
-      )
+      );
     }
 
-    // Fetch user data from database
+    // TODO: Add authentication check (e.g., verify user is admin or self)
+    // const user = req.user; // Example: Get user from auth middleware
+    // if (user.userId !== userId && user.role !== 'ADMINISTRATOR') {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    // }
+
+    // Fetch user data with group details
     const user = await prisma.user.findUnique({
-      where: { username: userId },
+      where: { userId },
       select: {
-        id: true,
-        username: true,
+        userId: true,
         firstName: true,
         lastName: true,
         email: true,
@@ -48,32 +59,51 @@ export async function GET(
         profileInfo: true,
         createdAt: true,
         updatedAt: true,
-        // Include relation counts
+        groupsLed: {
+          select: {
+            id: true,
+            groupUserName: true,
+            name: true,
+            description: true,
+            createdAt: true,
+          },
+        },
+        groupsMemberOf: {
+          select: {
+            group: {
+              select: {
+                id: true,
+                groupUserName: true,
+                name: true,
+                description: true,
+                createdAt: true,
+              },
+            },
+            joinedAt: true,
+          },
+        },
         _count: {
           select: {
             groupsMemberOf: true,
             advisedProjects: true,
             commitsAuthored: true,
             repositoriesOwned: true,
-          }
-        }
-      }
-    })
+          },
+        },
+      },
+    });
 
     if (!user) {
       return NextResponse.json(
-        { error: "User not found" },
+        { error: 'User not found' },
         { status: 404 }
-      )
+      );
     }
 
-    // Create a safe version of profileInfo with proper typing
+    // Format response
     const safeProfileInfo = (user.profileInfo || {}) as ProfileInfo;
-
-    // Format the response data
     const userResponse = {
-      id: user.id,
-      username: user.username,
+      userId: user.userId,
       name: `${user.firstName} ${user.lastName}`,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -82,150 +112,201 @@ export async function GET(
       profileInfo: safeProfileInfo,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      groups: {
+        led: user.groupsLed,
+        memberOf: user.groupsMemberOf.map((gm) => ({
+          ...gm.group,
+          joinedAt: gm.joinedAt,
+        })),
+      },
       stats: {
         groups: user._count.groupsMemberOf,
         advisedProjects: user._count.advisedProjects,
         commits: user._count.commitsAuthored,
         repositories: user._count.repositoriesOwned,
       },
-    }
+    };
 
-    return NextResponse.json(userResponse)
+    return NextResponse.json(userResponse);
   } catch (error) {
-    console.error("Error fetching user data:", error)
+    console.error('Error fetching user data:', error);
     return NextResponse.json(
-      { error: "Failed to fetch user data" },
+      { error: 'Failed to fetch user data' },
       { status: 500 }
-    )
+    );
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
+  const prisma = new PrismaClient();
   try {
-    // Retrieve and validate params
-    const { userId } = await params
-    const parsedParams = userIdSchema.safeParse(userId)
+    // Handle params as either direct object or promise
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
+
+    // Validate userId
+    const parsedParams = userIdSchema.safeParse(userId);
     if (!parsedParams.success) {
       return NextResponse.json(
-        { error: "Invalid user ID format" },
+        { error: 'Invalid user ID format' },
         { status: 400 }
-      )
+      );
     }
 
-    // Parse the request body
-    const body = await request.json()
-    const { firstName, lastName, email, password, profileInfo, role } = body
+    // TODO: Add authentication check
+    // const user = req.user;
+    // if (user.userId !== userId && user.role !== 'ADMINISTRATOR') {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    // }
+
+    // Parse and validate request body
+    const body = await req.json();
+    const parsedBody = updateUserSchema.safeParse(body);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: 'Invalid input: ' + parsedBody.error.errors.map((e) => e.message).join(', ') },
+        { status: 400 }
+      );
+    }
+
+    const { firstName, lastName, email, password, profileInfo, role } = parsedBody.data;
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { username: userId },
-    })
+      where: { userId },
+    });
 
     if (!existingUser) {
       return NextResponse.json(
-        { error: "User not found" },
+        { error: 'User not found' },
         { status: 404 }
-      )
+      );
     }
 
-    // Prepare data for update
-    const updateData: any = {}
+    // Check email uniqueness if email is being updated
+    if (email && email !== existingUser.email) {
+      const emailExists = await prisma.user.findUnique({
+        where: { email },
+        select: { userId: true },
+      });
+      if (emailExists) {
+        return NextResponse.json(
+          { error: 'Email is already in use' },
+          { status: 400 }
+        );
+      }
+    }
 
-    if (firstName) updateData.firstName = firstName
-    if (lastName) updateData.lastName = lastName
-    if (email) updateData.email = email
-    if (profileInfo) updateData.profileInfo = profileInfo
-    if (role) updateData.role = role
-
-    // Handle password update if provided
+    // Prepare update data
+    const updateData: Prisma.UserUpdateInput = {};
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    if (email) updateData.email = email;
+    if (profileInfo) updateData.profileInfo = profileInfo;
+    if (role) updateData.role = role as Role;
     if (password) {
-      updateData.passwordHash = await bcrypt.hash(password, 10)
+      updateData.passwordHash = await bcrypt.hash(password, 10);
     }
 
-    // Update the user
+    // Update user
     const updatedUser = await prisma.user.update({
-      where: { username: userId },
+      where: { userId },
       data: updateData,
       select: {
-        id: true,
-        username: true,
+        userId: true,
         firstName: true,
         lastName: true,
         email: true,
         role: true,
         profileInfo: true,
         updatedAt: true,
-        // Don't return sensitive info like passwordHash
-      }
-    })
+      },
+    });
 
-    return NextResponse.json(updatedUser)
+    return NextResponse.json(updatedUser);
   } catch (error) {
-    console.error("Error updating user data:", error)
+    console.error('Error updating user data:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Email is already in use' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "Failed to update user data" },
+      { error: 'Failed to update user data' },
       { status: 500 }
-    )
+    );
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
+  const prisma = new PrismaClient();
   try {
-    // Retrieve and validate params
-    const { userId } = await params
-    const parsedParams = userIdSchema.safeParse(userId)
+    // Handle params as either direct object or promise
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
+
+    // Validate userId
+    const parsedParams = userIdSchema.safeParse(userId);
     if (!parsedParams.success) {
       return NextResponse.json(
-        { error: "Invalid user ID format" },
+        { error: 'Invalid user ID format' },
         { status: 400 }
-      )
+      );
     }
 
-    // Check if the user exists
+    // TODO: Add authentication check
+    // const user = req.user;
+    // if (user.userId !== userId && user.role !== 'ADMINISTRATOR') {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    // }
+
+    // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { username: userId },
-    })
+      where: { userId },
+    });
 
     if (!existingUser) {
       return NextResponse.json(
-        { error: "User not found" },
+        { error: 'User not found' },
         { status: 404 }
-      )
+      );
     }
 
-    // Delete the user
+    // Delete user
     await prisma.user.delete({
-      where: { username: userId },
-    })
+      where: { userId },
+    });
 
     return NextResponse.json({
       success: true,
-      message: "User successfully deleted",
-    })
+      message: 'User successfully deleted',
+    });
   } catch (error) {
-    console.error("Error deleting user:", error)
-
-    // Handle referential integrity errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2003') {
-        return NextResponse.json(
-          { 
-            error: "Cannot delete user because they have related data in the system. Consider deactivating the user instead." 
-          },
-          { status: 400 }
-        )
-      }
+    console.error('Error deleting user:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      return NextResponse.json(
+        {
+          error: 'Cannot delete user because they have related data (e.g., groups, projects). Consider deactivating instead.',
+        },
+        { status: 400 }
+      );
     }
-
     return NextResponse.json(
-      { error: "Failed to delete user" },
+      { error: 'Failed to delete user' },
       { status: 500 }
-    )
+    );
+  } finally {
+    await prisma.$disconnect();
   }
 }

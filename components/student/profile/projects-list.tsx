@@ -1,31 +1,113 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Folder, ExternalLink, Calendar, User, GitBranch, Eye } from "lucide-react"
-import Link from "next/link"
-import { Progress } from "@/components/ui/progress"
-import { Project } from "@prisma/client"
+import { useState, useEffect } from 'react';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Folder, ExternalLink, Calendar, User } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { z } from 'zod';
+
+// Validation schema for project creation
+const createProjectSchema = z.object({
+  title: z.string().trim().min(1, 'Project title is required').max(255, 'Project title is too long'),
+  description: z.string().trim().max(1000, 'Description is too long').optional(),
+  groupId: z.string().min(1, 'Group ID is required'),
+  advisorId: z.string().min(1, 'Advisor ID is required').optional(),
+});
+
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  status: 'ACTIVE' | 'SUBMITTED' | 'COMPLETED' | 'ARCHIVED';
+  submissionDate: string | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  group: {
+    id: string;
+    name: string;
+    groupUserName: string;
+  };
+  advisor: {
+    id: string;
+    name: string;
+  } | null;
+  stats: {
+    tasks: number;
+    repositories: number;
+    evaluations: number;
+    feedback: number;
+  };
+  evaluations: {
+    id: string;
+    score: number;
+    createdAt: string;
+  }[];
+  feedback: {
+    id: string;
+    title: string;
+    createdAt: string;
+    authorId: string;
+    status: string;
+  }[];
+}
 
 interface ProjectsListProps {
-  userId: string
-  isOwner?: boolean
+  userId: string;
+  isOwner?: boolean;
 }
 
 export default function ProjectsList({ userId, isOwner = false }: ProjectsListProps) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // Create project form state
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [groupId, setGroupId] = useState('');
+  const [advisorId, setAdvisorId] = useState('');
+  const [titleError, setTitleError] = useState('');
+  const [groupIdError, setGroupIdError] = useState('');
+  const [descriptionError, setDescriptionError] = useState('');
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
+        setIsLoading(true);
         const response = await fetch(`/api/users/${userId}/projects`);
         const data = await response.json();
-        setProjects(data);
+        
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch projects');
+        }
+
+        setProjects(data || []);
       } catch (error) {
-        console.error("Error fetching projects:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
+        toast.error('Error fetching projects', {
+          description: errorMessage,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -33,6 +115,108 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
 
     fetchProjects();
   }, [userId]);
+
+  const handleCreateProject = async () => {
+    // Reset errors
+    setTitleError('');
+    setGroupIdError('');
+    setDescriptionError('');
+
+    // Validate input
+    const validationResult = createProjectSchema.safeParse({
+      title,
+      description: description || undefined,
+      groupId,
+      advisorId: advisorId || undefined,
+    });
+
+    if (!validationResult.success) {
+      const errors = validationResult.error.flatten().fieldErrors;
+      if (errors.title) setTitleError(errors.title[0]);
+      if (errors.groupId) setGroupIdError(errors.groupId[0]);
+      if (errors.description) setDescriptionError(errors.description[0]);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/groups/${groupId}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+          ...(advisorId && { advisorId }),
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (response.status === 400 && data.errors) {
+          const errors = data.errors;
+          if (errors.title) setTitleError(errors.title[0]);
+          if (errors.description) setDescriptionError(errors.description[0]);
+          throw new Error('Invalid input');
+        }
+        throw new Error(data.message || 'Failed to create project');
+      }
+
+      toast.success('Project created', {
+        description: `Project "${data.project.title}" created for group "${data.project.group.groupUserName}".`,
+      });
+      
+      setShowCreateModal(false);
+      resetForm();
+      // Refetch projects
+      const fetchResponse = await fetch(`/api/users/${userId}/projects`);
+      const fetchData = await fetchResponse.json();
+      if (fetchResponse.ok) {
+        setProjects(fetchData || []);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
+      toast.error('Error creating project', {
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setGroupId('');
+    setAdvisorId('');
+    setTitleError('');
+    setGroupIdError('');
+    setDescriptionError('');
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Helper function to get appropriate color for status badge
+  const getStatusColor = (status: Project['status']) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800';
+      case 'COMPLETED':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+      case 'SUBMITTED':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800';
+      case 'ARCHIVED':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
+      default:
+        return '';
+    }
+  };
 
   if (isLoading) {
     return (
@@ -44,9 +228,9 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
           <CardDescription>Loading projects...</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="h-32 bg-muted rounded-lg animate-pulse" />
-            <div className="h-32 bg-muted rounded-lg animate-pulse" />
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading projects...</span>
           </div>
         </CardContent>
       </Card>
@@ -67,25 +251,15 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
             <p className="mb-4 text-muted-foreground">
               {isOwner ? "You haven't started any projects yet." : "This user hasn't started any projects yet."}
             </p>
-            {isOwner && <Button>Create New Project</Button>}
+            {isOwner && (
+              <Button onClick={() => setShowCreateModal(true)}>
+                Create New Project
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
     );
-  }
-
-  // Helper function to get appropriate color for status badge
-  const getStatusColor = (status: Project["status"]) => {
-    switch (status) {
-      case "Active":
-        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800"
-      case "Completed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800"
-      case "Draft":
-        return "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800"
-      default:
-        return ""
-    }
   }
 
   return (
@@ -97,15 +271,19 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
               <Folder className="h-5 w-5 text-primary" /> Projects
             </CardTitle>
             <CardDescription>
-              {isOwner ? "Your current and past projects" : "Current and past projects"}
+              {isOwner ? 'Your current and past projects' : 'Current and past projects'}
             </CardDescription>
           </div>
-          {isOwner && <Button size="sm">New Project</Button>}
+          {isOwner && (
+            <Button size="sm" onClick={() => setShowCreateModal(true)}>
+              New Project
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {projects.map(project => (
+          {projects.map((project) => (
             <div 
               key={project.id} 
               className="rounded-lg border hover:border-primary transition-colors overflow-hidden"
@@ -119,49 +297,32 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
                           {project.title}
                         </Link>
                       </h3>
-                      <Badge 
-                        className={`${getStatusColor(project.status)} border`}
-                      >
+                      <Badge className={`${getStatusColor(project.status)} border`}>
                         {project.status}
                       </Badge>
                     </div>
-                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{project.description}</p>
-                  </div>
-                  
-                  <div className="flex gap-3 text-muted-foreground text-sm">
-                    {project.views !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <Eye className="h-4 w-4" />
-                        <span>{project.views}</span>
-                      </div>
-                    )}
+                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                      {project.description || 'No description provided'}
+                    </p>
                   </div>
                 </div>
-                
-                <div className="flex flex-wrap gap-2 text-xs mb-4">
-                  {project.technologies.map(tech => (
-                    <Badge key={tech} variant="secondary">{tech}</Badge>
-                  ))}
-                </div>
-                
-                {project.progress !== undefined && (
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-1.5 text-sm">
-                      <span className="font-medium">Progress</span>
-                      <span className="text-muted-foreground">{project.progress}%</span>
-                    </div>
-                    <Progress value={project.progress} className="h-2" />
-                  </div>
-                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground mb-4">
                   <div className="flex items-center gap-1">
                     <User className="h-3.5 w-3.5" />
-                    <span>Advisor: {project.advisor}</span>
+                    <span>Group: {project.group.groupUserName}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <User className="h-3.5 w-3.5" />
+                    <span>Advisor: {project.advisor ? project.advisor.name : 'None'}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>Last updated: {project.lastUpdated}</span>
+                    <span>Last updated: {formatDate(project.updatedAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Stats: {project.stats.tasks} tasks, {project.stats.evaluations} evaluations</span>
                   </div>
                 </div>
                 
@@ -171,17 +332,101 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
                       <ExternalLink className="h-4 w-4 mr-2" /> View Project
                     </Link>
                   </Button>
-                  
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <GitBranch className="h-3.5 w-3.5" />
-                    <span>main</span>
-                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
       </CardContent>
+
+      {/* Create Project Modal */}
+      <Dialog open={showCreateModal} onOpenChange={(open) => {
+        setShowCreateModal(open);
+        if (!open) resetForm();
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Add a new project for your group to work on.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="groupId">
+                Group ID <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="groupId"
+                value={groupId}
+                onChange={(e) => {
+                  setGroupId(e.target.value);
+                  setGroupIdError('');
+                }}
+                placeholder="Enter group ID"
+                className={groupIdError ? 'border-red-500' : ''}
+              />
+              {groupIdError && <p className="text-sm text-red-500">{groupIdError}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="title">
+                Project Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setTitleError('');
+                }}
+                placeholder="Enter project title"
+                className={titleError ? 'border-red-500' : ''}
+              />
+              {titleError && <p className="text-sm text-red-500">{titleError}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setDescriptionError('');
+                }}
+                placeholder="Describe the project goals and scope"
+                rows={3}
+                className={descriptionError ? 'border-red-500' : ''}
+              />
+              {descriptionError && <p className="text-sm text-red-500">{descriptionError}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="advisorId">Advisor ID (Optional)</Label>
+              <Input
+                id="advisorId"
+                value={advisorId}
+                onChange={(e) => setAdvisorId(e.target.value)}
+                placeholder="Enter advisor ID"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => {
+              setShowCreateModal(false);
+              resetForm();
+            }}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleCreateProject} disabled={isLoading}>
+              {isLoading ? 'Creating...' : 'Create Project'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
-  )
+  );
 }

@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { z } from 'zod';
-
-// Schema for group creation
-const createGroupSchema = z.object({
-  name: z.string().trim().min(1, 'Group name is required'),
-  description: z.string().optional(),
-});
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 // GET: Retrieve all groups (with filtering capabilities)
 export async function GET(req: NextRequest) {
@@ -19,7 +14,7 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Build filter condition
-    const whereCondition: any = {};
+    const whereCondition: Record<string, unknown> = {};
     if (nameFilter) {
       whereCondition.name = {
         contains: nameFilter,
@@ -38,7 +33,7 @@ export async function GET(req: NextRequest) {
       include: {
         leader: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
           },
@@ -47,7 +42,7 @@ export async function GET(req: NextRequest) {
           include: {
             user: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
               },
@@ -89,27 +84,26 @@ export async function GET(req: NextRequest) {
 // POST: Create a new group
 export async function POST(req: NextRequest) {
   try {
-    // Parse and validate request data
+    // Parse request data
     const rawData = await req.json();
-    const validationResult = createGroupSchema.safeParse(rawData);
-    
-    if (!validationResult.success) {
+    const { name, groupUserName, description } = rawData;
+
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
       return NextResponse.json(
-        { message: 'Invalid input', errors: validationResult.error.flatten().fieldErrors },
-        { status: 400 }
+        { message: 'Unauthorized' },
+        { status: 401 }
       );
     }
-    
-    const { name, description } = validationResult.data;
 
     // Check if the group name is already taken
     const existingGroup = await db.group.findUnique({
-      where: { name },
+      where: { groupUserName },
     });
 
     if (existingGroup) {
       return NextResponse.json(
-        { message: 'A group with this name already exists' },
+        { message: 'A group with this group username already exists' },
         { status: 400 }
       );
     }
@@ -130,9 +124,17 @@ export async function POST(req: NextRequest) {
     const group = await db.group.create({
       data: {
         name,
+        groupUserName,
         description,
+        leader: {
+          connect: {
+            userId: session.user.userId,
+          },
+        },
         members: {
-          create: {},
+          create: {
+            userId: session.user.userId,
+          },
         },
       },
       include: {
@@ -140,7 +142,7 @@ export async function POST(req: NextRequest) {
           include: {
             user: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
               },

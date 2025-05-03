@@ -45,10 +45,9 @@ export async function GET(
             },
             leader: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -77,9 +76,8 @@ export async function GET(
       projectCount: primaryGroup._count.projects,
       repositoryCount: primaryGroup._count.repositories,
       leader: {
-        id: primaryGroup.leader.id,
+        id: primaryGroup.leader.userId,
         name: `${primaryGroup.leader.firstName} ${primaryGroup.leader.lastName}`,
-        username: primaryGroup.leader.username,
       },
       joinedAt: userGroups[0].joinedAt,
       isLeader: isLeader,

@@ -33,10 +33,10 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { firstName, lastName, id, email, password, department, batchYear } = body;
+    const { firstName, lastName, userId, email, password, department, batchYear } = body;
 
     // Basic validation
-    if (!firstName || !lastName || !id || !email || !password || !department || !batchYear) {
+    if (!firstName || !lastName || !userId || !email || !password || !department || !batchYear) {
       const response = NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     // Check if username already exists
     const existingUser = await prisma.user.findUnique({
-      where: { id }
+      where: { userId }
     });
 
     if (existingUser) {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       data: {
         firstName,
         lastName,
-        id,
+        userId,
         email,
         passwordHash,
         role: Role.STUDENT,
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       { 
         message: 'User registered successfully', 
         user: {
-          id: user.id,
+          id: user.userId,
           role: user.role,
         }
       },

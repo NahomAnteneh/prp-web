@@ -10,12 +10,12 @@ export async function GET() {
   try {
     // Get the authenticated user session
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user?.userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
     // Get the user ID
-    const userId = session.user.id
+    const userId = session.user.userId
 
     // Fetch real notifications from the database
     const notifications = await prisma.notification.findMany({
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   try {
     // Get the authenticated user session
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user?.userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     await prisma.notification.updateMany({
       where: {
         id: { in: notificationIds },
-        recipientId: session.user.id,
+        recipientId: session.user.userId,
       },
       data: {
         read: true,

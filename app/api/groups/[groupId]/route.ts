@@ -34,20 +34,18 @@ export async function GET(
       include: {
         leader: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         members: {
           include: {
             user: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -60,10 +58,9 @@ export async function GET(
             advisorId: true,
             advisor: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -76,10 +73,9 @@ export async function GET(
             requestMessage: true,
             requestedAdvisor: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -195,7 +191,7 @@ export async function PATCH(
     // If changing name, check if the new name is already taken
     if (updateData.name && updateData.name !== group.name) {
       const existingGroup = await db.group.findUnique({
-        where: { name: updateData.name },
+        where: { groupUserName: updateData.name },
       });
 
       if (existingGroup) {
@@ -213,20 +209,18 @@ export async function PATCH(
       include: {
         leader: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         members: {
           include: {
             user: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },

@@ -20,6 +20,84 @@ interface CreateGroupModalProps {
   onSuccess: () => void;
 }
 
+// Utility function to generate a base groupUserName
+const generateBaseGroupUserName = (groupName: string): string => {
+  // Convert to lowercase, remove special characters, and replace spaces with hyphens
+  let baseName = groupName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .slice(0, 20); // Limit to 20 to allow for suffix and padding
+
+  // If baseName is empty, use a fallback
+  if (!baseName) {
+    baseName = 'group';
+  }
+
+  // If baseName is less than 6 characters, pad with random numbers
+  if (baseName.length < 6) {
+    const paddingLength = 6 - baseName.length;
+    const randomNumbers = Math.floor(Math.random() * Math.pow(10, paddingLength))
+      .toString()
+      .padStart(paddingLength, '0');
+    baseName = `${baseName}${randomNumbers}`;
+  }
+
+  return baseName;
+};
+
+// Async function to generate and check for a unique groupUserName
+const generateUniqueGroupUserName = async (groupName: string): Promise<string> => {
+  const maxAttempts = 5;
+  let attempt = 0;
+  const baseName = generateBaseGroupUserName(groupName);
+
+  while (attempt < maxAttempts) {
+    // Generate a candidate groupUserName
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    let candidateUserName = attempt === 0 ? baseName : `${baseName}-${randomSuffix}`;
+
+    // Ensure the candidate is not longer than 24 characters
+    candidateUserName = candidateUserName.slice(0, 24);
+
+    // Ensure the candidate is still at least 6 characters (pad if needed)
+    if (candidateUserName.length < 6) {
+      const paddingLength = 6 - candidateUserName.length;
+      const randomNumbers = Math.floor(Math.random() * Math.pow(10, paddingLength))
+        .toString()
+        .padStart(paddingLength, '0');
+      candidateUserName = `${candidateUserName}${randomNumbers}`.slice(0, 24);
+    }
+
+    try {
+      // Check if the groupUserName is available via API
+      const response = await fetch('/api/check-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupUserName: candidateUserName }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to check username availability');
+      }
+
+      if (data.isAvailable) {
+        return candidateUserName; // Return the unique groupUserName
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+      // Continue to the next attempt if the check fails
+    }
+
+    attempt++;
+  }
+
+  throw new Error('Unable to generate a unique group username. Please try a different group name.');
+};
+
 export default function CreateGroupModal({ maxGroupSize, onClose, onSuccess }: CreateGroupModalProps) {
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
@@ -34,14 +112,20 @@ export default function CreateGroupModal({ maxGroupSize, onClose, onSuccess }: C
       setNameError('Group name is required');
       return;
     }
-    
+
     try {
       setIsLoading(true);
+
+      // Generate a unique groupUserName
+      const groupUserName = await generateUniqueGroupUserName(groupName);
+
+      // Submit the group creation request
       const response = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: groupName,
+          groupUserName,
           description: description.trim() || null,
         }),
       });
@@ -65,8 +149,8 @@ export default function CreateGroupModal({ maxGroupSize, onClose, onSuccess }: C
         description: errorMessage,
       });
       
-      if (errorMessage.includes('already exists')) {
-        setNameError('This group name is already taken');
+      if (errorMessage.includes('already exists') || errorMessage.includes('unique group username')) {
+        setNameError('This group name or username is already taken');
       }
     } finally {
       setIsLoading(false);
@@ -130,4 +214,4 @@ export default function CreateGroupModal({ maxGroupSize, onClose, onSuccess }: C
       </DialogContent>
     </Dialog>
   );
-} 
+}

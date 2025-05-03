@@ -21,7 +21,7 @@ export const authOptions: AuthOptions = {
 
         // Find user by id
         const user = await prisma.user.findUnique({
-          where: { id: credentials.identifier }
+          where: { userId: credentials.identifier }
         });
 
         if (!user) {
@@ -40,7 +40,7 @@ export const authOptions: AuthOptions = {
 
         // Return user object without password
         return {
-          id: user.id,
+          userId: user.userId,
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
         };
@@ -53,7 +53,7 @@ export const authOptions: AuthOptions = {
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.userId = user.userId;
         token.name = user.name;
         token.role = user.role as Role;
       }
@@ -61,7 +61,7 @@ export const authOptions: AuthOptions = {
     },
     session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id as string;
+        session.user.userId = token.userId as string;
         session.user.name = token.name as string;
         session.user.role = token.role as Role;
       }

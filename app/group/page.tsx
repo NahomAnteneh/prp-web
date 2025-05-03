@@ -10,7 +10,6 @@ import ProjectsList from '@/components/group/ProjectsList';
 import AdvisorSection from '@/components/group/AdvisorSection';
 import CreateGroupModal from '@/components/group/CreateGroupModal';
 import JoinGroupModal from '@/components/group/JoinGroupModal';
-import RequestToJoinModal from '@/components/group/RequestToJoinModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/student/navbar';
 import Footer from '@/components/student/footer';
@@ -20,12 +19,10 @@ export default function GroupPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [groupData, setGroupData] = useState<Group>({} as Group);
+  const [groupData, setGroupData] = useState<Group | null>(null);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
-  const [showRequestToJoinModal, setShowRequestToJoinModal] = useState(false);
   const [maxGroupSize, setMaxGroupSize] = useState(4); // Default, will be updated from rules
-  const [unreadNotifications, setUnreadNotifications] = useState(0); // State for unread notifications
 
   useEffect(() => {
     // If user not authenticated, redirect to login
@@ -39,12 +36,10 @@ export default function GroupPage() {
       fetchGroupData();
       // Fetch rules including max group size
       fetchMaxGroupSize();
-      // Fetch unread notifications
-      fetchUnreadNotifications();
     }
   }, [status, session, router]);
 
-  const username = session?.user.username;
+  const userId = session?.user.userId;
 
   const fetchGroupData = async () => {
     try {
@@ -58,7 +53,7 @@ export default function GroupPage() {
         });
       } else {
         // User doesn't have a group
-        setGroupData({} as Group);
+        setGroupData(null);
       }
     } catch (error) {
       console.error('Failed to fetch group data:', error);
@@ -80,21 +75,6 @@ export default function GroupPage() {
     }
   };
 
-  const fetchUnreadNotifications = async () => {
-    try {
-      const response = await fetch('/api/notifications');
-      const data = await response.json();
-
-      if (response.ok) {
-        setUnreadNotifications(data.unreadCount);
-      } else {
-        console.error('Failed to fetch unread notifications:', data.message);
-      }
-    } catch (error) {
-      console.error('Error fetching unread notifications:', error);
-    }
-  };
-
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
@@ -108,7 +88,7 @@ export default function GroupPage() {
   if (!groupData) {
     return (
       <>
-        <Navbar unreadNotifications={unreadNotifications} userName={username} />
+        <Navbar />
         <div className="container mx-auto py-8 max-w-5xl">
           <div className="bg-muted/30 rounded-lg p-8 text-center">
             <h1 className="text-2xl font-bold mb-4">You are not part of any group</h1>
@@ -131,13 +111,6 @@ export default function GroupPage() {
               >
                 Join via Invitation Code
               </Button>
-              <Button 
-                size="lg" 
-                variant="secondary" 
-                onClick={() => setShowRequestToJoinModal(true)}
-              >
-                Browse & Request to Join
-              </Button>
             </div>
           </div>
 
@@ -156,13 +129,6 @@ export default function GroupPage() {
               onSuccess={fetchGroupData}
             />
           )}
-          
-          {showRequestToJoinModal && (
-            <RequestToJoinModal 
-              onClose={() => setShowRequestToJoinModal(false)}
-              onSuccess={fetchGroupData}
-            />
-          )}
         </div>
         <Footer />
       </>
@@ -172,7 +138,7 @@ export default function GroupPage() {
   // User has a group - show group dashboard
   return (
     <>
-      <Navbar unreadNotifications={unreadNotifications} userName={username} />
+      <Navbar/>
       <div className="container mx-auto py-6 max-w-6xl">
         <Tabs defaultValue="overview" className="mb-8">
           <TabsList className="grid w-full grid-cols-4">
@@ -199,7 +165,7 @@ export default function GroupPage() {
             <GroupOverview 
               group={groupData}
               maxGroupSize={maxGroupSize}
-              isLeader={session?.user?.id === groupData.leaderId}
+              isLeader={userId === groupData.leaderId}
               onUpdate={fetchGroupData}
             />
           </TabsContent>
@@ -207,14 +173,14 @@ export default function GroupPage() {
           <TabsContent value="projects" className="mt-6">
             <ProjectsList 
               groupId={groupData.id}
-              isLeader={session?.user?.id === groupData.leaderId}
+              isLeader={userId=== groupData.leaderId}
             />
           </TabsContent>
 
           <TabsContent value="advisor" className="mt-6">
             <AdvisorSection 
               group={groupData}
-              isLeader={session?.user?.id === groupData.leaderId}
+              isLeader={userId === groupData.leaderId}
               onUpdate={fetchGroupData}
             />
           </TabsContent>

@@ -1,39 +1,67 @@
-import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { z } from 'zod';
 
 // Initialize Prisma client
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
+// GET: List all projects for a user (member or advisor)
 export async function GET(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
   try {
-        const { userId } = params
+    // Handle params
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
 
-    // Get user's groups
-    const userGroups = await prisma.groupMember.findMany({
-      where: { userId },
-      select: { groupId: true }
-    })
-
-    const groupIds = userGroups.map((ug: { groupId: string }) => ug.groupId)
-
-    if (groupIds.length === 0) {
-      return NextResponse.json([]) // Return empty array if user is not in any group
+    // Validate userId
+    const userIdSchema = z.string().min(1, 'User ID is required');
+    const parsedUserId = userIdSchema.safeParse(userId);
+    if (!parsedUserId.success) {
+      return NextResponse.json(
+        { message: 'Invalid user ID format', projects: [] },
+        { status: 400 }
+      );
     }
 
-    // Build the filter conditions
-    const whereCondition: any = {
-      OR: [
-        { groupId: { in: groupIds } }, // Projects from user's groups
-        { advisorId: userId }         // Projects the user advises
-      ]
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { message: 'Unauthorized', projects: [] },
+        { status: 401 }
+      );
     }
 
-    // Fetch projects - both from user's groups and those they advise
+    // Restrict access to the user's own projects or admin
+    if (session.user.userId !== userId && session.user.role !== 'ADMINISTRATOR') {
+      return NextResponse.json(
+        { message: 'Forbidden: You can only view your own projects', projects: [] },
+        { status: 403 }
+      );
+    }
+
+    // Fetch projects where user is a group member or advisor
     const projects = await prisma.project.findMany({
-      where: whereCondition,
+      where: {
+        OR: [
+          {
+            group: {
+              members: {
+                some: {
+                  userId: userId,
+                },
+              },
+            },
+          },
+          {
+            advisorId: userId,
+          },
+        ],
+      },
       select: {
         id: true,
         title: true,
@@ -43,110 +71,93 @@ export async function GET(
         archived: true,
         createdAt: true,
         updatedAt: true,
-        groupId: true,
         advisorId: true,
-        milestones: true,
+        groupId: true,
         group: {
           select: {
             id: true,
             name: true,
-            leaderId: true,
+            groupUserName: true,
           },
         },
         advisor: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        evaluations: {
+          select: {
+            id: true,
+            score: true,
+            createdAt: true,
+          },
+        },
+        feedback: {
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            authorId: true,
+            status: true,
           },
         },
         _count: {
           select: {
             tasks: true,
-            evaluations: true,
+            repositories: true,
           },
-        },
-                tasks: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-          },
-          take: 5,
         },
       },
-      orderBy: [
-        { updatedAt: "desc" }
-      ],
-          })
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // Format the response
-    const formattedProjects = projects.map((project: any) => {
-            const isGroupLeader = project.group.leaderId === userId
+    // Format response
+    const formattedProjects = projects.map((project) => ({
+      id: project.id,
+      title: project.title,
+      description: project.description || '',
+      status: project.status,
+      submissionDate: project.submissionDate,
+      archived: project.archived,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      group: {
+        id: project.group.id,
+        name: project.group.name,
+        groupUserName: project.group.groupUserName,
+      },
+      advisor: project.advisor
+        ? {
+            id: project.advisor.userId,
+            name: `${project.advisor.firstName} ${project.advisor.lastName}`,
+          }
+        : null,
+      stats: {
+        tasks: project._count.tasks,
+        repositories: project._count.repositories,
+        evaluations: project.evaluations.length,
+        feedback: project.feedback.length,
+      },
+      evaluations: project.evaluations,
+      feedback: project.feedback,
+    }));
 
-            return {
-        id: project.id,
-        title: project.title,
-        description: project.description || "",
-        status: project.status,
-        submissionDate: project.submissionDate,
-        archived: project.archived,
-        createdAt: project.createdAt,
-        updatedAt: project.updatedAt,
-                group: {
-          id: project.group.id,
-          name: project.group.name,
-        },
-        advisor: project.advisor ? {
-          id: project.advisor.id,
-          name: `${project.advisor.firstName} ${project.advisor.lastName}`,
-        } : null,
-        isGroupLeader,
-        isAdvisor: project.advisorId === userId,
-        milestones: project.milestones,
-        stats: {
-          tasks: project._count.tasks,
-          evaluations: project._count.evaluations,
-        }
-      }
-    })
-
-    return NextResponse.json(formattedProjects)
+    return NextResponse.json(formattedProjects);
   } catch (error) {
-    console.error("Error fetching user projects:", error)
+    console.error('Error fetching user projects:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json(
+        { message: `Database error: ${error.message}`, projects: [] },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { error: "Failed to fetch project data" },
+      { message: 'Internal server error', projects: [] },
       { status: 500 }
-    )
+    );
+  } finally {
+    await prisma.$disconnect();
   }
-}
-
-// Helper function to format time ago
-function formatTimeAgo(date: Date): string {
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  
-  if (diffInSeconds < 60) {
-    return `${diffInSeconds} seconds ago`
-  }
-  
-  const diffInMinutes = Math.floor(diffInSeconds / 60)
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`
-  }
-  
-  const diffInHours = Math.floor(diffInMinutes / 60)
-  if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`
-  }
-  
-  const diffInDays = Math.floor(diffInHours / 24)
-  if (diffInDays < 30) {
-    return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`
-  }
-  
-  return new Intl.DateTimeFormat('en-US', { 
-    month: 'short', 
-    day: 'numeric' 
-  }).format(date)
 }

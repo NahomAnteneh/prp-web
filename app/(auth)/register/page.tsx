@@ -17,7 +17,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    id: "",
+    userId: "",
     email: "",
     department: "",
     batchYear: "",
@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const [formErrors, setFormErrors] = useState({
     firstName: "",
     lastName: "",
-    id: "",
+    userId: "",
     email: "",
     department: "",
     batchYear: "",
@@ -60,7 +60,7 @@ export default function RegisterPage() {
     const errors = {
       firstName: "",
       lastName: "",
-      id: "",
+      userId: "",
       email: "",
       department: "",
       batchYear: "",
@@ -91,11 +91,11 @@ export default function RegisterPage() {
     // }
 
     // ID Number validation
-    if (!formData.id) {
-      errors.id = "ID number is required";
+    if (!formData.userId) {
+      errors.userId = "ID number is required";
       isValid = false;
-    } else if (!formData.id.startsWith("BDU")) {
-      errors.id = "ID number must start with 'BDU'";
+    } else if (!formData.userId.startsWith("BDU")) {
+      errors.userId = "ID number must start with 'BDU'";
       isValid = false;
     }
 
@@ -159,8 +159,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
-          // username: formData.username,
-          id: formData.id,
+          userId: formData.userId,
           email: formData.email,
           password: formData.password,
           department: formData.department,
@@ -282,17 +281,17 @@ export default function RegisterPage() {
             </div> */}
             
             <div className="space-y-2">
-              <Label htmlFor="id" className="text-gray-700">Student ID</Label>
+              <Label htmlFor="userId" className="text-gray-700">Student ID</Label>
               <Input 
-                id="id"
-                name="id"
-                value={formData.id}
+                id="userId"
+                name="userId"
+                value={formData.userId}
                 onChange={handleChange}
                 placeholder="Your BiT student ID number"
-                className={`border-0 bg-gray-50 shadow-sm ${formErrors.id ? "ring-2 ring-red-500" : ""}`}
+                className={`border-0 bg-gray-50 shadow-sm ${formErrors.userId ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.id && (
-                <p className="text-sm text-red-500">{formErrors.id}</p>
+              {formErrors.userId && (
+                <p className="text-sm text-red-500">{formErrors.userId}</p>
               )}
             </div>
             

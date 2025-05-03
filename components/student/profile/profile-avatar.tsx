@@ -7,14 +7,12 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface ProfileAvatarProps {
   user: {
-    id: string
-    username: string
+    userId: string
     name: string
+    email: string
     role: string
     imageUrl?: string
     profileInfo: {
-      idNumber: string
-      email: string
       department: string
       batchYear: string
     }
@@ -33,8 +31,8 @@ export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarPr
       </Card>
     )
   }
-  const { name, username, role, profileInfo, imageUrl } = user
-  const { idNumber, email, department, batchYear } = profileInfo
+  const { name, userId, role, email, profileInfo, imageUrl } = user
+  const { department, batchYear } = profileInfo
 
   return (
     <Card className="h-full">
@@ -51,7 +49,7 @@ export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarPr
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
             <CardTitle className="text-2xl">{name}</CardTitle>
-            <CardDescription className="flex flex-col items-center">@{username}</CardDescription>
+            <CardDescription className="flex flex-col items-center">@{userId}</CardDescription>
           </div>
           {/* <Badge className="bg-blue-500 hover:bg-blue-600">{role}</Badge> */}
         </div>
@@ -69,7 +67,7 @@ export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarPr
             <div className="flex items-center gap-2">
               <Hash className="h-4 w-4 text-muted-foreground" />
               <dt className="text-muted-foreground">ID:</dt>
-              <dd className="font-medium">{idNumber}</dd>
+              <dd className="font-medium">{userId}</dd>
             </div>
             <div className="flex items-center gap-2">
               <School className="h-4 w-4 text-muted-foreground" />
