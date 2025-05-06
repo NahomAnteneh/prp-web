@@ -7,13 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Github, GitBranch, Users, Folder, BarChart3, Lock, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import RecentActivities from './recent-activities';
+import { Group } from '@prisma/client';
 
-interface Group {
-  id: string;
-  name: string;
-  groupUserName: string;
-  members: number;
-}
 
 interface Repository {
   id: string;
@@ -260,13 +256,13 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
               <div>
                 <h3 className="font-medium text-lg">{groupInfo.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  <Link href={`/groups/${groupInfo.id}`} className="hover:text-primary">
+                  <Link href={`/${groupInfo.groupUserName}`} className="hover:text-primary">
                     @{groupInfo.groupUserName}
-                  </Link> • {groupInfo.members} members
+                  </Link>
                 </p>
               </div>
               <Button size="sm" variant="outline" className="mt-2 md:mt-0">
-                <Link href={`/groups/${groupInfo.id}`}>
+                <Link href={`/${groupInfo.groupUserName}`}>
                   View Group
                 </Link>
               </Button>
@@ -398,6 +394,9 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
           </CardContent>
         </Card>
       </div>
+      <div>
+           <RecentActivities userId={userId} isOwner={isOwner} />
+        </div>
     </div>
   );
 }

@@ -8,7 +8,10 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Folder, ExternalLink, Calendar, User } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -21,8 +24,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Plus, FileCode } from 'lucide-react';
 import { z } from 'zod';
 
 // Validation schema matching server-side createProjectSchema
@@ -70,45 +71,90 @@ interface Project {
   }[];
 }
 
+interface ProjectResponse {
+  projects: Project[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
 interface ProjectsListProps {
   groupId: string;
   isLeader: boolean;
 }
 
 export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [projectData, setProjectData] = useState<ProjectResponse>({
+    projects: [],
+    pagination: { total: 0, limit: 5, offset: 0, hasMore: false }
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  // New project form state
+  // Create project form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [advisorId, setAdvisorId] = useState('');
   const [titleError, setTitleError] = useState('');
   const [descriptionError, setDescriptionError] = useState('');
 
-  useEffect(() => {
-    fetchProjects();
-  }, [groupId]);
-
-  const fetchProjects = async () => {
+  const fetchProjects = async (offset: number, limit: number, append: boolean = false) => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/groups/${groupId}/projects`);
+      setIsLoadingMore(true);
+      const url = `/api/groups/${groupId}/projects?offset=${offset}&limit=${limit}`;
+      const response = await fetch(url);
       const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to fetch projects');
       }
 
-      setProjects(data || []);
+      // Ensure data has the expected structure
+      const normalizedData: ProjectResponse = {
+        projects: Array.isArray(data.projects) ? data.projects.slice(0, limit) : Array.isArray(data) ? data.slice(0, limit) : [],
+        pagination: data.pagination || {
+          total: Array.isArray(data.projects) ? data.projects.length : Array.isArray(data) ? data.length : 0,
+          limit,
+          offset,
+          hasMore: (Array.isArray(data.projects) ? data.projects.length : Array.isArray(data) ? data.length : 0) > offset + limit
+        }
+      };
+
+      if (append) {
+        setProjectData({
+          projects: [...projectData.projects, ...normalizedData.projects],
+          pagination: normalizedData.pagination
+        });
+      } else {
+        setProjectData(normalizedData);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
       toast.error('Error fetching projects', {
         description: errorMessage,
       });
+      setProjectData({
+        projects: [],
+        pagination: { total: 0, limit, offset, hasMore: false }
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects(0, 5); // Fetch only 5 projects initially
+  }, [groupId]);
+
+  const handleLoadMore = () => {
+    if (projectData.pagination.hasMore) {
+      const newOffset = projectData.pagination.offset + projectData.pagination.limit;
+      fetchProjects(newOffset, projectData.pagination.limit, true);
     }
   };
 
@@ -132,7 +178,7 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
     }
 
     try {
-      setLoading(true);
+      setIsLoading(true);
       const response = await fetch(`/api/groups/${groupId}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -161,14 +207,15 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
       
       setShowCreateModal(false);
       resetForm();
-      fetchProjects();
+      // Refetch projects from the beginning
+      fetchProjects(0, 5);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
       toast.error('Error creating project', {
         description: errorMessage,
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -187,90 +234,155 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
       day: 'numeric',
     });
   };
-  
-  const getProjectStatusBadge = (status: string) => {
+
+  // Helper function to get appropriate color for status badge
+  const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
       case 'ACTIVE':
-        return <Badge className="bg-green-500">Active</Badge>;
-      case 'SUBMITTED':
-        return <Badge className="bg-blue-500">Submitted</Badge>;
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800';
       case 'COMPLETED':
-        return <Badge className="bg-purple-500">Completed</Badge>;
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+      case 'SUBMITTED':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800';
       case 'ARCHIVED':
-        return <Badge variant="outline">Archived</Badge>;
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-40">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-        <span className="ml-2">Loading projects...</span>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Folder className="h-5 w-5" /> Projects
+          </CardTitle>
+          <CardDescription>Loading projects...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading projects...</span>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
-  
-  return (
-    <div className="space-y-6">
-      {isLeader && (
-        <div className="flex justify-end">
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Create Project
-          </Button>
-        </div>
-      )}
-      
-      {projects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10">
-            <FileCode className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No Projects Yet</h3>
-            <p className="text-sm text-muted-foreground text-center max-w-md mt-1">
-              Your group doesn't have any projects yet. 
-              {isLeader ? ' Start by creating your first project above.' : ' The group leader can create a project.'}
+
+  if (projectData.projects.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Folder className="h-5 w-5" /> Projects
+          </CardTitle>
+          <CardDescription>No projects found</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-6">
+            <p className="mb-4 text-muted-foreground">
+              {isLeader ? "Your group hasn't started any projects yet." : "This group hasn't started any projects yet."}
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-1">
-          {projects.map((project) => (
-            <Card key={project.id}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
+            {isLeader && (
+              <Button onClick={() => setShowCreateModal(true)}>
+                Create New Project
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Folder className="h-5 w-5 text-primary" /> Projects
+            </CardTitle>
+            <CardDescription>
+              {isLeader ? 'Your group’s current and past projects' : 'Current and past projects'}
+            </CardDescription>
+          </div>
+          {isLeader && (
+            <Button size="sm" onClick={() => setShowCreateModal(true)}>
+              New Project
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {projectData.projects.map((project) => (
+            <div 
+              key={project.id}
+              className="rounded-lg border hover:border-primary transition-colors overflow-hidden"
+            >
+              <div className="p-5">
+                <div className="flex flex-col md:flex-row justify-between md:items-start gap-2 mb-3">
                   <div>
-                    <CardTitle>{project.title}</CardTitle>
-                    <CardDescription className="mt-1">
-                      Created on {formatDate(project.createdAt)} | Group: {project.group.groupUserName}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getProjectStatusBadge(project.status)}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <h3 className="text-lg font-semibold">
+                        <Link href={`/groups/${project.group.id}/projects/${project.id}`} className="hover:text-primary transition-colors">
+                          {project.title}
+                        </Link>
+                      </h3>
+                      <Badge className={`${getStatusColor(project.status)} border`}>
+                        {project.status}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                      {project.description || 'No description provided'}
+                    </p>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pb-2">
-                {project.description ? (
-                  <p className="text-sm">{project.description}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">No description provided</p>
-                )}
-                {project.advisor && (
-                  <p className="text-sm mt-2">
-                    Advisor: {project.advisor.name}
-                  </p>
-                )}
-                <div className="mt-2 text-sm text-muted-foreground">
-                  Stats: {project.stats.tasks} tasks, {project.stats.evaluations} evaluations, {project.stats.feedback} feedback items
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground mb-4">
+                  <div className="flex items-center gap-1">
+                    <User className="h-3.5 w-3.5" />
+                    <span>Group: {project.group.groupUserName}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <User className="h-3.5 w-3.5" />
+                    <span>Advisor: {project.advisor ? project.advisor.name : 'None'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Last updated: {formatDate(project.updatedAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Stats: {project.stats.tasks} tasks, {project.stats.evaluations} evaluations</span>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+                
+                <div className="flex justify-between items-center">
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/projects/${project.id}`}>
+                      <ExternalLink className="h-4 w-4 mr-2" /> View Project
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
-      )}
-      
+        {projectData.pagination.hasMore && (
+          <div className="text-center mt-6">
+            <Button 
+              variant="outline" 
+              onClick={handleLoadMore} 
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? 'Loading...' : 'Load More'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+
       {/* Create Project Modal */}
       <Dialog open={showCreateModal} onOpenChange={(open) => {
         setShowCreateModal(open);
@@ -336,12 +448,12 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
             }}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleCreateProject} disabled={loading}>
-              {loading ? 'Creating...' : 'Create Project'}
+            <Button type="button" onClick={handleCreateProject} disabled={isLoading}>
+              {isLoading ? 'Creating...' : 'Create Project'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Card>
   );
 }

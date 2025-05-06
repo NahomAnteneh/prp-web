@@ -1,123 +1,61 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle, Settings, Code } from 'lucide-react';
+import { Loader2, Users, CheckCircle, Settings } from 'lucide-react';
 import GroupOverview from '@/components/group/GroupOverview';
 import ProjectsList from '@/components/group/ProjectsList';
-import RepositoriesList from '@/components/group/RepositoriesList';
-import GroupSettings from '@/components/group/GroupSettings';
+import AdvisorSection from '@/components/group/AdvisorSection';
 import CreateGroupModal from '@/components/group/CreateGroupModal';
 import JoinGroupModal from '@/components/group/JoinGroupModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/student/navbar';
 import Footer from '@/components/student/footer';
-import { Group, GroupInvite } from '@prisma/client';
-import { toast } from 'sonner';
+import { Navbar as NavBar } from '@/components/navbar';
+import { Footer as FooterComponent } from '@/components/footer';
+import { Group } from '@prisma/client';
 
-// Define the expected type for groupData, including relations
-interface GroupWithRelations extends Group {
-  members: { userId: string }[];
-  invites: GroupInvite[];
+interface GroupPageProps {
+  groupData: Group | null;
+  isVisitor: boolean;
 }
 
-export default function GroupPage() {
-  const { data: session, status } = useSession();
+export default function GroupPage({ groupData, isVisitor }: GroupPageProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [groupData, setGroupData] = useState<GroupWithRelations | null>(null);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [maxGroupSize, setMaxGroupSize] = useState(4); // Default, will be updated from rules
 
-  const defaultTab = searchParams.get('tab') || 'overview';
-
-  const handleTabChange = (tab: string) => {
-    router.push(`/group?tab=${tab}`);
-  };
-
   useEffect(() => {
-    // If user not authenticated, redirect to login
-    if (status === 'unauthenticated') {
-      router.push('/login');
-      return;
-    }
-
-    if (status === 'authenticated') {
-      // Fetch current user's group information
-      fetchGroupData();
+    if (!isVisitor) {
       // Fetch rules including max group size
       fetchMaxGroupSize();
     }
-  }, [status, session, router]);
-
-  const userId = session?.user.userId;
-
-  const fetchGroupData = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/groups/my-group');
-      const data = await response.json();
-
-      if (response.ok) {
-        setGroupData({
-          ...data,
-          members: Array.isArray(data.members) ? data.members : [],
-          invites: Array.isArray(data.invites) ? data.invites : [],
-        });
-      } else {
-        // User doesn't have a group
-        setGroupData(null);
-        toast.info('No group found', {
-          description: 'You are not part of any group. Create or join one to continue.',
-        });
-      }
-    } catch (error) {
-      console.error('Failed to fetch group data:', error);
-      toast.error('Error fetching group data', {
-        description: 'Something went wrong while loading your group information.',
-      });
-      setGroupData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isVisitor]);
 
   const fetchMaxGroupSize = async () => {
     try {
       const response = await fetch('/api/rules');
       const data = await response.json();
 
-      if (response.ok && typeof data.maxGroupSize === 'number') {
+      if (response.ok && data.maxGroupSize) {
         setMaxGroupSize(data.maxGroupSize);
-      } else {
-        console.warn('Invalid maxGroupSize received:', data.maxGroupSize);
       }
     } catch (error) {
       console.error('Failed to fetch max group size:', error);
-      toast.error('Error fetching rules', {
-        description: 'Could not load group size rules. Using default value.',
-      });
     }
   };
-
-  if (status === 'loading' || loading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-lg">Loading group information...</span>
-      </div>
-    );
-  }
 
   // User is not part of a group - show options to create or join one
   if (!groupData) {
     return (
       <>
-        <Navbar />
+          {isVisitor ? (
+              <NavBar />
+            ): (
+              <Navbar />
+            )}
         <div className="container mx-auto py-8 max-w-5xl">
           <div className="bg-muted/30 rounded-lg p-8 text-center">
             <h1 className="text-2xl font-bold mb-4">You are not part of any group</h1>
@@ -148,18 +86,28 @@ export default function GroupPage() {
             <CreateGroupModal
               maxGroupSize={maxGroupSize}
               onClose={() => setShowCreateGroupModal(false)}
-              onSuccess={fetchGroupData}
+              onSuccess={() => {
+                console.log('Group created successfully');
+                setShowCreateGroupModal(false);
+              }}
             />
           )}
 
           {showJoinGroupModal && (
             <JoinGroupModal
               onClose={() => setShowJoinGroupModal(false)}
-              onSuccess={fetchGroupData}
+              onSuccess={() => {
+                console.log('Successfully joined a group');
+                setShowJoinGroupModal(false);
+              }}
             />
           )}
         </div>
-        <Footer />
+        {isVisitor ? (
+            <FooterComponent />
+          ): (
+            <Footer />
+          )}
       </>
     );
   }
@@ -167,9 +115,13 @@ export default function GroupPage() {
   // User has a group - show group dashboard
   return (
     <>
-      <Navbar />
+      {isVisitor ? (
+              <NavBar />
+            ): (
+              <Navbar />
+            )}
       <div className="container mx-auto py-6 max-w-6xl">
-        <Tabs defaultValue={defaultTab} onValueChange={handleTabChange} className="mb-8">
+        <Tabs defaultValue="overview" className="mb-8">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
@@ -179,9 +131,9 @@ export default function GroupPage() {
               <CheckCircle className="h-4 w-4" />
               <span>Projects</span>
             </TabsTrigger>
-            <TabsTrigger value="repositories" className="flex items-center gap-2">
-              <Code className="h-4 w-4" />
-              <span>Repositories</span>
+            <TabsTrigger value="advisor" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Advisor</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -194,36 +146,35 @@ export default function GroupPage() {
             <GroupOverview
               group={groupData}
               maxGroupSize={maxGroupSize}
-              isLeader={userId === groupData.leaderId}
-              onUpdate={fetchGroupData}
+              isLeader={!isVisitor}
             />
           </TabsContent>
 
           <TabsContent value="projects" className="mt-6">
             <ProjectsList
               groupId={groupData.id}
-              isLeader={userId === groupData.leaderId}
+              isLeader={!isVisitor}
             />
           </TabsContent>
 
-          <TabsContent value="repositories" className="mt-6">
-            <RepositoriesList
-              groupId={groupData.id}
-              isLeader={userId === groupData.leaderId}
+          <TabsContent value="advisor" className="mt-6">
+            <AdvisorSection
+              group={groupData}
+              isLeader={!isVisitor}
             />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
-            <GroupSettings
-              group={groupData}
-              maxGroupSize={maxGroupSize}
-              isLeader={!!userId && userId === groupData.leaderId}
-              onUpdate={fetchGroupData}
-            />
+            <h2 className="text-xl font-bold mb-4">Settings</h2>
+            <p>Settings content goes here...</p>
           </TabsContent>
         </Tabs>
       </div>
-      <Footer />
+      {isVisitor ? (
+            <FooterComponent />
+          ): (
+            <Footer />
+          )}
     </>
   );
 }

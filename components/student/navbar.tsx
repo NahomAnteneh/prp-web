@@ -22,24 +22,23 @@ export default function Navbar() {
   const [displayName, setDisplayName] = useState<string>("Student")
   const [unreadCount, setUnreadCount] = useState(0)
 
-  const userName = session?.user.username;
+  const userName = session?.user.userId;
 
   useEffect(() => {
     async function fetchNavbarData() {
       try {
-        const response = await fetch("/api/notifications")
-        if (response.ok) {
-          const data = await response.json()
+        const notifications = await fetch("/api/notifications")
+        if (notifications.ok) {
+          const data = await notifications.json()
           setUnreadCount(data.unreadCount || 0)
         } else {
           console.error("Failed to fetch navbar data")
         }
-        setDisplayName(userName || "Student")
       } catch (error) {
         console.error("Error fetching navbar data:", error)
       }
     }
-
+    setDisplayName(userName || "Student")
     fetchNavbarData()
   }, [userName])
 

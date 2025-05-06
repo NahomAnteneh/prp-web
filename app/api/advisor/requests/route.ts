@@ -10,20 +10,19 @@ export async function POST(request: Request) {
   try {
     // Get the authenticated user session
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = session.user.userId;
 
     // Verify user is an advisor
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { userId: userId },
       select: {
-        id: true,
+        userId: true,
         firstName: true,
         lastName: true,
-        username: true,
         role: true,
       },
     });
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
       include: {
         group: {
           include: {
-            project: true,
+            projects: true,
           },
         },
       },
@@ -98,10 +97,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // If accepted, update the project's advisor
-    if (action === "accept" && advisorRequest.group.project) {
+    // If accepted, update the specific project's advisor
+    if (action === "accept" && advisorRequest.projectId) {
       await prisma.project.update({
-        where: { id: advisorRequest.group.project.id },
+        where: { id: advisorRequest.projectId },
         data: { advisorId: userId },
       });
 
@@ -116,10 +115,10 @@ export async function POST(request: Request) {
         groupMembers.map(member => 
           prisma.notification.create({
             data: {
-              message: `Your request for an advisor has been accepted by ${user.username || "an advisor"}`,
+              message: `Your request for an advisor has been accepted by ${user.firstName || "an advisor"}`,
               recipientId: member.userId,
               read: false,
-              link: advisorRequest.group.project ? `/dashboard/project/${advisorRequest.group.project.id}` : undefined,
+              link: `/dashboard/project/${advisorRequest.projectId}`,
             },
           })
         )
@@ -157,4 +156,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

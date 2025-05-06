@@ -81,8 +81,7 @@ export async function GET(
         },
         owner: {
           select: {
-            id: true,
-            username: true,
+            userId: true,
             firstName: true,
             lastName: true,
           },

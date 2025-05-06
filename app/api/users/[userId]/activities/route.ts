@@ -1,47 +1,21 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { z } from "zod"
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
-
-const userIdSchema = z.string().min(1)
-
-// Query parameter schema
-const querySchema = z.object({
-  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
-  offset: z.string().regex(/^\d+$/).transform(Number).optional(),
-}).optional()
 
 export async function GET(
   request: Request,
   { params }: { params: { userId: string } }
 ) {
   try {
-    // Validate userId
-    const parsedParams = userIdSchema.safeParse(params.userId)
-    if (!parsedParams.success) {
-      return NextResponse.json(
-        { error: "Invalid user ID format" },
-        { status: 400 }
-      )
-    }
-
     const userId = params.userId
 
     // Parse query parameters
     const url = new URL(request.url)
-    const queryResult = querySchema.safeParse(Object.fromEntries(url.searchParams))
-    if (!queryResult.success) {
-      return NextResponse.json(
-        { error: "Invalid query parameters" },
-        { status: 400 }
-      )
-    }
-
-    const queryParams = queryResult.data || {}
-    const limit = queryParams.limit || 10
-    const offset = queryParams.offset || 0
+    const searchParams = Object.fromEntries(url.searchParams)
+    const limit = searchParams.limit ? parseInt(searchParams.limit) : 10
+    const offset = searchParams.offset ? parseInt(searchParams.offset) : 0
 
     // 1. Get recent commits
     const commits = await prisma.commit.findMany({

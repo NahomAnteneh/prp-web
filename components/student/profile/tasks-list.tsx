@@ -79,36 +79,52 @@ interface TaskResponse {
 
 export default function TasksList({ userId, isOwner = false }: TasksListProps) {
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("all")
   const [taskData, setTaskData] = useState<TaskResponse | null>(null)
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        setIsLoading(true)
-        // All tasks will be fetched regardless of active tab
-        // We'll filter on the client side in the TasksTabContent component
-        const response = await fetch(
-          `/api/users/${userId}/tasks`
-        )
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch tasks")
-        }
-        
-        const data = await response.json()
-        setTaskData(data)
-      } catch (error) {
-        console.error("Error fetching tasks:", error)
-        setError("Failed to load tasks. Please try again later.")
-      } finally {
-        setIsLoading(false)
+  const fetchTasks = async (offset: number, limit: number, append: boolean = false) => {
+    try {
+      setIsLoadingMore(true)
+      const response = await fetch(
+        `/api/users/${userId}/tasks?offset=${offset}&limit=${limit}`
+      )
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch tasks")
       }
+      
+      const data: TaskResponse = await response.json()
+      
+      if (append && taskData) {
+        setTaskData({
+          tasks: [...taskData.tasks, ...data.tasks],
+          pagination: data.pagination,
+          counts: data.counts
+        })
+      } else {
+        setTaskData(data)
+      }
+    } catch (error) {
+      console.error("Error fetching tasks:", error)
+      setError("Failed to load tasks. Please try again later.")
+    } finally {
+      setIsLoading(false)
+      setIsLoadingMore(false)
     }
+  }
 
-    fetchTasks()
+  useEffect(() => {
+    fetchTasks(0, 10)
   }, [userId])
+
+  const handleLoadMore = () => {
+    if (taskData && taskData.pagination.hasMore) {
+      const newOffset = taskData.pagination.offset + taskData.pagination.limit
+      fetchTasks(newOffset, taskData.pagination.limit, true)
+    }
+  }
 
   // Helper to get status badge styling
   const getStatusBadge = (status: Task['status']) => {
@@ -316,7 +332,13 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
 
         {taskData.pagination.hasMore && (
           <div className="text-center mt-4">
-            <Button variant="outline">Load More</Button>
+            <Button 
+              variant="outline" 
+              onClick={handleLoadMore} 
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
           </div>
         )}
       </CardContent>
@@ -436,4 +458,4 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
       </div>
     )
   }
-} 
+}

@@ -5,8 +5,10 @@ import { useParams } from "next/navigation"
 import { User, Users, BookOpen, Clock, Folder, ListChecks } from "lucide-react"
 import Image from "next/image"
 import { useSession } from "next-auth/react"
-import Navbar from "../navbar"
+import Navbar from "../navbar";
+import { Navbar as NavBar } from "../../navbar";
 import Footer from "../footer"
+import {Footer as FooterComponent } from "../../footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProfileAvatar from "./profile-avatar"
@@ -33,13 +35,12 @@ interface UserProfile {
 interface StudentProfilePageProps {
   userId?: string
   username: string
-  owner: boolean
+  visitor: boolean
 }
 
-export default function StudentProfilePage({ userId: propUserId, username: propUsername, owner: propOwner }: StudentProfilePageProps) {
+export default function StudentProfilePage({ userId: propUserId, username: propUsername, visitor: isVisitor }: StudentProfilePageProps) {
   const userId = propUserId 
   const username = propUsername
-  const owner = propOwner
   const [isLoading, setIsLoading] = useState(true)
   const [profileData, setProfileData] = useState<UserProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +120,11 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+    {isVisitor ? (
+      <NavBar />
+    ): (
       <Navbar />
+    )}
       
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-8 md:px-6">
         {isLoading ? (
@@ -141,27 +146,8 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Public View Banner */}
-            {profileData && !profileData.viewerHasFullAccess && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm flex items-center justify-between dark:bg-blue-900/20 dark:border-blue-800">
-                <span className="font-medium text-blue-700 dark:text-blue-400">You are viewing a limited public profile</span>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/login?returnTo=back">Sign in for full access</Link>
-                </Button>
-              </div>
-            )}
-            
-            {/* Profile ownership indicator (only visible to owner/admin) */}
-            {canEdit && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-sm flex items-center justify-between">
-                <span className="font-medium">You are viewing your own profile</span>
-                <span className="text-xs text-muted-foreground">You can see private content and edit options</span>
-              </div>
-            )}
-            
-            {/* Tabs for different sections */}
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+            <Tabs defaultValue="overview">
+              <TabsList className="grid w-full grid-cols-3"> {/* Adjusted grid-cols to 3 */}
                 <TabsTrigger value="overview" className="flex items-center gap-2">
                   <Users className="h-4 w-4" /> Overview
                 </TabsTrigger>
@@ -170,12 +156,6 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
                 </TabsTrigger>
                 <TabsTrigger value="tasks" className="flex items-center gap-2">
                   <ListChecks className="h-4 w-4" /> Tasks
-                </TabsTrigger>
-                <TabsTrigger value="activities" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" /> Activities
-                </TabsTrigger>
-                <TabsTrigger value="documents" className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> Documents
                 </TabsTrigger>
               </TabsList>
               
@@ -211,50 +191,16 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
                   </div>
                 </div>
               </TabsContent>
-              
-              <TabsContent value="activities" className="mt-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="md:w-1/4">
-                    <ProfileAvatar user={profileData} isOwner={canEdit} />
-                  </div>
-                  <div className="md:w-3/4">
-                    <RecentActivities userId={username} isOwner={canEdit} />
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="documents" className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Documents & Resources</CardTitle>
-                    <CardDescription>View and manage your documents and resources</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {canEdit ? (
-                      <>
-                        <p className="text-muted-foreground text-center py-4">
-                          No documents available at this time
-                        </p>
-                        <div className="flex justify-center mt-4">
-                          <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium">
-                            Upload New Document
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground text-center py-8">
-                        No public documents available
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
             </Tabs>
           </div>
         )}
       </main>
       
+      {isVisitor ? (
+      <FooterComponent />
+    ): (
       <Footer />
+    )}
     </div>
   )
 }

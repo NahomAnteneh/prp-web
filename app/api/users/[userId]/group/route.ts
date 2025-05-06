@@ -21,7 +21,7 @@ export async function GET(
       )
     }
 
-    const userId = params.userId
+    const userId = await params.userId
 
     // Find the user's groups
     const userGroups = await prisma.groupMember.findMany({
@@ -33,6 +33,7 @@ export async function GET(
           select: {
             id: true,
             name: true,
+            groupUserName: true,
             description: true,
             leaderId: true,
             createdAt: true,
@@ -71,6 +72,7 @@ export async function GET(
     const response = {
       id: primaryGroup.id,
       name: primaryGroup.name,
+      groupUserName: primaryGroup.groupUserName,
       description: primaryGroup.description,
       memberCount: primaryGroup._count.members,
       projectCount: primaryGroup._count.projects,

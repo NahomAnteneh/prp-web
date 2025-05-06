@@ -1,9 +1,9 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge, Calendar, Edit, Hash, Mail, School } from "lucide-react"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge, Calendar, Edit, Hash, School } from "lucide-react"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface ProfileAvatarProps {
   user: {
@@ -35,9 +35,9 @@ export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarPr
   const { department, batchYear } = profileInfo
 
   return (
-    <Card className="h-full">
+    <Card className="max-w-md mx-auto">
       <CardHeader className="flex flex-col items-center">
-      <div className="relative w-40 h-40 rounded-full overflow-hidden mb-6 border-4 border-primary/20">
+        <div className="relative w-32 h-32 rounded-full overflow-hidden mb-4 border-4 border-primary/20">
           <Avatar className="w-full h-full">
             {imageUrl ? (
               <AvatarImage src={imageUrl} alt={`${name}'s profile picture`} />
@@ -46,40 +46,37 @@ export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarPr
             )}
           </Avatar>
         </div>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <CardTitle className="text-2xl">{name}</CardTitle>
-            <CardDescription className="flex flex-col items-center">@{userId}</CardDescription>
-          </div>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <CardTitle className="text-xl">{name}</CardTitle>
+          <CardDescription>@{userId}</CardDescription>
           {/* <Badge className="bg-blue-500 hover:bg-blue-600">{role}</Badge> */}
         </div>
       </CardHeader>
-      <CardContent className="p-6 flex flex-col items-center">
+      <CardContent className="p-4">
         {isOwner && (
-          <div className="flex flex-wrap gap-2 w-full mb-4">
-            <Button variant="outline" size="sm" className="w-full gap-2 mt-2">
+          <div className="mb-4">
+            <Button variant="outline" size="sm" className="w-full gap-2">
               <Edit className="h-4 w-4" /> Edit Profile
             </Button>
           </div>
         )}
-
-        <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-2">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              <dt className="text-muted-foreground">ID:</dt>
-              <dd className="font-medium">{userId}</dd>
-            </div>
-            <div className="flex items-center gap-2">
-              <School className="h-4 w-4 text-muted-foreground" />
-              <dt className="text-muted-foreground">Department:</dt>
-              <dd className="font-medium">{department}</dd>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <dt className="text-muted-foreground">Batch Year:</dt>
-              <dd className="font-medium">{batchYear}</dd>
-            </div>
-          </dl>
+        <dl className="grid grid-cols-1 gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <dt className="text-muted-foreground w-24">ID:</dt>
+            <dd className="font-medium truncate">{userId}</dd>
+          </div>
+          <div className="flex items-center gap-2">
+            <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <dt className="text-muted-foreground w-24">Department:</dt>
+            <dd className="font-medium truncate">{department}</dd>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <dt className="text-muted-foreground w-24">Batch Year:</dt>
+            <dd className="font-medium truncate">{batchYear}</dd>
+          </div>
+        </dl>
       </CardContent>
     </Card>
   )

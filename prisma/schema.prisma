@@ -394,6 +394,7 @@ model AdvisorRequest {
   responseMessage    String?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+  projectId          String               // The project being requested
   groupId            String               // The group making the request
   requestedAdvisorId String               // The User (potential advisor) being requested
 

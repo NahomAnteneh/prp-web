@@ -72,6 +72,16 @@ interface Project {
   }[];
 }
 
+interface ProjectResponse {
+  projects: Project[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
 interface ProjectsListProps {
   userId: string;
   isOwner?: boolean;
@@ -79,7 +89,11 @@ interface ProjectsListProps {
 
 export default function ProjectsList({ userId, isOwner = false }: ProjectsListProps) {
   const [isLoading, setIsLoading] = useState(true);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [projectData, setProjectData] = useState<ProjectResponse>({
+    projects: [],
+    pagination: { total: 0, limit: 5, offset: 0, hasMore: false }
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   
   // Create project form state
@@ -91,30 +105,65 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
   const [groupIdError, setGroupIdError] = useState('');
   const [descriptionError, setDescriptionError] = useState('');
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/users/${userId}/projects`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch projects');
-        }
+  const fetchProjects = async (offset: number, limit: number, append: boolean = false) => {
+    try {
+      setIsLoadingMore(true);
+      const url = `/api/users/${userId}/projects?offset=${offset}&limit=${limit}`;
+      console.log('Fetching projects:', url); // Debug: Log the API URL
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('API response:', data); // Debug: Log the API response
 
-        setProjects(data || []);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-        toast.error('Error fetching projects', {
-          description: errorMessage,
-        });
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch projects');
       }
-    };
 
-    fetchProjects();
+      // Ensure data has the expected structure
+      const normalizedData: ProjectResponse = {
+        projects: Array.isArray(data.projects) ? data.projects.slice(0, limit) : Array.isArray(data) ? data.slice(0, limit) : [],
+        pagination: data.pagination || {
+          total: Array.isArray(data.projects) ? data.projects.length : Array.isArray(data) ? data.length : 0,
+          limit,
+          offset,
+          hasMore: (Array.isArray(data.projects) ? data.projects.length : Array.isArray(data) ? data.length : 0) > offset + limit
+        }
+      };
+
+      if (append) {
+        setProjectData({
+          projects: [...projectData.projects, ...normalizedData.projects],
+          pagination: normalizedData.pagination
+        });
+      } else {
+        setProjectData(normalizedData);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
+      console.error('Fetch projects error:', error); // Debug: Log the error
+      toast.error('Error fetching projects', {
+        description: errorMessage,
+      });
+      setProjectData({
+        projects: [],
+        pagination: { total: 0, limit, offset, hasMore: false }
+      });
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects(0, 5); // Fetch only 5 projects initially
   }, [userId]);
+
+  const handleLoadMore = () => {
+    if (projectData.pagination.hasMore) {
+      const newOffset = projectData.pagination.offset + projectData.pagination.limit;
+      fetchProjects(newOffset, projectData.pagination.limit, true);
+    }
+  };
 
   const handleCreateProject = async () => {
     // Reset errors
@@ -168,12 +217,8 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
       
       setShowCreateModal(false);
       resetForm();
-      // Refetch projects
-      const fetchResponse = await fetch(`/api/users/${userId}/projects`);
-      const fetchData = await fetchResponse.json();
-      if (fetchResponse.ok) {
-        setProjects(fetchData || []);
-      }
+      // Refetch projects from the beginning
+      fetchProjects(0, 5);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
       toast.error('Error creating project', {
@@ -237,7 +282,7 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
     );
   }
 
-  if (projects.length === 0) {
+  if (projectData.projects.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -283,9 +328,9 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {projects.map((project) => (
+          {projectData.projects.map((project) => (
             <div 
-              key={project.id} 
+              key={project.id} // Use project.id as the unique key
               className="rounded-lg border hover:border-primary transition-colors overflow-hidden"
             >
               <div className="p-5">
@@ -293,7 +338,7 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       <h3 className="text-lg font-semibold">
-                        <Link href={`/projects/${project.id}`} className="hover:text-primary transition-colors">
+                        <Link href={`/groups/${project.group.id}/projects/${project.id}`} className="hover:text-primary transition-colors">
                           {project.title}
                         </Link>
                       </h3>
@@ -337,6 +382,17 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
             </div>
           ))}
         </div>
+        {projectData.pagination.hasMore && (
+          <div className="text-center mt-6">
+            <Button 
+              variant="outline" 
+              onClick={handleLoadMore} 
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? 'Loading...' : 'Load More'}
+            </Button>
+          </div>
+        )}
       </CardContent>
 
       {/* Create Project Modal */}
@@ -401,16 +457,6 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
                 className={descriptionError ? 'border-red-500' : ''}
               />
               {descriptionError && <p className="text-sm text-red-500">{descriptionError}</p>}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="advisorId">Advisor ID (Optional)</Label>
-              <Input
-                id="advisorId"
-                value={advisorId}
-                onChange={(e) => setAdvisorId(e.target.value)}
-                placeholder="Enter advisor ID"
-              />
             </div>
           </div>
           

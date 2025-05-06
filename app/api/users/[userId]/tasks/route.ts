@@ -1,9 +1,5 @@
-// Get all the tasks also have a POST model to update tasks
-
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { z } from "zod"
 
 // Initialize Prisma client
@@ -37,7 +33,7 @@ export async function GET(
   try {
     // Await params before accessing its properties
     const { params } = context;
-    const username = params.userId;
+    const userId = params.userId;
 
     // Validate userId
     const parsedParams = userIdSchema.safeParse(params.userId)
@@ -58,20 +54,6 @@ export async function GET(
       )
     }
 
-    // Find user by username
-    const user = await prisma.user.findUnique({
-      where: { username }
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      )
-    }
-
-    const userId = user.username
-
     const queryParams = queryResult.data || {}
     const limit = queryParams.limit || 20
     const offset = queryParams.offset || 0
@@ -81,27 +63,6 @@ export async function GET(
     // Which tasks to include based on user's relationship with them
     const includeCreated = queryParams.created ?? true
     const includeAssigned = queryParams.assigned ?? true
-
-    // Get the authenticated user session
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      )
-    }
-
-    // Check authorization (users can only see their own tasks, or admins can see any)
-    const isAuthorized = 
-      session.user.username === username || 
-      session.user.role === "ADMINISTRATOR"
-    
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Not authorized to view this user's tasks" },
-        { status: 403 }
-      )
-    }
 
     // Build the filter conditions
     const whereCondition: any = {
@@ -183,18 +144,16 @@ export async function GET(
       include: {
         creator: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         assignee: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         project: {

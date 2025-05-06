@@ -1,12 +1,11 @@
 "use client";
 
-import { Role } from "@prisma/client"; // Assuming Role enum is accessible
+import { Group, Role } from "@prisma/client"; // Assuming Role enum is accessible
 import { notFound, useParams } from "next/navigation"; // Use useParams hook
 import { useEffect, useState } from "react";
-import { isAuthenticated } from "@/lib/auth";
 import StudentProfilePage from "@/components/student/profile/profile-page";
 import { useSession } from "next-auth/react";
-import router from "next/router";
+import GroupPage from "@/components/group/group-page";
 
 // Define an interface for the user data structure
 interface UserData {
@@ -14,8 +13,13 @@ interface UserData {
   role: Role;
   firstName?: string;
   lastName?: string;
-  // Add other potential user fields if needed
 }
+
+// Define an interface for the group data structure
+// interface GroupData {
+//   groupId: string;
+//   name: string;
+// }
 
 export default function UserPage() {
   // Use the useParams hook to get route parameters
@@ -23,74 +27,79 @@ export default function UserPage() {
   const ownerId = params?.ownerId as string;
   const { data: session, status } = useSession();
   const [userData, setUserData] = useState<UserData | null>(null);
-  // const [isLoading, setIsLoading] = useState(true);
-  // State to track if the user was not found
+  const [groupData, setGroupData] = useState<Group | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
 
-  // useEffect hook for data fetching on component mount or when ownerId changes
   useEffect(() => {
-    // if (status === 'unauthenticated') {
-    //   router.push('/login');
-    //   return;
-    // }
-    
-    // if (status === 'authenticated') {
-      // Fetch current user's group information
-      findUserByUsername(ownerId);
-    // }
-  }, [ownerId, status]); // Re-run effect if ownerId changes
+    checkIfGroupOrUser(ownerId);
+  }, [ownerId, status]);
 
-  // Handle the not found case - calling notFound() directly doesn't work in Client Components
-  // You might redirect, show a message, or render a specific component
   useEffect(() => {
     if (isNotFound) {
-      // Option 1: Redirect (requires useRouter hook from 'next/navigation')
-      // import { useRouter } from 'next/navigation';
-      // const router = useRouter();
-      // router.push('/404'); // Or your custom 404 page
-
-      // Option 2: Use Next.js notFound() - this might trigger the nearest not-found.js file
       notFound();
     }
   }, [isNotFound]);
 
-  async function findUserByUsername(userId: string) {
+  async function checkIfGroupOrUser(id: string) {
     setIsNotFound(false); // Reset not found state
     setUserData(null); // Reset user data
+    setGroupData(null); // Reset group data
 
     try {
+      // Check if it is a group
+      const groupResponse = await fetch(`/api/groups/${id}`);
 
+      if (groupResponse.ok) {
+        const group: Group = await groupResponse.json();
+        setGroupData(group); // Set group data on success
+        return;
+      }
 
-      const response = await fetch(`/api/users/${userId}`);
+      // If not a group, check if it is a user
+      const userResponse = await fetch(`/api/users/${id}`);
 
-      if (response.ok) {
-        const data: UserData = await response.json();
-        setUserData(data); // Set user data on success
-      } else if (response.status === 404) {
-        console.log(`User not found for username: ${userId}`);
+      if (userResponse.ok) {
+        const user: UserData = await userResponse.json();
+        setUserData(user); // Set user data on success
+      } else if (userResponse.status === 404) {
+        console.log(`Entity not found for ID: ${id}`);
         setIsNotFound(true); // Set not found state
       } else {
         // Handle other non-OK responses
-        console.error(`Error fetching user: ${response.statusText}`);
+        console.error(`Error fetching entity: ${userResponse.statusText}`);
         setIsNotFound(true); // Treat other errors as not found for simplicity here
       }
     } catch (error) {
-      console.error('Error fetching user:', error);
+      console.error("Error fetching entity:", error);
       setIsNotFound(true); // Set not found on network or other errors
-    } finally {
     }
+  }
+
+  // If group data exists, render the group page
+  if (groupData) {
+    return (
+      <div>
+        {/* <h1 className="text-3xl font-bold">Group Page: {groupData.name}</h1>
+        <p className="mt-4 text-muted-foreground">
+          Welcome to the group page for {groupData.name}. More details coming soon.
+        </p> */}
+        <GroupPage groupData={groupData} isVisitor={status !== "authenticated"} />
+      </div>
+    );
   }
 
   // If user data exists, render the profile based on role
   if (userData) {
+    const isVisitor = status !== "authenticated";
+
     if (userData.role === Role.STUDENT) {
-      return <StudentProfilePage userId={userData.userId} username={userData.userId} owner={ownerId === userData.userId} />;
+      return <StudentProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />;
     }
 
     // Default profile page for other user types
     return (
       <div className="container mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold">Profile Page for {userData.firstName || userData.username}</h1>
+        <h1 className="text-3xl font-bold">Profile Page for {userData.firstName || userData.userId}</h1>
         <p className="mt-4 text-muted-foreground">
           This is a {userData.role.toLowerCase()} profile. Full profile details coming soon.
         </p>
@@ -98,7 +107,7 @@ export default function UserPage() {
     );
   }
 
-  // If not loading and no user data (and notFound hasn't redirected yet),
+  // If not loading and no user or group data (and notFound hasn't redirected yet),
   // you might render a fallback or null. The notFound() call should handle this.
   return null; // Or a fallback UI while notFound() processes
 }

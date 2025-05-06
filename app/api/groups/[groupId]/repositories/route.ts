@@ -6,9 +6,9 @@ import { z } from 'zod';
 
 // Schema for creating a new repository
 const createRepositorySchema = z.object({
-  name: z.string().trim().min(1, 'Repository name is required'),
-  description: z.string().trim().min(1, 'Repository description is required'),
-  isPrivate: z.boolean().default(true),
+  name: z.string().trim().min(1, 'Repository name is required').max(255, 'Repository name is too long'),
+  description: z.string().trim().max(1000, 'Description is too long').optional(),
+  visibility: z.enum(['public', 'private'], { message: 'Visibility must be public or private' }),
 });
 
 // GET: Retrieve all repositories for a specific group
@@ -20,13 +20,14 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupId = params.groupId;
+    const { groupId } = params;
+    if (!groupId) {
+      return NextResponse.json({ message: 'Group ID is required' }, { status: 400 });
+    }
+
     const searchParams = req.nextUrl.searchParams;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') as string, 10) : 50;
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset') as string, 10) : 0;
@@ -45,15 +46,12 @@ export async function GET(
     });
 
     if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
 
     // Check if user has access to this group
-    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.id);
-    const isGroupLeader = group.leaderId === session.user.id;
+    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.userId);
+    const isGroupLeader = group.leaderId === session.user.userId;
     const isAdmin = session.user.role === 'ADMINISTRATOR';
 
     if (!isGroupMember && !isGroupLeader && !isAdmin) {
@@ -72,10 +70,15 @@ export async function GET(
       include: {
         owner: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
+          },
+        },
+        group: {
+          select: {
+            id: true,
+            name: true,
           },
         },
         projects: {
@@ -102,19 +105,20 @@ export async function GET(
     });
 
     return NextResponse.json({
-      repositories,
+      repositories: repositories.map((repo) => ({
+        ...repo,
+        visibility: repo.isPrivate ? 'private' : 'public',
+      })),
       pagination: {
         total,
         offset,
         limit,
+        hasMore: offset + repositories.length < total,
       },
     });
   } catch (error) {
     console.error('Error fetching repositories:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -127,13 +131,13 @@ export async function POST(
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupId = params.groupId;
+    const { groupId } = params;
+    if (!groupId) {
+      return NextResponse.json({ message: 'Group ID is required' }, { status: 400 });
+    }
 
     // Verify that the group exists
     const group = await db.group.findUnique({
@@ -148,16 +152,13 @@ export async function POST(
     });
 
     if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
 
     // Check if user has permission to create repositories
-    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.id);
-    const isGroupLeader = group.leaderId === session.user.id;
-    
+    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.userId);
+    const isGroupLeader = group.leaderId === session.user.userId;
+
     if (!isGroupMember && !isGroupLeader) {
       return NextResponse.json(
         { message: 'You do not have permission to create repositories for this group' },
@@ -176,7 +177,8 @@ export async function POST(
       );
     }
 
-    const { name, description, isPrivate } = validationResult.data;
+    const { name, description, visibility } = validationResult.data;
+    const isPrivate = visibility === 'private';
 
     // Check if a repository with the same name already exists in this group
     const existingRepository = await db.repository.findFirst({
@@ -193,22 +195,33 @@ export async function POST(
       );
     }
 
+    // Create an initial commit
+    const initialCommit = await db.commit.create({
+      data: {
+        id: `commit-${Date.now()}`, // Simplified; in production, use a proper hash
+        message: 'Initial commit',
+        timestamp: new Date(),
+        repositoryId: '', // Will be updated after repository creation
+        authorId: session.user.userId,
+        parentCommitIDs: [],
+      },
+    });
+
     // Create the repository
     const repository = await db.repository.create({
       data: {
         name,
-        description,
+        description: description || '',
         isPrivate,
         groupId,
-        ownerId: session.user.id, // Set the current user as the owner
+        ownerId: session.user.userId,
       },
       include: {
         owner: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         group: {
@@ -220,23 +233,30 @@ export async function POST(
       },
     });
 
-    // Create a default main branch for the repository
+    // Update the initial commit with the repository ID
+    await db.commit.update({
+      where: { id: initialCommit.id },
+      data: { repositoryId: repository.id },
+    });
+
+    // Create a default main branch
     await db.branch.create({
       data: {
         name: 'main',
         repositoryId: repository.id,
-        // You would need to create an initial commit and set it as the head
-        // This is a simplified version - in a real app, you'd handle initial commit creation
-        headCommitId: 'initial', // Mock ID - in real implementation you'd create a real commit
+        headCommitId: initialCommit.id,
       },
     });
 
-    return NextResponse.json(repository, { status: 201 });
+    return NextResponse.json(
+      {
+        ...repository,
+        visibility: repository.isPrivate ? 'private' : 'public',
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating repository:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

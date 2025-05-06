@@ -44,13 +44,11 @@ export async function GET(req: NextRequest) {
     const users = await prisma.user.findMany({
       where: filter,
       select: {
-        id: true,
-        username: true,
+        userId: true,
         firstName: true,
         lastName: true,
         email: true,
         role: true,
-        emailVerified: true,
         createdAt: true,
         updatedAt: true,
         // Exclude sensitive data like passwordHash
@@ -97,10 +95,10 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { username, firstName, lastName, email, password, role } = body;
+    const { userId, firstName, lastName, email, password, role } = body;
 
     // Validate required fields
-    if (!username || !firstName || !lastName || !email || !password) {
+    if (!userId || !firstName || !lastName || !email || !password) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -111,7 +109,7 @@ export async function POST(req: NextRequest) {
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { username },
+          { userId },
           { email },
         ],
       },
@@ -130,7 +128,7 @@ export async function POST(req: NextRequest) {
     // Create user
     const newUser = await prisma.user.create({
       data: {
-        username,
+        userId,
         firstName,
         lastName,
         email,
@@ -138,8 +136,7 @@ export async function POST(req: NextRequest) {
         role: role || "STUDENT", // Default to STUDENT if not specified
       },
       select: {
-        id: true,
-        username: true,
+        userId: true,
         firstName: true,
         lastName: true,
         email: true,

@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { z } from 'zod';
 
@@ -24,23 +22,6 @@ export async function GET(
       return NextResponse.json(
         { message: 'Invalid user ID format', projects: [] },
         { status: 400 }
-      );
-    }
-
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized', projects: [] },
-        { status: 401 }
-      );
-    }
-
-    // Restrict access to the user's own projects or admin
-    if (session.user.userId !== userId && session.user.role !== 'ADMINISTRATOR') {
-      return NextResponse.json(
-        { message: 'Forbidden: You can only view your own projects', projects: [] },
-        { status: 403 }
       );
     }
 
