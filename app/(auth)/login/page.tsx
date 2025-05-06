@@ -60,11 +60,9 @@ export default function LoginPage() {
       
       // Check user role to determine the appropriate dashboard
       if (userRole === "ADVISOR") {
-        targetPath = "/advisor-dashboard";  
+        targetPath = "/";  
       } else if (userRole === "EVALUATOR") {
-        targetPath = "/evaluator-dashboard";
-      } else if (userRole === "ADMINISTRATOR") {
-        targetPath = "/admin-dashboard";
+        targetPath = "/";
       }
       
       router.push(targetPath);

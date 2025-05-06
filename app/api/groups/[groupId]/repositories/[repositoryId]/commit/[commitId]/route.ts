@@ -57,9 +57,8 @@ export async function GET(
     // Check if user has access to this group
     const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.id);
     const isGroupLeader = group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isGroupLeader && !isAdmin) {
+    if (!isGroupMember && !isGroupLeader) {
       return NextResponse.json(
         { message: 'You do not have permission to view this commit' },
         { status: 403 }

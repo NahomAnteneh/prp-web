@@ -5,10 +5,18 @@ import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Settings, FileText, FolderGit2, UserCheck } from 'lucide-react';
+import { Loader2, Settings, FileText, FolderGit2, UserCheck, LayoutDashboard, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Project } from '@/components/project/project-card';
+import { Project } from '@/components/projects/project-card';
+import {
+  ProjectOverview,
+  ProjectRepositories,
+  ProjectDocuments,
+  ProjectAdvisor,
+  ProjectFeedback,
+  ProjectSettings
+} from '@/components/projects';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -18,7 +26,7 @@ export default function ProjectDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('repositories');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -126,8 +134,13 @@ export default function ProjectDetailsPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="repositories" value={activeTab} onValueChange={setActiveTab} className="mt-6">
-        <TabsList className="grid grid-cols-4 md:w-[600px]">
+      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="mt-6">
+        <TabsList className="grid grid-cols-6 md:w-[900px]">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">Overview</span>
+            <span className="sm:hidden">Overview</span>
+          </TabsTrigger>
           <TabsTrigger value="repositories" className="flex items-center gap-2">
             <FolderGit2 className="h-4 w-4" />
             <span className="hidden sm:inline">Repositories</span>
@@ -141,74 +154,38 @@ export default function ProjectDetailsPage() {
             <FileText className="h-4 w-4" />
             <span>Documents</span>
           </TabsTrigger>
+          <TabsTrigger value="feedback" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span>Feedback</span>
+          </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             <span>Settings</span>
           </TabsTrigger>
         </TabsList>
         
+        <TabsContent value="overview" className="mt-6">
+          <ProjectOverview ownerId={ownerId} projectId={projectId} />
+        </TabsContent>
+        
         <TabsContent value="repositories" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Repositories</CardTitle>
-              <CardDescription>
-                Manage the repositories associated with this project.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                Repository list component will be displayed here.
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectRepositories ownerId={ownerId} projectId={projectId} />
         </TabsContent>
         
         <TabsContent value="advisor" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Advisor</CardTitle>
-              <CardDescription>
-                View advisor details and communication.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                Advisor information and communication tools will be displayed here.
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectAdvisor ownerId={ownerId} projectId={projectId} />
         </TabsContent>
         
         <TabsContent value="documents" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Documents</CardTitle>
-              <CardDescription>
-                Access and manage project documentation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                Project documents will be displayed here.
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectDocuments ownerId={ownerId} projectId={projectId} />
+        </TabsContent>
+        
+        <TabsContent value="feedback" className="mt-6">
+          <ProjectFeedback ownerId={ownerId} projectId={projectId} />
         </TabsContent>
         
         <TabsContent value="settings" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Settings</CardTitle>
-              <CardDescription>
-                Manage project settings and configurations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                Project settings and configuration options will be displayed here.
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectSettings ownerId={ownerId} projectId={projectId} />
         </TabsContent>
       </Tabs>
     </div>

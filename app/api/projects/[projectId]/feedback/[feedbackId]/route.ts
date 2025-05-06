@@ -80,9 +80,8 @@ export async function GET(
         evaluatorId: session.user.id,
       },
     });
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isAdvisor && !isEvaluator && !isAdmin) {
+    if (!isGroupMember && !isAdvisor && !isEvaluator) {
       return NextResponse.json(
         { message: 'You do not have permission to view this feedback' },
         { status: 403 }
@@ -156,13 +155,12 @@ export async function PATCH(
     const isAuthor = feedback.authorId === session.user.id;
     const isGroupLeader = feedback.project.group.leaderId === session.user.id;
     const isAdvisor = feedback.project.advisorId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
     // Check if user has permission to update the feedback
     // Author can update content and title, but not status
     // Group leader, advisor, and admin can update anything
-    const canUpdateStatus = isGroupLeader || isAdvisor || isAdmin;
-    const canUpdateContent = isAuthor || isGroupLeader || isAdvisor || isAdmin;
+    const canUpdateStatus = isGroupLeader || isAdvisor;
+    const canUpdateContent = isAuthor || isGroupLeader || isAdvisor;
 
     if (!canUpdateContent) {
       return NextResponse.json(
@@ -269,9 +267,8 @@ export async function DELETE(
     // Check permissions (only author, group leader, or admin can delete)
     const isAuthor = feedback.authorId === session.user.id;
     const isGroupLeader = feedback.project.group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isAuthor && !isGroupLeader && !isAdmin) {
+    if (!isAuthor && !isGroupLeader) {
       return NextResponse.json(
         { message: 'You do not have permission to delete this feedback' },
         { status: 403 }

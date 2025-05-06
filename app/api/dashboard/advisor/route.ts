@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient, AdvisorRequestStatus, Role, TaskStatus } from "@prisma/client";
+import { PrismaClient, AdvisorRequestStatus, Role, TaskStatus, ProjectStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
@@ -53,8 +53,8 @@ type FeedbackActivity = {
   id: string;
   content: string;
   createdAt: Date;
-  author: { id: string; name: string | null };
-  project: { id: string; title: string; group: { id: string; name: string } } | null;
+  author: { userId: string; firstName: string; lastName: string };
+  project: { id: string; title: string; group: { id: string; name: string; groupUserName?: string } } | null;
 }
 
 type TaskActivity = {
@@ -63,8 +63,8 @@ type TaskActivity = {
   title: string;
   status: TaskStatus;
   updatedAt: Date;
-  assignee: { id: string; name: string | null } | null;
-  project: { id: string; title: string; group: { id: string; name: string } };
+  assignee: { userId: string; firstName: string; lastName: string } | null;
+  project: { id: string; title: string; group: { id: string; name: string; groupUserName?: string } };
 }
 
 type Activity = FeedbackActivity | TaskActivity;
@@ -73,19 +73,19 @@ export async function GET() {
   try {
     // Get the authenticated user session
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = session.user.userId;
 
     // Verify user is an advisor
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { userId: userId },
       select: {
-        id: true,
-        name: true,
-        username: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
         role: true,
       },
     });
@@ -113,18 +113,18 @@ export async function GET() {
             description: true,
             leader: {
               select: {
-                id: true,
-                name: true,
-                username: true,
+                userId: true,
+                firstName: true,
+                lastName: true,
               },
             },
             members: {
               select: {
                 user: {
                   select: {
-                    id: true,
-                    name: true,
-                    username: true,
+                    userId: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
@@ -140,8 +140,9 @@ export async function GET() {
             deadline: true,
             assignee: {
               select: {
-                id: true,
-                name: true,
+                userId: true,
+                firstName: true,
+                lastName: true,
               },
             },
           },
@@ -156,9 +157,9 @@ export async function GET() {
     // Calculate project statistics
     const projectStats = {
       total: advisedProjects.length,
-      active: advisedProjects.filter(p => p.status === "Active").length,
-      completed: advisedProjects.filter(p => p.status === "Completed").length,
-      pending: advisedProjects.filter(p => p.status === "Pending").length,
+      active: advisedProjects.filter(p => p.status === ProjectStatus.ACTIVE).length,
+      completed: advisedProjects.filter(p => p.status === ProjectStatus.COMPLETED).length,
+      pending: advisedProjects.filter(p => p.status === ProjectStatus.SUBMITTED).length,
     };
 
     // Group projects by group
@@ -171,7 +172,7 @@ export async function GET() {
           projects: [],
         };
       }
-      acc[project.group.id].projects.push(project);
+      acc[project.group.id].projects.push(project as any);
       return acc;
     }, {});
 
@@ -191,8 +192,9 @@ export async function GET() {
         createdAt: true,
         author: {
           select: {
-            id: true,
-            name: true,
+            userId: true,
+            firstName: true,
+            lastName: true,
           },
         },
         project: {
@@ -203,6 +205,7 @@ export async function GET() {
               select: {
                 id: true,
                 name: true,
+                groupUserName: true,
               },
             },
           },
@@ -228,8 +231,9 @@ export async function GET() {
         updatedAt: true,
         assignee: {
           select: {
-            id: true,
-            name: true,
+            userId: true,
+            firstName: true,
+            lastName: true,
           },
         },
         project: {
@@ -240,6 +244,7 @@ export async function GET() {
               select: {
                 id: true,
                 name: true,
+                groupUserName: true,
               },
             },
           },
@@ -270,23 +275,23 @@ export async function GET() {
             description: true,
             leader: {
               select: {
-                id: true,
-                name: true,
-                username: true,
+                userId: true,
+                firstName: true,
+                lastName: true,
               },
             },
             members: {
               select: {
                 user: {
                   select: {
-                    id: true,
-                    name: true,
-                    username: true,
+                    userId: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
             },
-            project: {
+            projects: {
               select: {
                 id: true,
                 title: true,
@@ -336,9 +341,9 @@ export async function GET() {
 
     return NextResponse.json({
       advisor: {
-        id: user.id,
-        name: user.name,
-        username: user.username,
+        id: user.userId,
+        name: user.firstName,
+        username: user.lastName,
       },
       projectStats,
       projectsByGroup: Object.values(projectsByGroup),

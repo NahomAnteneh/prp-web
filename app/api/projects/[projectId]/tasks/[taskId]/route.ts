@@ -90,9 +90,8 @@ export async function GET(
         evaluatorId: session.user.id,
       },
     });
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isAdvisor && !isEvaluator && !isAdmin) {
+    if (!isGroupMember && !isAdvisor && !isEvaluator) {
       return NextResponse.json(
         { message: 'You do not have permission to view this task' },
         { status: 403 }
@@ -170,11 +169,10 @@ export async function PATCH(
       (member: { userId: string }) => member.userId === session.user.id
     );
     const isAdvisor = task.project.advisorId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
     // Different levels of permissions based on user role
     // - Assignee: Can update status, description
-    // - Creator/Leader/Advisor/Admin: Can update anything
+    // - Creator/Leader/Advisor: Can update anything
     // - Other members: Cannot update tasks not assigned to them (except status)
 
     // Validate input data
@@ -191,7 +189,7 @@ export async function PATCH(
     const updateData = validationResult.data;
 
     // Handle different permission levels
-    if (!isCreator && !isGroupLeader && !isAdvisor && !isAdmin) {
+    if (!isCreator && !isGroupLeader && !isAdvisor) {
       // For regular members or assignees
       if (isAssignee) {
         // Assignees can update status and description
@@ -317,9 +315,8 @@ export async function DELETE(
     // Check permissions (only creator, group leader, or admin can delete)
     const isCreator = task.creatorId === session.user.id;
     const isGroupLeader = task.project.group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isCreator && !isGroupLeader && !isAdmin) {
+    if (!isCreator && !isGroupLeader) {
       return NextResponse.json(
         { message: 'You do not have permission to delete this task' },
         { status: 403 }

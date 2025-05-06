@@ -63,10 +63,9 @@ export async function GET(
     }
 
     const isGroupMember = group.members.some((m) => m.userId === session.user.userId);
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-    if (!isGroupMember && !isAdmin) {
+    if (!isGroupMember) {
       return NextResponse.json(
-        { message: 'You must be a member of this group or an administrator to view projects' },
+        { message: 'You must be a member of this group to view projects' },
         { status: 403 }
       );
     }

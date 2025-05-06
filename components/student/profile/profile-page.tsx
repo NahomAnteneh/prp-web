@@ -46,11 +46,10 @@ export default function StudentProfilePage({ userId: propUserId, username: propU
   const [error, setError] = useState<string | null>(null)
   const { data: session } = useSession()
   
-  // Check if the current user is the profile owner or an admin
+  // Check if the current user is the profile owner
   const isOwner = session?.user?.userId === userId;
-  const isAdmin = session?.user?.role === "ADMINISTRATOR"
   // Use viewerHasFullAccess from API response when available, otherwise fallback to session check
-  const canEdit = profileData?.viewerHasFullAccess || isOwner || isAdmin
+  const canEdit = profileData?.viewerHasFullAccess || isOwner
 
   useEffect(() => {
     const fetchProfileData = async () => {

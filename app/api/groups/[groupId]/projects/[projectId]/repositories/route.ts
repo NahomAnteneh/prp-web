@@ -63,11 +63,10 @@ export async function GET(
         evaluatorId: session.user.id,
       },
     });
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isAdvisor && !isEvaluator && !isAdmin) {
+    if (!isGroupMember && !isAdvisor && !isEvaluator) {
       return NextResponse.json(
-        { message: 'You do not have permission to view this project\'s repositories' },
+        { message: 'You do not have permission to view this project' },
         { status: 403 }
       );
     }

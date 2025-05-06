@@ -81,18 +81,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST handler to create a new user (admin only)
+// POST handler to create a new user
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate user
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMINISTRATOR") {
-      return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 401 }
-      );
-    }
-
     // Parse request body
     const body = await req.json();
     const { userId, firstName, lastName, email, password, role } = body;

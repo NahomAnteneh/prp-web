@@ -62,9 +62,8 @@ export async function GET(
         evaluatorId: session.user.id,
       },
     });
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isAdvisor && !isEvaluator && !isAdmin) {
+    if (!isGroupMember && !isAdvisor && !isEvaluator) {
       return NextResponse.json(
         { message: 'You do not have permission to view feedback for this project' },
         { status: 403 }
@@ -169,10 +168,9 @@ export async function POST(
         evaluatorId: session.user.id,
       },
     });
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
     // Only project members, the project advisor, evaluators, and admins can provide feedback
-    if (!isGroupMember && !isAdvisor && !isEvaluator && !isAdmin) {
+    if (!isGroupMember && !isAdvisor && !isEvaluator) {
       return NextResponse.json(
         { message: 'You do not have permission to provide feedback for this project' },
         { status: 403 }

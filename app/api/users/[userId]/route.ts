@@ -41,9 +41,9 @@ export async function GET(
       );
     }
 
-    // TODO: Add authentication check (e.g., verify user is admin or self)
+    // TODO: Add authentication check (e.g., verify user is self)
     // const user = req.user; // Example: Get user from auth middleware
-    // if (user.userId !== userId && user.role !== 'ADMINISTRATOR') {
+    // if (user.userId !== userId) {
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     // }
 

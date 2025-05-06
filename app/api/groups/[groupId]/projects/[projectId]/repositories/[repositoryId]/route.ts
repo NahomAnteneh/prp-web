@@ -43,12 +43,11 @@ export async function DELETE(
     }
 
     // Check if user is authorized to unlink repositories from this project
-    const isGroupLeader = project.group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
+    const isGroupLeader = project.group.leaderId === session.user.userId;
 
-    if (!isGroupLeader && !isAdmin) {
+    if (!isGroupLeader) {
       return NextResponse.json(
-        { message: 'Only the group leader or administrators can unlink repositories from projects' },
+        { message: 'Only the group leader can unlink repositories from projects' },
         { status: 403 }
       );
     }

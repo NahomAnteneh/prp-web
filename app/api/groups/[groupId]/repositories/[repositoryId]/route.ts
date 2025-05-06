@@ -93,9 +93,8 @@ export async function GET(
     const isGroupMember = repository.group?.members.some((member: { userId: string }) => member.userId === session.user.id) || false;
     const isGroupLeader = repository.group?.leaderId === session.user.id || false;
     const isRepoOwner = repository.ownerId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isGroupLeader && !isRepoOwner && !isAdmin) {
+    if (!isGroupMember && !isGroupLeader && !isRepoOwner) {
       return NextResponse.json(
         { message: 'You do not have permission to view this private repository' },
         { status: 403 }

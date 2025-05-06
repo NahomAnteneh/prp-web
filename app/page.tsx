@@ -28,9 +28,6 @@ export default async function Home() {
         return <StudentDashboard />;
       case Role.ADVISOR:
         return <AdvisorDashboard />;
-      case Role.ADMINISTRATOR:
-        // TODO: Create and import AdminDashboard component
-        return <div className="p-8">Administrator Dashboard - Under Development</div>;
       case Role.EVALUATOR:
         // TODO: Create and import EvaluatorDashboard component
         return <div className="p-8">Evaluator Dashboard - Under Development</div>;

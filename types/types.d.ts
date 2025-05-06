@@ -2,7 +2,6 @@ export enum Role {
   STUDENT = "STUDENT",
   ADVISOR = "ADVISOR",
   EVALUATOR = "EVALUATOR",
-  ADMINISTRATOR = "ADMINISTRATOR",
 }
 
 export enum ProjectStatus {
