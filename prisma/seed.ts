@@ -5,16 +5,16 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 // --- Configuration ---
-const NUM_USERS = 200;
-const NUM_GROUPS = 50;
-const NUM_PROJECTS_PER_GROUP_RANGE = [3, 10];
-const NUM_REPOS_PER_GROUP_RANGE = [5, 10];
-const NUM_USER_REPOS = 30;
-const COMMITS_PER_BRANCH = 50;
+const NUM_USERS = 20;
+const NUM_GROUPS = 5;
+const NUM_PROJECTS_PER_GROUP_RANGE = [3, 5];
+const NUM_REPOS_PER_GROUP_RANGE = [5, 7];
+const NUM_USER_REPOS = 3;
+const COMMITS_PER_BRANCH = 5;
 const BRANCHES_PER_REPO = 5;
 const MAX_MEMBERS_PER_GROUP = 8;
 const TASKS_PER_PROJECT = 15;
-const FEEDBACK_ITEMS = 300;
+const FEEDBACK_ITEMS = 30;
 const EVALUATIONS_PER_PROJECT = 5;
 const MR_PER_REPO = 10;
 const REVIEWS_PER_MR = 4;
