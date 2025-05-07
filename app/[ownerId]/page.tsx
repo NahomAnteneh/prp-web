@@ -4,6 +4,7 @@ import { Group, Role } from "@prisma/client"; // Assuming Role enum is accessibl
 import { notFound, useParams } from "next/navigation"; // Use useParams hook
 import { useEffect, useState } from "react";
 import StudentProfilePage from "@/components/student/profile/profile-page";
+import AdvisorProfilePage from "@/components/advisor/profile/profile-page";
 import { useSession } from "next-auth/react";
 import GroupPage from "@/components/group/group-page";
 
@@ -94,6 +95,10 @@ export default function UserPage() {
 
     if (userData.role === Role.STUDENT) {
       return <StudentProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />;
+    }
+    
+    if (userData.role === Role.ADVISOR) {
+      return <AdvisorProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />;
     }
 
     // Default profile page for other user types

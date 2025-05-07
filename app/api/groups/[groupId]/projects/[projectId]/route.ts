@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -12,37 +10,34 @@ const updateProjectSchema = z.object({
   submissionDate: z.string().optional().nullable(), // ISO date string
   advisorId: z.string().optional().nullable(),
   archived: z.boolean().optional(),
-  milestones: z.array(z.object({
-    id: z.string().optional(), // For existing milestones
-    title: z.string(),
-    description: z.string().optional(),
-    dueDate: z.string().optional(), // ISO date string
-    completed: z.boolean().optional(),
-  })).optional(),
 });
 
 // GET: Retrieve a specific project
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string; projectId: string } }
+  context: { params: { groupId: string; projectId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const { groupId, projectId } = await context.params;
 
-    if (!session?.user) {
+    const id = await db.group.findUnique({
+      where: { groupUserName: groupId },
+      select: { id: true },
+    });
+
+    if (!id) {
       return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
+        { message: 'Group not found' },
+        { status: 404 }
       );
     }
 
-    const { groupId, projectId } = params;
 
     // Check if project exists and belongs to the specified group
     const project = await db.project.findFirst({
       where: {
         id: projectId,
-        groupId: groupId,
+        groupId: id.id,
       },
       include: {
         group: {
@@ -59,10 +54,9 @@ export async function GET(
         },
         advisor: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
             email: true,
             profileInfo: true,
           },
@@ -76,10 +70,9 @@ export async function GET(
             createdAt: true,
             author: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -96,10 +89,9 @@ export async function GET(
             createdAt: true,
             author: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -115,16 +107,15 @@ export async function GET(
             deadline: true,
             assignee: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
         },
         repositories: {
-              include: {
+          include: {
             repository: {
               select: {
                 id: true,
@@ -144,33 +135,13 @@ export async function GET(
       );
     }
 
-    // Check if user is authorized to view this project
-    const isGroupMember = project.group.members.some(
-      (member: { userId: string }) => member.userId === session.user.id
-    );
-    const isAdvisor = project.advisorId === session.user.id;
-    const isEvaluator = await db.projectEvaluator.findFirst({
-      where: {
-        projectId: projectId,
-        evaluatorId: session.user.id,
-      },
-    });
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupMember && !isAdvisor && !isEvaluator && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to view this project' },
-        { status: 403 }
-      );
-    }
-
     // Format repositories for cleaner response
     const formattedRepositories = project.repositories.map((repo: {
       repository: {
         id: string;
         name: string;
         description: string | null;
-      }
+      };
     }) => ({
       id: repo.repository.id,
       name: repo.repository.name,
@@ -199,34 +170,25 @@ export async function PATCH(
   { params }: { params: { groupId: string; projectId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const { groupId, projectId } = params;
 
-    if (!session?.user) {
+    const id = await db.group.findUnique({
+      where: { groupUserName: groupId },
+      select: { id: true },
+    });
+
+    if (!id) {
       return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
+        { message: 'Group not found' },
+        { status: 404 }
       );
     }
-
-    const { groupId, projectId } = params;
 
     // Check if project exists and belongs to the specified group
     const project = await db.project.findFirst({
       where: {
         id: projectId,
-        groupId: groupId,
-      },
-      include: {
-        group: {
-          select: {
-            leaderId: true,
-            members: {
-              select: {
-                userId: true,
-              },
-            },
-          },
-        },
+        groupId: id.id,
       },
     });
 
@@ -237,18 +199,6 @@ export async function PATCH(
       );
     }
 
-    // Check if user is authorized to update this project
-    const isGroupLeader = project.group.leaderId === session.user.id;
-    const isAdvisor = project.advisorId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupLeader && !isAdvisor && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to update this project' },
-        { status: 403 }
-      );
-    }
-    
     // Validate input data
     const rawData = await req.json();
     const validationResult = updateProjectSchema.safeParse(rawData);
@@ -261,20 +211,20 @@ export async function PATCH(
     }
 
     const updateData = validationResult.data;
-    
+
     // If advisor is being changed, check if they exist and have the correct role
     if (updateData.advisorId && updateData.advisorId !== project.advisorId) {
       const advisor = await db.user.findUnique({
-        where: { id: updateData.advisorId },
-        select: { id: true, role: true },
+        where: { userId: updateData.advisorId },
+        select: { userId: true, role: true },
       });
 
       if (!advisor) {
         return NextResponse.json(
           { message: 'Advisor not found' },
           { status: 404 }
-      );
-    }
+        );
+      }
 
       if (advisor.role !== 'ADVISOR') {
         return NextResponse.json(
@@ -284,70 +234,21 @@ export async function PATCH(
       }
     }
 
-    // Process milestones data for JSON storage
-    let milestonesData;
-    if (updateData.milestones) {
-      // Get existing milestones
-      const existingMilestones = project.milestones ? 
-        (project.milestones as any).milestones || [] : 
-        [];
-      
-      // Map new milestones preserving existing ones where possible
-      milestonesData = updateData.milestones.map(m => {
-        // If we have an ID, try to find the existing milestone
-        if (m.id) {
-          const existing = existingMilestones.find((em: any) => em.id === m.id);
-          if (existing) {
-            return {
-              ...existing,
-              title: m.title || existing.title,
-              description: m.description ?? existing.description,
-              dueDate: m.dueDate ? new Date(m.dueDate) : existing.dueDate,
-              completed: m.completed ?? existing.completed,
-              updatedAt: new Date(),
-            };
-          }
-        }
-        
-        // Otherwise create a new milestone
-        return {
-          id: m.id || Math.random().toString(36).substring(2, 15),
-          title: m.title,
-          description: m.description,
-          dueDate: m.dueDate ? new Date(m.dueDate) : null,
-          completed: m.completed || false,
-          createdAt: new Date(),
-        };
-      });
-    }
-
-    // Prepare update data object
-    const projectUpdateData: any = {
-      ...updateData,
-      milestones: undefined, // Remove the raw milestones data
-    };
-
-    // If we processed milestones, add them back in the correct format
-    if (milestonesData) {
-      projectUpdateData.milestones = { milestones: milestonesData };
-    }
-
     // Set submission date if status is changing to SUBMITTED
     if (updateData.status === 'SUBMITTED' && project.status !== 'SUBMITTED') {
-      projectUpdateData.submissionDate = new Date();
+      updateData.submissionDate = new Date().toISOString();
     }
 
     // Update the project
     const updatedProject = await db.project.update({
       where: { id: projectId },
-      data: projectUpdateData,
+      data: updateData,
       include: {
         advisor: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
       },
@@ -372,29 +273,27 @@ export async function DELETE(
   { params }: { params: { groupId: string; projectId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const { groupId, projectId } = params;
 
-    if (!session?.user) {
+    const id = await db.group.findUnique({
+      where: { groupUserName: groupId },
+      select: { id: true },
+    });
+
+    if (!id) {
       return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
+        { message: 'Group not found' },
+        { status: 404 }
       );
     }
-
-    const { groupId, projectId } = params;
 
     // Check if project exists and belongs to the specified group
     const project = await db.project.findFirst({
       where: {
         id: projectId,
-        groupId: groupId,
+        groupId: id.id,
       },
       include: {
-        group: {
-          select: {
-            leaderId: true,
-          },
-        },
         tasks: true,
         feedback: true,
         evaluations: true,
@@ -408,17 +307,6 @@ export async function DELETE(
       );
     }
 
-    // Check if user is authorized to delete this project
-    const isGroupLeader = project.group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'Only the group leader or administrators can delete projects' },
-        { status: 403 }
-      );
-    }
-
     // Check if project has related items
     const hasAssociatedData = project.tasks.length > 0 || 
                              project.feedback.length > 0 || 
@@ -428,7 +316,7 @@ export async function DELETE(
     if (hasAssociatedData) {
       const url = new URL(req.url);
       const forceDelete = url.searchParams.get('force') === 'true';
-      
+
       if (!forceDelete) {
         return NextResponse.json({
           message: 'This project has associated tasks, feedback, or evaluations. Use ?force=true to confirm deletion.',
@@ -436,11 +324,6 @@ export async function DELETE(
           feedbackCount: project.feedback.length,
           evaluationCount: project.evaluations.length,
         }, { status: 409 }); // Conflict
-      } else if (!isAdmin) {
-        return NextResponse.json(
-          { message: 'Only administrators can force delete projects with associated data' },
-          { status: 403 }
-        );
       }
     }
 
@@ -459,4 +342,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}

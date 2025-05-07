@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -17,10 +15,9 @@ export async function GET(
   { params }: { params: { groupId: string; repositoryId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
     const { groupId, repositoryId } = params;
 
-    // Find the repository first to check privacy
+    // Find the repository
     const repository = await db.repository.findUnique({
       where: {
         id: repositoryId,
@@ -76,31 +73,6 @@ export async function GET(
       );
     }
 
-    // If repository is public, no authentication needed
-    if (!repository.isPrivate) {
-      return NextResponse.json(repository);
-    }
-    
-    // For private repositories, check authentication
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check if user has access to this private repository
-    const isGroupMember = repository.group?.members.some((member: { userId: string }) => member.userId === session.user.id) || false;
-    const isGroupLeader = repository.group?.leaderId === session.user.id || false;
-    const isRepoOwner = repository.ownerId === session.user.id;
-
-    if (!isGroupMember && !isGroupLeader && !isRepoOwner) {
-      return NextResponse.json(
-        { message: 'You do not have permission to view this private repository' },
-        { status: 403 }
-      );
-    }
-
     return NextResponse.json(repository);
   } catch (error) {
     console.error('Error fetching repository:', error);
@@ -117,35 +89,7 @@ export async function PATCH(
   { params }: { params: { groupId: string; repositoryId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { groupId, repositoryId } = params;
-
-    // Verify that the group exists
-    const group = await db.group.findUnique({
-      where: { id: groupId },
-      include: {
-        members: {
-          select: {
-            userId: true,
-          },
-        },
-      },
-    });
-
-    if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
-    }
 
     // Find the repository
     const repository = await db.repository.findUnique({
@@ -159,18 +103,6 @@ export async function PATCH(
       return NextResponse.json(
         { message: 'Repository not found' },
         { status: 404 }
-      );
-    }
-
-    // Check permissions: Only repository owner, group leader, or admin can update
-    const isRepoOwner = repository.ownerId === session.user.id;
-    const isGroupLeader = group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isRepoOwner && !isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to update this repository' },
-        { status: 403 }
       );
     }
 
@@ -205,7 +137,7 @@ export async function PATCH(
       }
     }
 
-    // Update the repository (including privacy setting if provided)
+    // Update the repository
     const updatedRepository = await db.repository.update({
       where: {
         id: repositoryId,
@@ -245,28 +177,7 @@ export async function DELETE(
   { params }: { params: { groupId: string; repositoryId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { groupId, repositoryId } = params;
-
-    // Verify that the group exists
-    const group = await db.group.findUnique({
-      where: { id: groupId },
-    });
-
-    if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
-    }
 
     // Find the repository
     const repository = await db.repository.findUnique({
@@ -280,18 +191,6 @@ export async function DELETE(
       return NextResponse.json(
         { message: 'Repository not found' },
         { status: 404 }
-      );
-    }
-
-    // Check permissions: Only repository owner, group leader, or admin can delete
-    const isRepoOwner = repository.ownerId === session.user.id;
-    const isGroupLeader = group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isRepoOwner && !isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to delete this repository' },
-        { status: 403 }
       );
     }
 
@@ -313,4 +212,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}

@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -17,13 +15,7 @@ export async function GET(
   { params }: { params: { groupId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { groupId } = params;
+    const { groupId } = await params;
     if (!groupId) {
       return NextResponse.json({ message: 'Group ID is required' }, { status: 400 });
     }
@@ -36,29 +28,10 @@ export async function GET(
     // Verify that the group exists
     const group = await db.group.findUnique({
       where: { id: groupId },
-      include: {
-        members: {
-          select: {
-            userId: true,
-          },
-        },
-      },
     });
 
     if (!group) {
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
-    }
-
-    // Check if user has access to this group
-    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.userId);
-    const isGroupLeader = group.leaderId === session.user.userId;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupMember && !isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'You do not have permission to view repositories for this group' },
-        { status: 403 }
-      );
     }
 
     // Get all repositories for the group with filtering
@@ -128,12 +101,6 @@ export async function POST(
   { params }: { params: { groupId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-
     const { groupId } = params;
     if (!groupId) {
       return NextResponse.json({ message: 'Group ID is required' }, { status: 400 });
@@ -142,28 +109,10 @@ export async function POST(
     // Verify that the group exists
     const group = await db.group.findUnique({
       where: { id: groupId },
-      include: {
-        members: {
-          select: {
-            userId: true,
-          },
-        },
-      },
     });
 
     if (!group) {
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
-    }
-
-    // Check if user has permission to create repositories
-    const isGroupMember = group.members.some((member: { userId: string }) => member.userId === session.user.userId);
-    const isGroupLeader = group.leaderId === session.user.userId;
-
-    if (!isGroupMember && !isGroupLeader) {
-      return NextResponse.json(
-        { message: 'You do not have permission to create repositories for this group' },
-        { status: 403 }
-      );
     }
 
     // Validate input data
@@ -202,7 +151,7 @@ export async function POST(
         message: 'Initial commit',
         timestamp: new Date(),
         repositoryId: '', // Will be updated after repository creation
-        authorId: session.user.userId,
+        authorId: 'system', // Placeholder for system-generated commits
         parentCommitIDs: [],
       },
     });
@@ -214,7 +163,7 @@ export async function POST(
         description: description || '',
         isPrivate,
         groupId,
-        ownerId: session.user.userId,
+        ownerId: 'system', // Placeholder for system ownership
       },
       include: {
         owner: {

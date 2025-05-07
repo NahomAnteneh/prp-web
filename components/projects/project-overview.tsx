@@ -50,21 +50,21 @@ export function ProjectOverview({ ownerId, projectId }: ProjectOverviewProps) {
         setIsLoading(true);
         // Fetch recent activities
         const activitiesResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/activities`);
-        
+
         if (!activitiesResponse.ok) {
           throw new Error(`Failed to fetch activities: ${activitiesResponse.statusText}`);
         }
-        
+
         const activitiesData = await activitiesResponse.json();
-        setActivities(activitiesData);
-        
+        setActivities(Array.isArray(activitiesData) ? activitiesData : []); // Ensure activities is an array
+
         // Fetch project stats
         const statsResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/stats`);
-        
+
         if (!statsResponse.ok) {
           throw new Error(`Failed to fetch project stats: ${statsResponse.statusText}`);
         }
-        
+
         const statsData = await statsResponse.json();
         setStats(statsData);
       } catch (error) {
@@ -171,4 +171,4 @@ export function ProjectOverview({ ownerId, projectId }: ProjectOverviewProps) {
       </CardContent>
     </Card>
   );
-} 
+}

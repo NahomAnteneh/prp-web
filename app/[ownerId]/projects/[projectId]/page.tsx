@@ -121,7 +121,7 @@ export default function ProjectDetailsPage() {
             {project.advisor && (
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Advisor</span>
-                <span className="font-medium">{project.advisor.name}</span>
+                <span className="font-medium">{project.advisor.firstName} {project.advisor.lastName}</span>
               </div>
             )}
             <div className="flex flex-col">

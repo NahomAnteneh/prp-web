@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -15,22 +13,18 @@ export async function GET(
   { params }: { params: { groupId: string; projectId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { groupId, projectId } = params;
+
+    const realGroupId = await db.group.findUnique({
+      where: { groupUserName: groupId },
+      select: { id: true },
+    });
 
     // Check if project exists and belongs to the specified group
     const project = await db.project.findFirst({
       where: {
         id: projectId,
-        groupId: groupId,
+        groupId: realGroupId?.id,
       },
       include: {
         group: {
@@ -52,25 +46,6 @@ export async function GET(
       );
     }
 
-    // Check if user is authorized to view this project's repositories
-    const isGroupMember = project.group.members.some(
-      (member: { userId: string }) => member.userId === session.user.id
-    );
-    const isAdvisor = project.advisorId === session.user.id;
-    const isEvaluator = await db.projectEvaluator.findFirst({
-      where: {
-        projectId,
-        evaluatorId: session.user.id,
-      },
-    });
-
-    if (!isGroupMember && !isAdvisor && !isEvaluator) {
-      return NextResponse.json(
-        { message: 'You do not have permission to view this project' },
-        { status: 403 }
-      );
-    }
-
     // Fetch repositories linked to the project
     const projectRepositories = await db.projectRepository.findMany({
       where: {
@@ -87,10 +62,9 @@ export async function GET(
             updatedAt: true,
             owner: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -99,30 +73,20 @@ export async function GET(
     });
 
     // Format response
-    const repositories = projectRepositories.map((pr: {
-      repository: {
-        id: string;
-        name: string;
-        description: string;
-        isPrivate: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        owner: {
-          id: string;
-          firstName: string;
-          lastName: string;
-          username: string;
-        };
+    const repositories = projectRepositories.map((pr) => {
+      if (!pr.repository) {
+        throw new Error("Invalid data structure: 'repository' property is missing.");
+      }
+      return {
+        id: pr.repository.id,
+        name: pr.repository.name,
+        description: pr.repository.description,
+        isPrivate: pr.repository.isPrivate,
+        createdAt: pr.repository.createdAt,
+        updatedAt: pr.repository.updatedAt,
+        owner: pr.repository.owner,
       };
-    }) => ({
-      id: pr.repository.id,
-      name: pr.repository.name,
-      description: pr.repository.description,
-      isPrivate: pr.repository.isPrivate,
-      createdAt: pr.repository.createdAt,
-      updatedAt: pr.repository.updatedAt,
-      owner: pr.repository.owner,
-    }));
+    });
 
     return NextResponse.json({ repositories });
   } catch (error) {
@@ -140,15 +104,6 @@ export async function POST(
   { params }: { params: { groupId: string; projectId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { groupId, projectId } = params;
 
     // Check if project exists and belongs to the specified group
@@ -157,30 +112,12 @@ export async function POST(
         id: projectId,
         groupId: groupId,
       },
-      include: {
-        group: {
-          select: {
-            leaderId: true,
-          },
-        },
-      },
     });
 
     if (!project) {
       return NextResponse.json(
         { message: 'Project not found or does not belong to this group' },
         { status: 404 }
-      );
-    }
-
-    // Check if user is authorized to link repositories to this project
-    const isGroupLeader = project.group.leaderId === session.user.id;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
-
-    if (!isGroupLeader && !isAdmin) {
-      return NextResponse.json(
-        { message: 'Only the group leader or administrators can link repositories to projects' },
-        { status: 403 }
       );
     }
 
@@ -260,4 +197,4 @@ export async function POST(
       { status: 500 }
     );
   }
-} 
+}
