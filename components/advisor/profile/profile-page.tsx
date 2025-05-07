@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Users, BookOpen, Star, MapPin, Clock, Folder, FileText, ListChecks } from "lucide-react"
+import { Users, BookOpen, Star, MapPin, Clock, Folder, FileText, ListChecks, Settings, CheckSquare, History } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Navbar from "../../student/navbar"
 import { Navbar as NavBar } from "../../navbar"
@@ -13,6 +13,9 @@ import ProfileOverview from "@/components/advisor/profile/profile-overview"
 import AdviseesList from "@/components/advisor/profile/advisees-list"
 import RatingsReviews from "@/components/advisor/profile/ratings-reviews"
 import AdvisedProjects from "@/components/advisor/profile/advised-projects"
+import AdvisorSettings from "@/components/advisor/profile/settings"
+import EvaluatedProjects from "@/components/advisor/profile/evaluated-projects"
+import CurrentEvaluations from "./current-evaluations"
 
 interface AdvisorProfile {
   userId: string
@@ -47,6 +50,9 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
   const isOwner = session?.user?.userId === userId;
   // Use viewerHasFullAccess from API response when available, otherwise fallback to session check
   const canEdit = profileData?.viewerHasFullAccess || isOwner
+  
+  // Check if the user is currently an evaluator
+  const isEvaluator = profileData?.role === "evaluator"
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -125,20 +131,33 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
         ) : (
           <div className="space-y-8">
             <Tabs defaultValue="overview">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="overview" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" /> Overview
-                </TabsTrigger>
-                <TabsTrigger value="advisees" className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> Advisees
-                </TabsTrigger>
-                <TabsTrigger value="projects" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" /> Projects
-                </TabsTrigger>
-                <TabsTrigger value="ratings" className="flex items-center gap-2">
-                  <Star className="h-4 w-4" /> Ratings
-                </TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto">
+                <TabsList className="flex min-w-max border-b">
+                  <TabsTrigger value="overview" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" /> Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="advisees" className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" /> Advisees
+                  </TabsTrigger>
+                  <TabsTrigger value="advised-projects" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> Advised Projects
+                  </TabsTrigger>
+                  <TabsTrigger value="evaluated-projects" className="flex items-center gap-2">
+                    <History className="h-4 w-4" /> Evaluation History
+                  </TabsTrigger>
+                  {isEvaluator && (
+                    <TabsTrigger value="current-evaluations" className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4" /> Current Evaluations
+                    </TabsTrigger>
+                  )}
+                  <TabsTrigger value="ratings" className="flex items-center gap-2">
+                    <Star className="h-4 w-4" /> Ratings
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" /> Settings
+                  </TabsTrigger>
+                </TabsList>
+              </div>
               
               <TabsContent value="overview" className="mt-6">
                 <div className="flex flex-col md:flex-row gap-6">
@@ -162,7 +181,7 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
                 </div>
               </TabsContent>
               
-              <TabsContent value="projects" className="mt-6">
+              <TabsContent value="advised-projects" className="mt-6">
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="md:w-1/4">
                     <ProfileAvatar user={profileData} isOwner={canEdit} />
@@ -173,6 +192,30 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
                 </div>
               </TabsContent>
               
+              <TabsContent value="evaluated-projects" className="mt-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4">
+                    <ProfileAvatar user={profileData} isOwner={canEdit} />
+                  </div>
+                  <div className="md:w-3/4">
+                    <EvaluatedProjects userId={username} isOwner={canEdit} />
+                  </div>
+                </div>
+              </TabsContent>
+              
+              {isEvaluator && (
+                <TabsContent value="current-evaluations" className="mt-6">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="md:w-1/4">
+                      <ProfileAvatar user={profileData} isOwner={canEdit} />
+                    </div>
+                    <div className="md:w-3/4">
+                      <CurrentEvaluations userId={username} isOwner={canEdit} />
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
+              
               <TabsContent value="ratings" className="mt-6">
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="md:w-1/4">
@@ -180,6 +223,17 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
                   </div>
                   <div className="md:w-3/4">
                     <RatingsReviews userId={username} isOwner={canEdit} />
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="settings" className="mt-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4">
+                    <ProfileAvatar user={profileData} isOwner={canEdit} />
+                  </div>
+                  <div className="md:w-3/4">
+                    <AdvisorSettings userId={username} isOwner={canEdit} initialData={profileData} />
                   </div>
                 </div>
               </TabsContent>
