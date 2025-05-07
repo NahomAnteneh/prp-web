@@ -25,6 +25,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import { signOut, useSession } from "next-auth/react";
+import { SearchBar } from "@/components/SearchBar";
 
 const FEATURES = [
   {
@@ -84,10 +85,7 @@ export function Navbar() {
 
   const handleLogout = async () => {
     try {
-      // Use NextAuth's signOut function
       await signOut({ redirect: false });
-      
-      // Redirect to the home page
       router.push("/");
     } catch (error) {
       console.error('Error logging out:', error);
@@ -174,6 +172,9 @@ export function Navbar() {
           </NavigationMenu>
         </div>
 
+        {/* Search Bar */}
+        <SearchBar />
+
         {/* Desktop Actions */}
         <div className="hidden items-center gap-4 md:flex">
           {user ? (
@@ -216,6 +217,8 @@ export function Navbar() {
               </SheetTitle>
             </SheetHeader>
             <nav className="flex flex-col gap-4 mt-8">
+              {/* Mobile Search */}
+              <SearchBar mobile />
               <div>
                 <span className="flex py-2 text-base font-medium text-foreground/70">Features</span>
                 <div className="ml-4 mt-1 space-y-3">

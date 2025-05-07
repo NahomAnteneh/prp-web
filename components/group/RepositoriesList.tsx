@@ -13,32 +13,7 @@ import { Button } from '@/components/ui/button';
 import { GitBranch, ExternalLink, Calendar, Lock, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { z } from 'zod';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
-// Validation schema for creating a repository
-const createRepositorySchema = z.object({
-  name: z.string().trim().min(1, 'Repository name is required').max(255, 'Repository name is too long'),
-  description: z.string().trim().max(1000, 'Description is too long').optional(),
-  visibility: z.enum(['public', 'private'], { message: 'Visibility must be public or private' }),
-});
+import CreateRepositoryModal from './CreateRepositoryModal';
 
 interface Repository {
   id: string;
@@ -71,9 +46,10 @@ interface RepositoryResponse {
 interface RepositoriesListProps {
   groupId: string;
   isLeader: boolean;
+  groupName: string;
 }
 
-export default function RepositoriesList({ groupId, isLeader }: RepositoriesListProps) {
+export default function RepositoriesList({ groupId, isLeader, groupName }: RepositoriesListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [repositoryData, setRepositoryData] = useState<RepositoryResponse>({
@@ -81,14 +57,6 @@ export default function RepositoriesList({ groupId, isLeader }: RepositoriesList
     pagination: { total: 0, limit: 5, offset: 0, hasMore: false },
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
-
-  // Create repository form state
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [visibility, setVisibility] = useState<'public' | 'private'>('public');
-  const [nameError, setNameError] = useState('');
-  const [descriptionError, setDescriptionError] = useState('');
-  const [visibilityError, setVisibilityError] = useState('');
 
   const fetchRepositories = async (offset: number, limit: number, append: boolean = false) => {
     try {
@@ -170,78 +138,6 @@ export default function RepositoriesList({ groupId, isLeader }: RepositoriesList
     }
   };
 
-  const handleCreateRepository = async () => {
-    // Reset errors
-    setNameError('');
-    setDescriptionError('');
-    setVisibilityError('');
-
-    // Validate input
-    const validationResult = createRepositorySchema.safeParse({
-      name,
-      description: description || undefined,
-      visibility,
-    });
-
-    if (!validationResult.success) {
-      const errors = validationResult.error.flatten().fieldErrors;
-      if (errors.name) setNameError(errors.name[0]);
-      if (errors.description) setDescriptionError(errors.description[0]);
-      if (errors.visibility) setVisibilityError(errors.visibility[0]);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/groups/${groupId}/repositories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          visibility,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 400 && data.errors) {
-          const errors = data.errors;
-          if (errors.name) setNameError(errors.name[0]);
-          if (errors.description) setDescriptionError(errors.description[0]);
-          if (errors.visibility) setVisibilityError(errors.visibility[0]);
-          throw new Error('Invalid input');
-        }
-        throw new Error(data.message || 'Failed to create repository');
-      }
-
-      toast.success('Repository created', {
-        description: `Repository "${data.name}" created for group "${data.group.name}".`,
-      });
-
-      setShowCreateModal(false);
-      resetForm();
-      fetchRepositories(0, 5);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error creating repository', {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setVisibility('public');
-    setNameError('');
-    setDescriptionError('');
-    setVisibilityError('');
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -301,6 +197,13 @@ export default function RepositoriesList({ groupId, isLeader }: RepositoriesList
             )}
           </div>
         </CardContent>
+        <CreateRepositoryModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          groupId={groupId}
+          groupUserName={groupName}
+          onRepositoryCreated={() => fetchRepositories(0, 5)}
+        />
       </Card>
     );
   }
@@ -314,7 +217,7 @@ export default function RepositoriesList({ groupId, isLeader }: RepositoriesList
               <GitBranch className="h-5 w-5 text-primary" /> Repositories
             </CardTitle>
             <CardDescription>
-              {isLeader ? 'Your group’s code repositories' : 'Group code repositories'}
+              {isLeader ? "Your group's code repositories" : 'Group code repositories'}
             </CardDescription>
           </div>
           {isLeader && (
@@ -411,106 +314,13 @@ export default function RepositoriesList({ groupId, isLeader }: RepositoriesList
         )}
       </CardContent>
 
-      <Dialog
-        open={showCreateModal}
-        onOpenChange={(open) => {
-          setShowCreateModal(open);
-          if (!open) resetForm();
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Repository</DialogTitle>
-            <DialogDescription>
-              Add a new repository for your group to store code.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Repository Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setNameError('');
-                }}
-                placeholder="Enter repository name"
-                className={nameError ? 'border-red-500' : ''}
-              />
-              {nameError && <p className="text-sm text-red-500">{nameError}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  setDescriptionError('');
-                }}
-                placeholder="Describe the repository purpose"
-                rows={3}
-                className={descriptionError ? 'border-red-500' : ''}
-              />
-              {descriptionError && <p className="text-sm text-red-500">{descriptionError}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="visibility">
-                Visibility <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={visibility}
-                onValueChange={(value: 'public' | 'private') => {
-                  setVisibility(value);
-                  setVisibilityError('');
-                }}
-              >
-                <SelectTrigger className={visibilityError ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select visibility" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="private">Private</SelectItem>
-                </SelectContent>
-              </Select>
-              {visibilityError && <p className="text-sm text-red-500">{visibilityError}</p>}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowCreateModal(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCreateRepository}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                  Creating...
-                </>
-              ) : (
-                'Create Repository'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateRepositoryModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        groupId={groupId}
+        groupUserName={groupName}
+        onRepositoryCreated={() => fetchRepositories(0, 5)}
+      />
     </Card>
   );
 }

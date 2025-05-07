@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { z } from 'zod';
+import CreateProjectModal from './CreateProjectModal';
 
 // Validation schema matching server-side createProjectSchema
 const createProjectSchema = z.object({
@@ -291,6 +292,12 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
             )}
           </div>
         </CardContent>
+        <CreateProjectModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          groupId={groupId}
+          onProjectCreated={() => fetchProjects(0, 5)}
+        />
       </Card>
     );
   }
@@ -304,7 +311,7 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
               <Folder className="h-5 w-5 text-primary" /> Projects
             </CardTitle>
             <CardDescription>
-              {isLeader ? 'Your group’s current and past projects' : 'Current and past projects'}
+              {isLeader ? "Your group's current and past projects" : 'Current and past projects'}
             </CardDescription>
           </div>
           {isLeader && (
@@ -383,77 +390,12 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
         )}
       </CardContent>
 
-      {/* Create Project Modal */}
-      <Dialog open={showCreateModal} onOpenChange={(open) => {
-        setShowCreateModal(open);
-        if (!open) resetForm();
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Add a new project for your group to work on.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                Project Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setTitleError('');
-                }}
-                placeholder="Enter project title"
-                className={titleError ? 'border-red-500' : ''}
-              />
-              {titleError && <p className="text-sm text-red-500">{titleError}</p>}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  setDescriptionError('');
-                }}
-                placeholder="Describe the project goals and scope"
-                rows={3}
-                className={descriptionError ? 'border-red-500' : ''}
-              />
-              {descriptionError && <p className="text-sm text-red-500">{descriptionError}</p>}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="advisorId">Advisor ID (Optional)</Label>
-              <Input
-                id="advisorId"
-                value={advisorId}
-                onChange={(e) => setAdvisorId(e.target.value)}
-                placeholder="Enter advisor ID"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => {
-              setShowCreateModal(false);
-              resetForm();
-            }}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleCreateProject} disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Create Project'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateProjectModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        groupId={groupId}
+        onProjectCreated={() => fetchProjects(0, 5)}
+      />
     </Card>
   );
 }

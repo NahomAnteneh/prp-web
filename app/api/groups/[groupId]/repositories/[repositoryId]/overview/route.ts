@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
-
-// Updated parameter parsing to correctly handle groupId and repositoryId
-const paramsSchema = z.object({
-  groupId: z.string().min(1),
-  repositoryId: z.string().min(1),
-});
 
 export async function GET(
   req: NextRequest,
@@ -14,15 +7,13 @@ export async function GET(
 ) {
   try {
     // Validate params
-    const parsedParams = paramsSchema.safeParse(params);
-    if (!parsedParams.success) {
+    const { groupId, repositoryId } = await params;
+    if (!groupId || !repositoryId) {
       return NextResponse.json(
         { error: 'Invalid parameters' },
         { status: 400 }
       );
     }
-
-    const { groupId, repositoryId } = parsedParams.data;
 
     const realGroupId = await prisma.group.findUnique({
       where: { groupUserName: groupId },

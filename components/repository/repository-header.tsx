@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Github, GitGraph, GitBranchIcon } from "lucide-react";
+import { GitBranchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Container } from "@/components/ui/container";
 import { RepositoryNav } from "./repository-nav";
-import ShallowLink from "@/components/shallow-link";
 import { useState, useEffect } from "react";
 import type { Session } from "next-auth";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import Navbar from "../student/navbar";
 
 interface RepositoryHeaderProps {
   owner: string;
@@ -53,8 +56,6 @@ export function RepositoryHeader({
     const fetchRepositoryData = async () => {
       try {
         setIsLoading(true);
-        // Assuming there's a group ID in the URL structure
-        // This would need to be adjusted based on your actual routing structure
         const response = await fetch(`/api/groups/${owner}/repositories/${repository}/overview`);
         
         if (!response.ok) {
@@ -74,39 +75,44 @@ export function RepositoryHeader({
   }, [owner, repository]);
 
   return (
-    <header className="border-b bg-background border-foreground/20">
-      <div className="border-b flex justify-between h-12">
-        <Link
-          className="p-4 border-r bg-transparent rounded-none hover:bg-foreground hover:text-background cursor-pointer flex items-center justify-center gap-2 transition-all w-32"
-          href={"/"}
-          prefetch={true}
-        >
-          <GitBranchIcon className="h-4 w-4 text-[#f0883e]" />
-          <span className="text-sm font-medium">gitfaster</span>
-        </Link>
-
-        <div className="font-mono text-sm flex">
-          <div className="flex items-center justify-center p-4 border-x">
-            Hi, {session?.user.name}
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <Navbar />
+      
+      <div className="border-t border-foreground/10 bg-muted/40">
+        <Container className="py-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div className="flex items-center text-lg font-medium">
+              <Link
+                href={`/${owner}`}
+                className="hover:underline"
+                prefetch={true}
+              >
+                {owner}
+              </Link>
+              <span className="mx-1">/</span>
+              <Link
+                href={`/${owner}/${repository}`}
+                className="hover:underline font-semibold"
+                prefetch={true}
+              >
+                {repository}
+              </Link>
+              {repoData?.isPrivate && (
+                <Badge variant="outline" className="ml-2">Private</Badge>
+              )}
+            </div>
+            
+            {!isLoading && repoData && repoData.description && (
+              <div className="text-sm text-muted-foreground max-w-xl">
+                {repoData.description}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-      <div className="px-4">
-        <div className="flex items-center py-4 gap-2">
-          <div className="flex items-center text-md">
-            {owner}
-            <span className="mx-1">/</span>
-            <Link
-              href={`/${owner}/${repository}`}
-              className="hover:underline text-foreground"
-              prefetch={true}
-            >
-              {repository}
-            </Link>
+          
+          <div className="mt-3">
+            <RepositoryNav owner={owner} repository={repository} />
           </div>
-        </div>
-        {/* Navigation tabs - now using the client component */}
-        <RepositoryNav owner={owner} repository={repository} />
+        </Container>
       </div>
     </header>
   );

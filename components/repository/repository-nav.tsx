@@ -25,20 +25,19 @@ export function RepositoryNav({ owner, repository }: RepositoryNavProps) {
   };
 
   return (
-    <div className="flex items-center overflow-x-auto ">
+    <div className="flex items-center overflow-x-auto scrollbar-hide -mx-4 md:mx-0">
       <Link
         href={basePath}
         className={cn("border-b-2 pb-1 cursor-pointer border-transparent", {
-          "border-[#f78166]":
-            isActive("code") || isActive("tree") || isActive("blob"),
+          "border-primary": isActive("code") || isActive("tree") || isActive("blob"),
         })}
       >
         <Button
           variant="ghost"
           asChild
-          className="flex items-center gap-2 px-3 py-1 hover:bg-transparent hover:text-foreground text-foreground"
+          className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground text-foreground"
         >
-          <div>
+          <div className="flex items-center gap-2">
             <Code className="h-4 w-4" />
             <span>Code</span>
           </div>
@@ -48,13 +47,13 @@ export function RepositoryNav({ owner, repository }: RepositoryNavProps) {
       <Link
         href={`${basePath}/issues`}
         className={cn("border-b-2 pb-1 cursor-pointer border-transparent", {
-          "border-[#f78166]": isActive("issues"),
+          "border-primary": isActive("issues"),
         })}
       >
         <Button
           variant="ghost"
           asChild
-          className="flex items-center gap-2 px-3 py-1 hover:bg-transparent hover:text-foreground text-foreground"
+          className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground text-foreground"
         >
           <div className="flex items-center gap-2">
             <svg
@@ -71,23 +70,23 @@ export function RepositoryNav({ owner, repository }: RepositoryNavProps) {
         </Button>
       </Link>
 
-      {/* <Link
+      <Link
         href={`${basePath}/pulls`}
         className={cn("border-b-2 pb-1 cursor-pointer border-transparent", {
-          "border-[#f78166]": isActive("pulls"),
+          "border-primary": isActive("pulls"),
         })}
       >
         <Button
           variant="ghost"
           asChild
-          className="flex items-center gap-2 px-3 py-1 hover:bg-transparent hover:text-foreground text-foreground"
+          className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground text-foreground"
         >
           <div className="flex items-center gap-2">
             <GitPullRequest className="h-4 w-4" />
             <span>Pull requests</span>
           </div>
         </Button>
-      </Link> */}
+      </Link>
     </div>
   );
 }

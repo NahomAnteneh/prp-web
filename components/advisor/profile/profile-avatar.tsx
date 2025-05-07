@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge, Calendar, Edit, Hash, School, MapPin, Clock, Briefcase } from "lucide-react"
+import { Badge, Calendar, Edit, Hash, School, MapPin, Clock, Briefcase, Star } from "lucide-react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface ProfileAvatarProps {
@@ -12,6 +12,8 @@ interface ProfileAvatarProps {
     email: string
     role: string
     imageUrl?: string
+    rating?: number
+    totalRatings?: number
     profileInfo: {
       department: string
       officeNumber: string
@@ -52,6 +54,15 @@ export default function ProfileAvatar({ user, isOwner = false }: ProfileAvatarPr
           <CardTitle className="text-xl">{name}</CardTitle>
           <CardDescription>@{userId}</CardDescription>
           <Badge className="bg-indigo-500 hover:bg-indigo-600">Advisor</Badge>
+          {user.rating && (
+            <div className="flex items-center gap-1 mt-1">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <span className="font-medium">{user.rating.toFixed(1)}</span>
+              {user.totalRatings && (
+                <span className="text-muted-foreground text-sm">({user.totalRatings} reviews)</span>
+              )}
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-4">

@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProfileAvatar from "@/components/advisor/profile/profile-avatar"
 import ProfileOverview from "@/components/advisor/profile/profile-overview"
 import AdviseesList from "@/components/advisor/profile/advisees-list"
-import RatingsReviews from "@/components/advisor/profile/ratings-reviews"
 import AdvisedProjects from "@/components/advisor/profile/advised-projects"
 import AdvisorSettings from "@/components/advisor/profile/settings"
 import EvaluatedProjects from "@/components/advisor/profile/evaluated-projects"
@@ -130,9 +129,9 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
           </div>
         ) : (
           <div className="space-y-8">
-            <Tabs defaultValue="overview">
-              <div className="overflow-x-auto">
-                <TabsList className="flex min-w-max border-b">
+            <Tabs defaultValue="overview" className="w-full">
+              <div className="w-full border-b">
+                <TabsList className="w-full justify-start">
                   <TabsTrigger value="overview" className="flex items-center gap-2">
                     <Users className="h-4 w-4" /> Overview
                   </TabsTrigger>
@@ -150,9 +149,6 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
                       <CheckSquare className="h-4 w-4" /> Current Evaluations
                     </TabsTrigger>
                   )}
-                  <TabsTrigger value="ratings" className="flex items-center gap-2">
-                    <Star className="h-4 w-4" /> Ratings
-                  </TabsTrigger>
                   <TabsTrigger value="settings" className="flex items-center gap-2">
                     <Settings className="h-4 w-4" /> Settings
                   </TabsTrigger>
@@ -215,17 +211,6 @@ export default function AdvisorProfilePage({ userId: propUserId, username: propU
                   </div>
                 </TabsContent>
               )}
-              
-              <TabsContent value="ratings" className="mt-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="md:w-1/4">
-                    <ProfileAvatar user={profileData} isOwner={canEdit} />
-                  </div>
-                  <div className="md:w-3/4">
-                    <RatingsReviews userId={username} isOwner={canEdit} />
-                  </div>
-                </div>
-              </TabsContent>
               
               <TabsContent value="settings" className="mt-6">
                 <div className="flex flex-col md:flex-row gap-6">

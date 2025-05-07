@@ -209,6 +209,7 @@ export default function GroupPage() {
           <TabsContent value="repositories" className="mt-6">
             <RepositoriesList
               groupId={groupData.id}
+              groupName={groupData.name}
               isLeader={userId === groupData.leaderId}
             />
           </TabsContent>

@@ -8,6 +8,9 @@ import Link from "next/link";
 import Navbar from "@/components/student/navbar";
 import Footer from "@/components/student/footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RepositoryHeader } from "@/components/repository/repository-header";
+import { useSession } from "next-auth/react";
+import ExplorerView from "@/components/repository/explorer/explorer-view";
 
 // Type definitions
 interface Repository {
@@ -43,15 +46,31 @@ interface Repository {
   }>;
 }
 
+interface TreeNode {
+  path: string;
+  type: "file" | "directory";
+}
+
+interface FileType {
+  name: string;
+  content?: string;
+  url?: string;
+  isBinary: boolean;
+}
+
 export default function MainRepoPage() {
   const params = useParams<{ ownerId: string; repoId: string }>();
   const { ownerId, repoId } = params;
+  const { data: session } = useSession();
   
   const [repoData, setRepoData] = useState<Repository | null>(null);
   const [readme, setReadme] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("code");
+  const [fileTree, setFileTree] = useState<TreeNode[]>([]);
+  const [fileData, setFileData] = useState<FileType | null>(null);
+  const [isFileTreeLoading, setIsFileTreeLoading] = useState(true);
 
   // Fetch repository data
   useEffect(() => {
@@ -80,12 +99,24 @@ export default function MainRepoPage() {
             const { content } = await readmeResponse.json();
             setReadme(content);
           }
+
+          // Fetch file tree
+          setIsFileTreeLoading(true);
+          const treeResponse = await fetch(
+            `/api/groups/${ownerId}/repositories/${repoId}/tree/${repoData.defaultBranch.name}`
+          );
+          
+          if (treeResponse.ok) {
+            const { tree } = await treeResponse.json();
+            setFileTree(tree);
+          }
         }
       } catch (err) {
         console.error("Error fetching repository data:", err);
         setError("Failed to load repository data");
       } finally {
         setIsLoading(false);
+        setIsFileTreeLoading(false);
       }
     }
 
@@ -95,7 +126,7 @@ export default function MainRepoPage() {
   if (isLoading) {
     return (
       <>
-        <Navbar />
+        <RepositoryHeader owner={ownerId} repository={repoId} session={session} />
         <div className="container mx-auto py-6 max-w-6xl">
           <Skeleton className="h-10 w-64 mb-2" />
           <Skeleton className="h-5 w-full mb-1" />
@@ -107,7 +138,6 @@ export default function MainRepoPage() {
             <Skeleton className="h-32 w-full" />
           </div>
         </div>
-        <Footer />
       </>
     );
   }
@@ -115,13 +145,12 @@ export default function MainRepoPage() {
   if (error || !repoData) {
     return (
       <>
-        <Navbar />
+        <RepositoryHeader owner={ownerId} repository={repoId} session={session} />
         <div className="container mx-auto py-6 max-w-6xl">
           <div className="p-4 text-red-600">
             {error || "Failed to load repository"}
           </div>
         </div>
-        <Footer />
       </>
     );
   }
@@ -130,7 +159,7 @@ export default function MainRepoPage() {
 
   return (
     <>
-      <Navbar />
+      <RepositoryHeader owner={ownerId} repository={repoId} session={session} />
       <div className="container mx-auto py-6 max-w-6xl">
         <div>
           <h1 className="text-3xl font-bold mb-2">{repoData.name}</h1>
@@ -149,25 +178,25 @@ export default function MainRepoPage() {
             
             <span className="flex items-center mr-4">
               <GitBranchIcon className="h-4 w-4 mr-1" />
-              {repoData.stats.branches} branch{repoData.stats.branches !== 1 ? 'es' : ''}
+              {repoData.stats?.branches} branch{repoData.stats?.branches !== 1 ? 'es' : ''}
             </span>
             
             <span className="flex items-center mr-4">
               <UsersIcon className="h-4 w-4 mr-1" />
-              {repoData.contributors.length} contributor{repoData.contributors.length !== 1 ? 's' : ''}
+              {repoData.contributors?.length} contributor{repoData.contributors?.length !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <InfoIcon className="h-4 w-4" />
-              <span>Overview</span>
-            </TabsTrigger>
             <TabsTrigger value="code" className="flex items-center gap-2">
               <Code className="h-4 w-4" />
               <span>Code</span>
+            </TabsTrigger>
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <InfoIcon className="h-4 w-4" />
+              <span>Overview</span>
             </TabsTrigger>
             <TabsTrigger value="readme" className="flex items-center gap-2" disabled={!readme}>
               <BookOpenIcon className="h-4 w-4" />
@@ -175,6 +204,19 @@ export default function MainRepoPage() {
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="code" className="mt-6">
+            <div className="border-t pt-4">
+              <h2 className="text-xl font-semibold mb-3">Repository Content</h2>
+              <div className="bg-white shadow rounded-lg overflow-hidden">
+                <ExplorerView
+                  fileTree={fileTree}
+                  fileData={fileData}
+                  isLoading={isFileTreeLoading}
+                />
+              </div>
+            </div>
+          </TabsContent>
+          
           <TabsContent value="overview" className="mt-6">
             <div className="border-t pt-4">
               <h2 className="text-xl font-semibold mb-3">About</h2>
@@ -182,7 +224,7 @@ export default function MainRepoPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <h3 className="font-medium mb-2">Owner</h3>
-                    <p>{repoData.owner.firstName} {repoData.owner.lastName}</p>
+                    <p>{repoData.owner?.firstName} {repoData.owner?.lastName}</p>
                   </div>
                   
                   {repoData.group && (
@@ -195,7 +237,7 @@ export default function MainRepoPage() {
                   <div>
                     <h3 className="font-medium mb-2">Contributors</h3>
                     <ul className="list-disc list-inside">
-                      {repoData.contributors.map(contributor => (
+                      {repoData.contributors?.map(contributor => (
                         <li key={contributor.userId}>
                           {contributor.firstName} {contributor.lastName}
                         </li>
@@ -207,66 +249,22 @@ export default function MainRepoPage() {
             </div>
           </TabsContent>
           
-          <TabsContent value="code" className="mt-6">
+          <TabsContent value="readme" className="mt-6">
             <div className="border-t pt-4">
-              <h2 className="text-xl font-semibold mb-3">Repository Content</h2>
-              
-              <div className="bg-white shadow rounded-lg overflow-hidden">
-                <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
-                  <div className="flex items-center">
-                    <GitBranchIcon className="h-4 w-4 mr-2" />
-                    <span className="font-medium">{defaultBranchName}</span>
-                  </div>
-                  
-                  <Link
-                    href={`/${ownerId}/${repoId}/tree/${defaultBranchName}`}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Browse Files
-                  </Link>
-                </div>
-                
-                <div className="p-4">
-                  <div className="flex items-center text-sm mb-2">
-                    <FolderIcon className="h-4 w-4 mr-2 text-amber-500" />
-                    <Link 
-                      href={`/${ownerId}/${repoId}/tree/${defaultBranchName}`}
-                      className="hover:underline text-blue-600"
-                    >
-                      Root
-                    </Link>
-                  </div>
-                  
-                  <div className="flex items-center text-sm">
-                    <FileIcon className="h-4 w-4 mr-2 text-blue-500" />
-                    <Link 
-                      href={`/${ownerId}/${repoId}/blob/${defaultBranchName}/README.md`}
-                      className="hover:underline text-blue-600"
-                    >
-                      README.md
-                    </Link>
-                  </div>
+              <h2 className="text-xl font-semibold mb-3">README</h2>
+              <div className="bg-white shadow rounded-lg p-4">
+                <div className="prose max-w-none">
+                  {readme ? (
+                    <div dangerouslySetInnerHTML={{ __html: readme }} />
+                  ) : (
+                    <p className="text-muted-foreground">No README file found.</p>
+                  )}
                 </div>
               </div>
             </div>
           </TabsContent>
-          
-          {readme && (
-            <TabsContent value="readme" className="mt-6">
-              <div className="border-t pt-4">
-                <h2 className="text-xl font-semibold mb-3">README</h2>
-                <div className="bg-white shadow rounded-lg p-4">
-                  <div className="prose max-w-full">
-                    {/* Here you would render Markdown, but for simplicity we'll just show it as text */}
-                    <pre className="whitespace-pre-wrap">{readme}</pre>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          )}
         </Tabs>
       </div>
-      <Footer />
     </>
   );
 }

@@ -1,1 +1,0 @@
-// in here I need you to get all unread notifications and also a method to mark them as read

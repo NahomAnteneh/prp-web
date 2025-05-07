@@ -15,6 +15,7 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu"
 import { useSession } from "next-auth/react"
+import { SearchBar } from "@/components/SearchBar"
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -138,10 +139,15 @@ export default function Navbar() {
           </NavigationMenu>
         </div>
 
+        {/* Search Bar - Desktop */}
+        <div className="hidden md:block flex-1 max-w-md mx-4">
+          <SearchBar />
+        </div>
+
         {/* Right side menu items */}
         <div className="flex items-center space-x-4">
           {/* Settings */}
-          <Button 
+          {/* <Button 
             variant="ghost" 
             size="icon" 
             asChild
@@ -151,7 +157,7 @@ export default function Navbar() {
             <Link href="/settings">
               <Settings className="h-5 w-5" />
             </Link>
-          </Button>
+          </Button> */}
 
           {/* Notifications Dropdown */}
           <NotificationDropdown 
@@ -188,6 +194,11 @@ export default function Navbar() {
       {/* Mobile Menu Panel */}
       {isMobileMenuOpen && (
         <div className="p-4 bg-background border-t md:hidden">
+          {/* Mobile Search */}
+          <div className="mb-4">
+            <SearchBar mobile={true} />
+          </div>
+          
           <div className="flex flex-col space-y-3">
             {/* Show user info in mobile menu */}
             <Link 

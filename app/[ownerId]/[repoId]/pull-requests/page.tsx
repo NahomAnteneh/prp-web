@@ -3,9 +3,9 @@
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { RepositoryHeader } from "@/components/repository/repository-header";
-import { GitBranchIcon } from "lucide-react";
+import { GitPullRequest } from "lucide-react";
 
-export default function Branches() {
+export default function PullRequests() {
   const params = useParams<{ ownerId: string; repoId: string }>();
   const { ownerId, repoId } = params;
   const { data: session } = useSession();
@@ -16,14 +16,14 @@ export default function Branches() {
       <div className="container mx-auto py-6 max-w-6xl">
         <div className="bg-white shadow rounded-lg p-6">
           <div className="flex items-center gap-2 mb-4">
-            <GitBranchIcon className="h-5 w-5" />
-            <h1 className="text-2xl font-bold">Branches</h1>
+            <GitPullRequest className="h-5 w-5" />
+            <h1 className="text-2xl font-bold">Pull Requests</h1>
           </div>
           <div className="text-muted-foreground">
-            Here is the list of all the branches
+            Here is the list of all pull requests
           </div>
         </div>
       </div>
     </>
   );
-}
+} 

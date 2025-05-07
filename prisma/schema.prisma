@@ -97,20 +97,19 @@ model Project {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   groupId        String
-  groupUsername String
   advisorId      String?
 
   // --- Relations ---
-  group             Group              @relation("GroupProjects", fields: [groupId], references: [id], onDelete: Cascade) // UPDATED relation name
+  group             Group              @relation("GroupProjects", fields: [groupId], references: [id], onDelete: Cascade)
   advisor           User?              @relation("ProjectAdvisor", fields: [advisorId], references: [userId], onDelete: SetNull)
   evaluations       Evaluation[]
   feedback          Feedback[]
-  projectEvaluators ProjectEvaluator[] // Evaluators assigned to this project
+  projectEvaluators ProjectEvaluator[]
   tasks             Task[]
-  repositories      ProjectRepository[] // Many-to-many relation with Repository via join table
+  repositories      ProjectRepository[]
 
   @@index([title])
-  @@index([groupId]) // Index for faster lookup by group
+  @@index([groupId])
   @@index([advisorId])
   @@index([status])
 }

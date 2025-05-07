@@ -80,10 +80,11 @@ export default function UserPage() {
   if (groupData) {
     return (
       <div>
-        {/* <h1 className="text-3xl font-bold">Group Page: {groupData.name}</h1>
-        <p className="mt-4 text-muted-foreground">
-          Welcome to the group page for {groupData.name}. More details coming soon.
-        </p> */}
+        <div className="bg-blue-50 py-2 border-b mb-4">
+          <div className="container mx-auto">
+            <h1 className="text-lg text-blue-800 font-medium">Viewing Group Profile</h1>
+          </div>
+        </div>
         <GroupPage groupData={groupData} isVisitor={status !== "authenticated"} />
       </div>
     );
@@ -92,18 +93,41 @@ export default function UserPage() {
   // If user data exists, render the profile based on role
   if (userData) {
     const isVisitor = status !== "authenticated";
-
+    
     if (userData.role === Role.STUDENT) {
-      return <StudentProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />;
+      return (
+        <>
+          <div className="bg-blue-50 py-2 border-b mb-4">
+            <div className="container mx-auto">
+              <h1 className="text-lg text-blue-800 font-medium">Viewing Student Profile</h1>
+            </div>
+          </div>
+          <StudentProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />
+        </>
+      );
     }
     
     if (userData.role === Role.ADVISOR) {
-      return <AdvisorProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />;
+      return (
+        <>
+          <div className="bg-blue-50 py-2 border-b mb-4">
+            <div className="container mx-auto">
+              <h1 className="text-lg text-blue-800 font-medium">Viewing Advisor Profile</h1>
+            </div>
+          </div>
+          <AdvisorProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />
+        </>
+      );
     }
 
     // Default profile page for other user types
     return (
       <div className="container mx-auto py-8 px-4">
+        <div className="bg-blue-50 py-2 border-b mb-4 -mx-4">
+          <div className="container mx-auto">
+            <h1 className="text-lg text-blue-800 font-medium">Viewing Profile</h1>
+          </div>
+        </div>
         <h1 className="text-3xl font-bold">Profile Page for {userData.firstName || userData.userId}</h1>
         <p className="mt-4 text-muted-foreground">
           This is a {userData.role.toLowerCase()} profile. Full profile details coming soon.

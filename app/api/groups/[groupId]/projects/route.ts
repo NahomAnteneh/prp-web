@@ -11,7 +11,6 @@ const prisma = new PrismaClient();
 const createProjectSchema = z.object({
   title: z.string().trim().min(1, 'Project title is required').max(255, 'Project title is too long'),
   description: z.string().trim().max(1000, 'Description is too long').optional(),
-  advisorId: z.string().min(1, 'Advisor ID is required').optional(),
 });
 
 // GET: List all projects for a group
@@ -76,7 +75,7 @@ export async function GET(
     const includeArchived = url.searchParams.get('includeArchived') === 'true';
 
     // Build filter conditions
-    const whereConditions: any = { groupId };
+    const whereConditions: any = { groupId: group.id };
     if (status) {
       whereConditions.status = status;
     }
@@ -96,14 +95,6 @@ export async function GET(
         archived: true,
         createdAt: true,
         updatedAt: true,
-        advisorId: true,
-        advisor: {
-          select: {
-            userId: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
         group: {
           select: {
             id: true,
@@ -152,12 +143,6 @@ export async function GET(
         name: project.group.name,
         groupUserName: project.group.groupUserName,
       },
-      advisor: project.advisor
-        ? {
-            id: project.advisor.userId,
-            name: `${project.advisor.firstName} ${project.advisor.lastName}`,
-          }
-        : null,
       stats: {
         tasks: project._count.tasks,
         repositories: project._count.repositories,
@@ -236,18 +221,17 @@ export async function POST(
 
     const isGroupMember = group.members.some((m) => m.userId === session.user.userId);
     const isGroupLeader = group.leaderId === session.user.userId;
-    const isAdmin = session.user.role === 'ADMINISTRATOR';
 
-    if (!isGroupMember && !isAdmin) {
+    if (!isGroupMember) {
       return NextResponse.json(
         { message: 'You must be a member of this group to create a project' },
         { status: 403 }
       );
     }
 
-    if (!isGroupLeader && !isAdmin) {
+    if (!isGroupLeader) {
       return NextResponse.json(
-        { message: 'Only the group leader or administrators can create projects' },
+        { message: 'Only the group leader can create projects' },
         { status: 403 }
       );
     }
@@ -265,111 +249,61 @@ export async function POST(
       );
     }
 
-    const { title, description, advisorId } = validationResult.data;
-
-    // Validate advisor if provided
-    if (advisorId) {
-      const advisor = await prisma.user.findUnique({
-        where: { userId: advisorId },
-        select: { userId: true, role: true },
-      });
-      if (!advisor) {
-        return NextResponse.json(
-          { message: 'Advisor not found' },
-          { status: 404 }
-        );
-      }
-      if (advisor.role !== 'ADVISOR') {
-        return NextResponse.json(
-          { message: 'The specified user is not an advisor' },
-          { status: 400 }
-        );
-      }
-    }
+    const { title, description } = validationResult.data;
 
     // Create project
-    const project = await prisma.project.create({
-      data: {
-        title,
-        description: description || null,
-        groupId,
-        advisorId: advisorId || null,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        submissionDate: true,
-        archived: true,
-        createdAt: true,
-        updatedAt: true,
-        advisorId: true,
+    try {
+      const project = await prisma.project.create({
+        data: {
+          title,
+          description: description || null,
+          groupId: group.id
+        },
+        include: {
+          group: true
+        }
+      });
+
+      // Format response
+      const formattedProject = {
+        id: project.id,
+        title: project.title,
+        description: project.description || '',
+        status: project.status,
+        submissionDate: project.submissionDate,
+        archived: project.archived,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
         group: {
-          select: {
-            id: true,
-            name: true,
-            groupUserName: true,
-          },
-        },
-        advisor: {
-          select: {
-            userId: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    });
+          id: group.id,
+          name: group.name,
+          groupUserName: group.groupUserName
+        }
+      };
 
-    // Format response
-    const formattedProject = {
-      id: project.id,
-      title: project.title,
-      description: project.description || '',
-      status: project.status,
-      submissionDate: project.submissionDate,
-      archived: project.archived,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-      group: {
-        id: project.group.id,
-        name: project.group.name,
-        groupUserName: project.group.groupUserName,
-      },
-      advisor: project.advisor
-        ? {
-            id: project.advisor.userId,
-            name: `${project.advisor.firstName} ${project.advisor.lastName}`,
-          }
-        : null,
-    };
-
-    return NextResponse.json(
-      {
+      return NextResponse.json({
         message: 'Project created successfully',
-        project: formattedProject,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error('Error creating project:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
+        project: formattedProject
+      }, { status: 201 });
+    } catch (error) {
+      console.error('Error creating project:', error);
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          return NextResponse.json(
+            { message: 'A project with this title already exists for this group' },
+            { status: 400 }
+          );
+        }
         return NextResponse.json(
-          { message: 'A project with this title already exists for this group' },
-          { status: 400 }
+          { message: `Database error: ${error.message}` },
+          { status: 500 }
         );
       }
       return NextResponse.json(
-        { message: `Database error: ${error.message}` },
+        { message: 'Internal server error' },
         { status: 500 }
       );
     }
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
   } finally {
     await prisma.$disconnect();
   }

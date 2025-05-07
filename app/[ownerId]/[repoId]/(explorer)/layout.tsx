@@ -1,6 +1,7 @@
 import { FileTree } from "@/components/repository/explorer/file-tree";
 import { BranchSelector } from "@/components/repository/explorer/branch-selector";
 import { Breadcrumbs } from "@/components/repository/explorer/breadcrumbs";
+import { RepositoryHeader } from "@/components/repository/repository-header";
 import { notFound } from "next/navigation";
 
 interface TreeNode {
@@ -152,8 +153,9 @@ export default async function ExplorerLayout({ children, params }: LayoutProps) 
 
   return (
     <>
+      <RepositoryHeader owner={ownerId} repository={repoId} session={null} />
       {fileTreeInitial.length > 0 && (
-        <div className="grid grid-cols-12 w-full h-screen">
+        <div className="grid grid-cols-12 w-full h-[calc(100vh-4rem)]">
           <div className="col-span-3 border-r border-foreground/20 overflow-y-auto flex flex-col">
             <div className="border-b border-foreground/20 flex flex-col items-stretch gap-2 p-2">
               <BranchSelector

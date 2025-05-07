@@ -32,26 +32,37 @@ export interface Project {
   id: string;
   title: string;
   description?: string;
-  status: 'ACTIVE' | 'SUBMITTED' | 'COMPLETED' | 'ARCHIVED';
-  isPrivate: boolean;
-  submissionDate?: string;
-  archived: boolean;
-  createdAt: string;
-  updatedAt: string;
-  groupId: string;
-  advisorId?: string;
-  
-  // Relations that might be included
-  group: Group;
-  advisor?: User;
-  
-  // Counts that might be included in API responses
-  _count?: {
-    repositories?: number;
-    feedback?: number;
-    evaluations?: number;
-    tasks?: number;
+  status?: string;
+  department?: string;
+  batchYear?: string;
+  advisor?: string;
+  profileInfo?: {
+    id: string;
+    name: string;
+    username: string;
+    profileInfo?: any;
   };
+}
+
+interface FetchProjectsParams {
+  search?: string;
+  status?: string[];
+  departments?: string[];
+  batchYears?: string[];
+  advisors?: string[];
+}
+
+export async function fetchProjects(params: FetchProjectsParams = {}): Promise<Project[]> {
+  const queryParams = new URLSearchParams();
+  if (params.search) queryParams.append('search', params.search);
+  if (params.status?.length) queryParams.append('status', params.status.join(','));
+  if (params.departments?.length) queryParams.append('departments', params.departments.join(','));
+  if (params.batchYears?.length) queryParams.append('batchYears', params.batchYears.join(','));
+  if (params.advisors?.length) queryParams.append('advisors', params.advisors.join(','));
+
+  const response = await fetch(`/api/projects?${queryParams.toString()}`);
+  if (!response.ok) throw new Error('Failed to fetch projects');
+  return response.json();
 }
 
 interface ProjectCardProps {
@@ -80,8 +91,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl font-bold line-clamp-1">{project.title}</CardTitle>
-          <Badge className={getStatusColor(project.status)}>
-            {project.status}
+          <Badge className={getStatusColor(project.status || '')}>
+            {project.status || 'No Status'}
           </Badge>
         </div>
         <CardDescription className="line-clamp-2 min-h-[2.5rem]">
@@ -92,7 +103,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <div className="text-sm">
           <div className="flex items-center mb-1">
             <span className="text-muted-foreground mr-2">Group:</span>
-            <span className="font-medium">{project.group.name}</span>
+            <span className="font-medium">{project.group?.name || 'No Group'}</span>
           </div>
           {project.advisor && (
             <div className="flex items-center mb-1">

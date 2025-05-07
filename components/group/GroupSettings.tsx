@@ -47,7 +47,7 @@ const inviteSchema = z.object({
 
 interface GroupSettingsProps {
   group: Group & {
-    members: { userId: string }[];
+    members: { userId: string; userName?: string; displayName?: string; email?: string; role?: string }[];
     invites: GroupInvite[];
   };
   maxGroupSize: number;
@@ -69,12 +69,34 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
   const [inviteError, setInviteError] = useState('');
   const [invites, setInvites] = useState<GroupInvite[]>(group.invites || []);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [memberToEdit, setMemberToEdit] = useState<(typeof group.members)[0] | null>(null);
+  const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('member');
+  const [memberPermissions, setMemberPermissions] = useState<{
+    canCreateProjects: boolean;
+    canCreateRepositories: boolean;
+    canInviteMembers: boolean;
+  }>({
+    canCreateProjects: false,
+    canCreateRepositories: false,
+    canInviteMembers: false,
+  });
 
   // Sidebar navigation items
   const navItems = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'members', label: 'Members', icon: Users },
+    { id: 'roles', label: 'Roles & Permissions', icon: User },
     { id: 'danger', label: 'Danger Zone', icon: Trash2 },
+  ];
+
+  // Predefined roles
+  const roles = [
+    { id: 'member', label: 'Member', permissions: { canCreateProjects: false, canCreateRepositories: false, canInviteMembers: false } },
+    { id: 'contributor', label: 'Contributor', permissions: { canCreateProjects: false, canCreateRepositories: true, canInviteMembers: false } },
+    { id: 'manager', label: 'Manager', permissions: { canCreateProjects: true, canCreateRepositories: true, canInviteMembers: true } },
+    { id: 'admin', label: 'Admin', permissions: { canCreateProjects: true, canCreateRepositories: true, canInviteMembers: true } },
+    { id: 'custom', label: 'Custom', permissions: { canCreateProjects: false, canCreateRepositories: false, canInviteMembers: false } },
   ];
 
   // Handle profile picture selection
@@ -285,6 +307,79 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
     }
   };
 
+  // Update member role and permissions
+  const handleUpdateMemberRole = async () => {
+    if (!memberToEdit) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/groups/${group.id}/members/${memberToEdit.userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          role: selectedRole,
+          permissions: selectedRole === 'custom' ? memberPermissions : roles.find(r => r.id === selectedRole)?.permissions
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update member role');
+      }
+
+      toast.success('Member role updated', {
+        description: `Member role has been updated.`,
+      });
+      onUpdate();
+      setShowRoleDialog(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
+      toast.error('Error updating member role', {
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Open role dialog with current member permissions
+  const handleOpenRoleDialog = (member: (typeof group.members)[0]) => {
+    setMemberToEdit(member);
+    setSelectedRole(member.role || 'member');
+    // Set permissions based on member's current role
+    if (member.role === 'custom') {
+      // If we had stored custom permissions, we would set them here
+      setMemberPermissions({
+        canCreateProjects: false,
+        canCreateRepositories: false,
+        canInviteMembers: false,
+      });
+    } else {
+      // Set permissions based on predefined role
+      const rolePermissions = roles.find(r => r.id === member.role)?.permissions;
+      setMemberPermissions(rolePermissions || {
+        canCreateProjects: false,
+        canCreateRepositories: false,
+        canInviteMembers: false,
+      });
+    }
+    setShowRoleDialog(true);
+  };
+
+  // Handle role selection
+  const handleRoleChange = (roleId: string) => {
+    setSelectedRole(roleId);
+    if (roleId !== 'custom') {
+      const rolePermissions = roles.find(r => r.id === roleId)?.permissions;
+      setMemberPermissions(rolePermissions || {
+        canCreateProjects: false,
+        canCreateRepositories: false,
+        canInviteMembers: false,
+      });
+    }
+  };
+
   // Non-leaders see a read-only view
   if (!isLeader) {
     return (
@@ -370,7 +465,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                 <div>
                   <h2 className="text-lg font-semibold mb-2">Group Username</h2>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Update your group’s unique username.
+                    Update your group's unique username.
                   </p>
                   <div className="max-w-md space-y-2">
                     <Input
@@ -492,6 +587,56 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
               </div>
             )}
 
+            {activeSection === 'roles' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">Roles & Permissions</h2>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Manage member roles and permissions within your group.
+                  </p>
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h3 className="text-md font-semibold mb-4">Members</h3>
+                    <ul className="space-y-4">
+                      {group.members.map((member) => (
+                        <li
+                          key={member.userId}
+                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                              <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {member.displayName || member.userName || 'Unknown User'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {member.email || 'No email available'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 py-1 px-2 rounded-full">
+                              {member.role || 'Member'}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenRoleDialog(member)}
+                              disabled={isLoading || member.userId === session?.user.userId}
+                              className="border-gray-300 dark:border-gray-600"
+                            >
+                              Edit Role
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeSection === 'danger' && (
               <div>
                 <h2 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h2>
@@ -597,6 +742,93 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 'Delete Group'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Management Dialog */}
+      <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
+        <DialogContent className="border-gray-200 dark:border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Manage Member Role</DialogTitle>
+            <DialogDescription>
+              Update role and permissions for {memberToEdit?.displayName || memberToEdit?.userName || 'this member'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select value={selectedRole} onValueChange={handleRoleChange}>
+                <SelectTrigger className="border-gray-300 dark:border-gray-600">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedRole === 'custom' && (
+              <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-semibold">Custom Permissions</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="createProjects" className="flex-1">Can create projects</Label>
+                    <input
+                      type="checkbox"
+                      id="createProjects"
+                      checked={memberPermissions.canCreateProjects}
+                      onChange={(e) => setMemberPermissions({...memberPermissions, canCreateProjects: e.target.checked})}
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="createRepositories" className="flex-1">Can create repositories</Label>
+                    <input
+                      type="checkbox"
+                      id="createRepositories"
+                      checked={memberPermissions.canCreateRepositories}
+                      onChange={(e) => setMemberPermissions({...memberPermissions, canCreateRepositories: e.target.checked})}
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="inviteMembers" className="flex-1">Can invite members</Label>
+                    <input
+                      type="checkbox"
+                      id="inviteMembers"
+                      checked={memberPermissions.canInviteMembers}
+                      onChange={(e) => setMemberPermissions({...memberPermissions, canInviteMembers: e.target.checked})}
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRoleDialog(false)}
+              className="border-gray-300 dark:border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateMemberRole}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                'Update Role'
               )}
             </Button>
           </DialogFooter>

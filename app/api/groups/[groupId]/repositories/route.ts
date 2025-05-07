@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { z } from 'zod';
+
+const prisma = new PrismaClient();
 
 // Schema for creating a new repository
 const createRepositorySchema = z.object({
@@ -26,7 +30,7 @@ export async function GET(
     const name = searchParams.get('name') || undefined;
 
     // Verify that the group exists
-    const group = await db.group.findUnique({
+    const group = await prisma.group.findUnique({
       where: { id: groupId },
     });
 
@@ -35,7 +39,7 @@ export async function GET(
     }
 
     // Get all repositories for the group with filtering
-    const repositories = await db.repository.findMany({
+    const repositories = await prisma.repository.findMany({
       where: {
         groupId,
         ...(name && { name: { contains: name, mode: 'insensitive' } }),
@@ -70,7 +74,7 @@ export async function GET(
       orderBy: { createdAt: 'desc' },
     });
 
-    const total = await db.repository.count({
+    const total = await prisma.repository.count({
       where: {
         groupId,
         ...(name && { name: { contains: name, mode: 'insensitive' } }),
@@ -101,111 +105,171 @@ export async function POST(
   { params }: { params: { groupId: string } }
 ) {
   try {
-    const { groupId } = params;
-    if (!groupId) {
-      return NextResponse.json({ message: 'Group ID is required' }, { status: 400 });
+    // Handle params
+    const resolvedParams = await Promise.resolve(params);
+    const groupId = resolvedParams.groupId;
+
+    // Validate groupId
+    const groupIdSchema = z.string().min(1, 'Group ID is required');
+    const parsedGroupId = groupIdSchema.safeParse(groupId);
+    if (!parsedGroupId.success) {
+      return NextResponse.json(
+        { message: 'Invalid group ID format' },
+        { status: 400 }
+      );
     }
 
-    // Verify that the group exists
-    const group = await db.group.findUnique({
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Check if group exists and user is a member or admin
+    const group = await prisma.group.findUnique({
       where: { id: groupId },
+      select: {
+        id: true,
+        name: true,
+        leaderId: true,
+        members: { select: { userId: true } },
+      },
     });
 
     if (!group) {
-      return NextResponse.json({ message: 'Group not found' }, { status: 404 });
+      return NextResponse.json(
+        { message: 'Group not found' },
+        { status: 404 }
+      );
+    }
+
+    const isGroupMember = group.members.some((m) => m.userId === session.user.userId);
+    const isGroupLeader = group.leaderId === session.user.userId;
+
+    if (!isGroupMember) {
+      return NextResponse.json(
+        { message: 'You must be a member of this group to create a repository' },
+        { status: 403 }
+      );
+    }
+
+    if (!isGroupLeader) {
+      return NextResponse.json(
+        { message: 'Only the group leader can create repositories' },
+        { status: 403 }
+      );
     }
 
     // Validate input data
     const rawData = await req.json();
     const validationResult = createRepositorySchema.safeParse(rawData);
-
     if (!validationResult.success) {
       return NextResponse.json(
-        { message: 'Invalid input', errors: validationResult.error.flatten().fieldErrors },
+        {
+          message: 'Invalid input',
+          errors: validationResult.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
     const { name, description, visibility } = validationResult.data;
-    const isPrivate = visibility === 'private';
 
-    // Check if a repository with the same name already exists in this group
-    const existingRepository = await db.repository.findFirst({
-      where: {
-        groupId,
-        name,
-      },
-    });
-
-    if (existingRepository) {
-      return NextResponse.json(
-        { message: 'A repository with this name already exists in the group' },
-        { status: 409 }
-      );
-    }
-
-    // Create an initial commit
-    const initialCommit = await db.commit.create({
-      data: {
-        id: `commit-${Date.now()}`, // Simplified; in production, use a proper hash
-        message: 'Initial commit',
-        timestamp: new Date(),
-        repositoryId: '', // Will be updated after repository creation
-        authorId: 'system', // Placeholder for system-generated commits
-        parentCommitIDs: [],
-      },
-    });
-
-    // Create the repository
-    const repository = await db.repository.create({
-      data: {
-        name,
-        description: description || '',
-        isPrivate,
-        groupId,
-        ownerId: 'system', // Placeholder for system ownership
-      },
-      include: {
-        owner: {
-          select: {
-            userId: true,
-            firstName: true,
-            lastName: true,
+    // Create repository with initial commit in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create repository
+      const repository = await tx.repository.create({
+        data: {
+          name,
+          description: description || '',
+          isPrivate: visibility === 'private',
+          ownerId: session.user.userId,
+          groupId: group.id,
+        },
+        include: {
+          group: true,
+          owner: {
+            select: {
+              userId: true,
+              firstName: true,
+              lastName: true,
+            },
           },
         },
-        group: {
-          select: {
-            id: true,
-            name: true,
-          },
+      });
+
+      // Create initial commit
+      const initialCommit = await tx.commit.create({
+        data: {
+          id: `commit-${Date.now()}`,
+          message: 'Initial commit',
+          timestamp: new Date(),
+          repositoryId: repository.id,
+          authorId: session.user.userId,
+          parentCommitIDs: [],
         },
-      },
+      });
+
+      // Create main branch
+      await tx.branch.create({
+        data: {
+          name: 'main',
+          repositoryId: repository.id,
+          headCommitId: initialCommit.id,
+        },
+      });
+
+      return repository;
     });
 
-    // Update the initial commit with the repository ID
-    await db.commit.update({
-      where: { id: initialCommit.id },
-      data: { repositoryId: repository.id },
-    });
-
-    // Create a default main branch
-    await db.branch.create({
-      data: {
-        name: 'main',
-        repositoryId: repository.id,
-        headCommitId: initialCommit.id,
+    // Format response
+    const formattedRepository = {
+      id: result.id,
+      name: result.name,
+      description: result.description,
+      visibility: result.isPrivate ? 'private' : 'public',
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
+      group: {
+        id: result.group?.id ?? '',
+        name: result.group?.name ?? '',
       },
-    });
+      owner: {
+        userId: result.owner.userId,
+        firstName: result.owner.firstName,
+        lastName: result.owner.lastName,
+      },
+    };
 
     return NextResponse.json(
       {
-        ...repository,
-        visibility: repository.isPrivate ? 'private' : 'public',
+        message: 'Repository created successfully',
+        ...formattedRepository,
       },
       { status: 201 }
     );
   } catch (error) {
     console.error('Error creating repository:', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return NextResponse.json(
+          { message: 'A repository with this name already exists for this group' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { message: `Database error: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
   }
 }
