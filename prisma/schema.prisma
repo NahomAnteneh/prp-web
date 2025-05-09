@@ -43,7 +43,6 @@ model User {
   evaluatedProjects    ProjectEvaluator[]   // Projects this user is assigned to evaluate
   tasksAssigned        Task[]               @relation("TaskAssignee")
   tasksCreated         Task[]               @relation("TaskCreator")
-  repositoriesOwned    Repository[]         @relation("RepositoryOwner") // Repositories created/managed by this user
 
   @@index([userId]) // Index for faster username lookups
   @@index([email])    // Index for faster email lookups
@@ -64,7 +63,7 @@ model Group {
   projects        Project[]         @relation("GroupProjects") // A group can have multiple projects
   invites         GroupInvite[]
   advisorRequests AdvisorRequest[] // Requests sent by this group to potential advisors
-  repositories    Repository[]      // Repositories owned by this group
+  repositories    Repository[]      @relation("GroupOwnedRepository")// Repositories owned by this group
   projectRepositories ProjectRepository[] // Join table entries linking projects/repositories for this group
 
   @@index([name]) // Index for faster group name lookups
@@ -156,11 +155,10 @@ model Repository {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   /// ID of the group that owns this repository. If null, it's a user-owned repository.
-  groupId   String? // CHANGED: Made optional
+  groupId   String // CHANGED: Made optional
 
   // --- Relations ---
-  owner         User              @relation("RepositoryOwner", fields: [ownerId], references: [userId], onDelete: Restrict)
-  group         Group?            @relation(fields: [groupId], references: [id], onDelete: Cascade) // CHANGED: Made optional
+  owner         Group            @relation("GroupOwnedRepository", fields: [groupId], references: [id], onDelete: Cascade) // CHANGED: Made optional
   branches      Branch[]
   commits       Commit[]
   mergeRequests MergeRequest[]

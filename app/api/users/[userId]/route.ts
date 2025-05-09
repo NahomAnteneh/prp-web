@@ -77,6 +77,11 @@ export async function GET(
                 name: true,
                 description: true,
                 createdAt: true,
+                _count: {
+                  select: {
+                    repositories: true,
+                  }
+                }
               },
             },
             joinedAt: true,
@@ -87,7 +92,6 @@ export async function GET(
             groupsMemberOf: true,
             advisedProjects: true,
             commitsAuthored: true,
-            repositoriesOwned: true,
           },
         },
       },
@@ -123,7 +127,7 @@ export async function GET(
         groups: user._count.groupsMemberOf,
         advisedProjects: user._count.advisedProjects,
         commits: user._count.commitsAuthored,
-        repositories: user._count.repositoriesOwned,
+        // repositories: user._count.repositoriesOwned,
       },
     };
 

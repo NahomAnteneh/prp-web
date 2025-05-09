@@ -4,14 +4,21 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 
 import Navbar from "../navbar"
-import Announcements, { Announcement } from "./announcements"
+import Announcements from "./announcements"
 import StatusOverview, { ProjectSummary, TaskSummary } from "./status-overview"
 import RecentActivities, { Activity } from "./recent-activities"
 import Footer from "../footer"
 
 // Define interface for API data objects
-interface AnnouncementData extends Omit<Announcement, 'createdAt'> {
-  createdAt: string
+interface AnnouncementData {
+  id: string;
+  title: string;
+  content: string;
+  active: boolean;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+  creatorId: string;
 }
 
 interface TaskDeadlineData {
@@ -28,8 +35,7 @@ interface ActivityData extends Omit<Activity, 'timestamp'> {
 // Define the shape of the dashboard data
 interface DashboardData {
   user: {
-    id: string
-    username: string
+    userId: string
     unreadNotifications: number
     hasGroup: boolean
     groupName: string | null
@@ -47,13 +53,12 @@ export default function StudentDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [dashboardData, setDashboardData] = useState<{
     user: { 
-      id: string
-      username: string
+      userId: string
       unreadNotifications: number
       hasGroup: boolean
       groupName: string | null
     };
-    announcements: Announcement[];
+    announcements: AnnouncementData[];
     projectSummary: ProjectSummary;
     taskSummary: TaskSummary;
     recentActivities: Activity[];
@@ -74,7 +79,7 @@ export default function StudentDashboard() {
         const data = await response.json() as DashboardData
         console.log("Dashboard API response:", data) // Add logging to debug
         console.log("User data received:", data.user) // Log specific user data
-        console.log("Username value:", data.user?.username) // Specifically log the username
+        console.log("Username value:", data.user?.userId) // Specifically log the username
         
         // Ensure data has all required properties
         if (!data || !data.user || !data.projectSummary || !data.taskSummary) {
@@ -84,8 +89,7 @@ export default function StudentDashboard() {
         // Transform the data with null checks
         const transformedData = {
           user: {
-            id: data.user.id,
-            username: data.user.username, // Provide a default name if none exists
+            userId: data.user.userId,
             unreadNotifications: data.user.unreadNotifications || 0,
             hasGroup: data.user.hasGroup || false,
             groupName: data.user.groupName || null
@@ -111,7 +115,7 @@ export default function StudentDashboard() {
         }
         
         console.log("Transformed data:", transformedData) // Add logging to debug
-        console.log("Username after transformation:", transformedData.user.username) // Check username after transformation
+        console.log("Username after transformation:", transformedData.user.userId) // Check username after transformation
         setDashboardData(transformedData)
       } catch (err) {
         console.error("Error fetching dashboard data:", err)
@@ -125,13 +129,12 @@ export default function StudentDashboard() {
   }, [])
 
   // Debug username value that's being passed to Navbar
-  console.log("Rendering with username:", dashboardData?.user?.username)
+  console.log("Rendering with username:", dashboardData?.user?.userId)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar 
-        userName={dashboardData?.user?.username} // Provide a default name
-      />
+/>
       
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-8 md:px-8 lg:px-12">
         <h1 className="text-3xl font-bold text-center mb-8">Student Dashboard</h1>
@@ -186,7 +189,11 @@ export default function StudentDashboard() {
               </div>
             )}
             
-            <Announcements announcements={dashboardData.announcements || []} />
+            <Announcements announcements={dashboardData.announcements.map(announcement => ({
+              ...announcement,
+              createdAt: new Date(announcement.createdAt),
+              updatedAt: new Date(announcement.updatedAt),
+            })) || []} />
             
             <StatusOverview 
               projectSummary={dashboardData.projectSummary}

@@ -27,9 +27,9 @@ interface Repository {
     name: string;
   };
   owner: {
-    userId: string;
-    firstName: string;
-    lastName: string;
+    id: string;
+    name: string;
+    groupUserName: string;
   };
 }
 
@@ -81,18 +81,18 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
           ['public', 'private'].includes(repo.visibility) &&
           typeof repo.createdAt === 'string' &&
           typeof repo.updatedAt === 'string' &&
-          typeof repo.group === 'object' &&
-          typeof repo.group.id === 'string' &&
-          typeof repo.group.name === 'string' &&
+          // typeof repo.group === 'object' &&
+          // typeof repo.group.id === 'string' &&
+          // typeof repo.group.name === 'string' &&
           typeof repo.owner === 'object' &&
-          typeof repo.owner.userId === 'string' &&
-          typeof repo.owner.firstName === 'string' &&
-          typeof repo.owner.lastName === 'string'
+          typeof repo.owner.id === 'string' &&
+          typeof repo.owner.name === 'string' &&
+          typeof repo.owner.groupUserName === 'string'
         );
       };
 
       // Normalize repositories
-      const repositories = (Array.isArray(data.repositories) ? data.repositories : []).filter(isValidRepository);
+      const repositories = (Array.isArray(data.repositories) ? data.repositories : []);
 
       const normalizedData: RepositoryResponse = {
         repositories,
@@ -245,7 +245,7 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <h3 className="text-lg font-semibold">
-                          <Link href={`/groups/${repo.group.id}/repositories/${repo.id}`} className="hover:text-primary transition-colors">
+                          <Link href={`/groups/${repo.group?.id}/repositories/${repo.id}`} className="hover:text-primary transition-colors">
                             {repo.name}
                           </Link>
                         </h3>
@@ -278,7 +278,7 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
                     </div>
                     <div className="flex items-center gap-1">
                       <GitBranch className="h-3.5 w-3.5" />
-                      <span>Owner: {repo.owner.firstName} {repo.owner.lastName}</span>
+                      <span>Owner: {repo.owner.groupUserName}</span>
                     </div>
                   </div>
 

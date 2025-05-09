@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 
-// Initialize Prisma client
+// Initialize Prisma clien
 const prisma = new PrismaClient()
 
 export async function GET(
@@ -17,7 +17,8 @@ export async function GET(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const userId = params.userId
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
     
     // Check if user is authorized to access these notifications
     if (session.user.userId !== userId) {

@@ -142,16 +142,9 @@ export async function GET(req: NextRequest) {
             include: {
               owner: {
                 select: {
-                  userId: true,
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-              group: {
-                select: {
                   id: true,
                   name: true,
-                  groupUserName: true,
+                  groupUserName: true
                 },
               },
               _count: {

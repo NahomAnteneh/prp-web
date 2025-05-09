@@ -1,6 +1,5 @@
 import React from 'react';
 import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 export type SearchType = 'projects' | 'repositories' | 'groups' | 'users' | 'students' | 'advisors';
@@ -19,14 +18,13 @@ interface SearchFiltersProps {
   className?: string;
 }
 
-const typeOptions = [
-  { value: 'projects', label: 'Projects' },
-  { value: 'repositories', label: 'Repositories' },
-  { value: 'groups', label: 'Groups' },
-  { value: 'users', label: 'Users' },
-  { value: 'students', label: 'Students' },
-  { value: 'advisors', label: 'Advisors' },
-];
+// const typeOptions = [
+//   { value: 'projects', label: 'Projects' },
+//   { value: 'repositories', label: 'Repositories' },
+//   { value: 'groups', label: 'Groups' },
+//   { value: 'students', label: 'Students' },
+//   { value: 'advisors', label: 'Advisors' },
+// ];
 
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },
@@ -34,6 +32,25 @@ const statusOptions = [
   { value: 'SUBMITTED', label: 'Submitted' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'ARCHIVED', label: 'Archived' },
+];
+
+const departmentOptions = [
+  { value: 'all', label: 'All Departments' },
+  { value: 'CSE', label: 'Computer Science' },
+  { value: 'ECE', label: 'Electronics' },
+  { value: 'ME', label: 'Mechanical' },
+  { value: 'CE', label: 'Civil' },
+  { value: 'CHE', label: 'Chemical' },
+];
+
+const batchOptions = [
+  { value: 'all', label: 'All Batches' },
+  { value: '2020', label: '2020' },
+  { value: '2021', label: '2021' },
+  { value: '2022', label: '2022' },
+  { value: '2023', label: '2023' },
+  { value: '2024', label: '2024' },
+  { value: '2025', label: '2025' },
 ];
 
 export function SearchFilters({
@@ -50,11 +67,25 @@ export function SearchFilters({
   className,
 }: SearchFiltersProps) {
   const safeStatus = status || 'all';
+  const safeDept = dept || 'all';
+  const safeBatch = batch || 'all';
   const safeRole = role || 'all';
   
   const handleStatusChange = (value: string) => {
     if (setStatus) {
       setStatus(value === 'all' ? '' : value);
+    }
+  };
+  
+  const handleDeptChange = (value: string) => {
+    if (setDept) {
+      setDept(value === 'all' ? '' : value);
+    }
+  };
+  
+  const handleBatchChange = (value: string) => {
+    if (setBatch) {
+      setBatch(value === 'all' ? '' : value);
     }
   };
   
@@ -66,14 +97,14 @@ export function SearchFilters({
   
   return (
     <div className={cn('flex flex-wrap gap-2 items-center', className)}>
-      <Select value={type} onValueChange={setType}>
+      {/* <Select value={type} onValueChange={setType}>
         <SelectTrigger className="w-40">{typeOptions.find(opt => opt.value === type)?.label}</SelectTrigger>
         <SelectContent>
           {typeOptions.map(opt => (
             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
           ))}
         </SelectContent>
-      </Select>
+      </Select> */}
       
       {setStatus && (
         <Select value={safeStatus} onValueChange={handleStatusChange}>
@@ -89,11 +120,29 @@ export function SearchFilters({
       )}
       
       {setDept && (
-        <Input value={dept} onChange={e => setDept(e.target.value)} placeholder="Department" className="w-32" />
+        <Select value={safeDept} onValueChange={handleDeptChange}>
+          <SelectTrigger className="w-36">
+            {departmentOptions.find(opt => opt.value === safeDept)?.label || 'All Departments'}
+          </SelectTrigger>
+          <SelectContent>
+            {departmentOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
       
       {setBatch && (
-        <Input value={batch} onChange={e => setBatch(e.target.value)} placeholder="Batch" className="w-24" />
+        <Select value={safeBatch} onValueChange={handleBatchChange}>
+          <SelectTrigger className="w-28">
+            {batchOptions.find(opt => opt.value === safeBatch)?.label || 'All Batches'}
+          </SelectTrigger>
+          <SelectContent>
+            {batchOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
       
       {setRole && (
@@ -113,4 +162,4 @@ export function SearchFilters({
       )}
     </div>
   );
-} 
+}

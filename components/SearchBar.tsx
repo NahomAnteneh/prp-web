@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Search, X, FileText } from "lucide-react";
+import { Search, X, Folder, GitBranch, Users, GraduationCap, Briefcase } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,19 +19,18 @@ interface SearchBarProps {
 
 // Only show types that match the /search page
 const searchTypes = [
-  { id: "projects", label: "Projects", icon: FileText },
-  { id: "repositories", label: "Repositories", icon: FileText },
-  { id: "groups", label: "Groups", icon: FileText },
-  { id: "users", label: "Users", icon: FileText },
-  { id: "students", label: "Students", icon: FileText },
-  { id: "advisors", label: "Advisors", icon: FileText },
+  { id: "projects", label: "Projects", icon: Folder },
+  { id: "repositories", label: "Repositories", icon: GitBranch },
+  { id: "groups", label: "Groups", icon: Users },
+  { id: "students", label: "Students", icon: GraduationCap },
+  { id: "advisors", label: "Advisors", icon: Briefcase },
 ];
 
 export function SearchBar({ className, mobile = false, defaultValue = '', onSearch }: SearchBarProps) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState(defaultValue);
-  const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["projects"]);
+  const [selectedTypes, setSelectedTypes] = React.useState<string[]>([]);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const popoverRef = React.useRef<HTMLDivElement>(null);
 
@@ -47,6 +46,7 @@ export function SearchBar({ className, mobile = false, defaultValue = '', onSear
           params.set('type', selectedTypes[0]);
         }
         router.push(`/search?${params.toString()}`);
+        router.refresh(); // Reload the page
       }
       setIsExpanded(false);
     }
@@ -209,4 +209,4 @@ export function SearchBar({ className, mobile = false, defaultValue = '', onSear
       )}
     </div>
   );
-} 
+}

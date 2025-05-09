@@ -26,10 +26,9 @@ export async function GET(
       include: {
         owner: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         group: {
@@ -146,10 +145,9 @@ export async function PATCH(
       include: {
         owner: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         group: {

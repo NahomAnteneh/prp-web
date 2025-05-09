@@ -73,17 +73,11 @@ export async function GET(
         isPrivate: true,
         createdAt: true,
         updatedAt: true,
-        group: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         owner: {
           select: {
-            userId: true,
-            firstName: true,
-            lastName: true,
+            id: true,
+           name: true,
+           groupUserName: true,
           },
         },
         _count: {

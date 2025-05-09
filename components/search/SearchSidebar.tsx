@@ -4,7 +4,6 @@ const categories = [
   { key: 'repositories', label: 'Repositories' },
   { key: 'projects', label: 'Projects' },
   { key: 'groups', label: 'Groups' },
-  { key: 'users', label: 'Users' },
   { key: 'students', label: 'Students' },
   { key: 'advisors', label: 'Advisors' },
 ];

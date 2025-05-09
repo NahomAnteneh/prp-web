@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Menu, X, User, Settings } from "lucide-react"
+import { Menu, X, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LogoutButton } from "@/components/ui/logout-button"
 import NotificationDropdown from "./dashboard/notification-dropdown"
@@ -28,7 +28,7 @@ export default function Navbar() {
   useEffect(() => {
     async function fetchNavbarData() {
       try {
-        const notifications = await fetch("/api/notifications")
+        const notifications = await fetch(`/api/users/${userName}/notifications`)
         if (notifications.ok) {
           const data = await notifications.json()
           setUnreadCount(data.unreadCount || 0)
@@ -45,7 +45,7 @@ export default function Navbar() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await fetch("/api/notifications", {
+      const response = await fetch(`/api/users/${userName}/notifications`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -146,19 +146,6 @@ export default function Navbar() {
 
         {/* Right side menu items */}
         <div className="flex items-center space-x-4">
-          {/* Settings */}
-          {/* <Button 
-            variant="ghost" 
-            size="icon" 
-            asChild
-            className="relative"
-            aria-label="Settings"
-          >
-            <Link href="/settings">
-              <Settings className="h-5 w-5" />
-            </Link>
-          </Button> */}
-
           {/* Notifications Dropdown */}
           <NotificationDropdown 
             unreadCount={unreadCount} 
