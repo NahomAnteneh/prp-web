@@ -10,6 +10,8 @@ import { GraduationCap, Users, Compass, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { signIn } from "next-auth/react";
+import ProfilePhotoModal from "@/components/student/profile/profile-photo-modal";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function RegisterPage() {
     confirmPassword: "",
     general: "",
   });
+  const [showProfilePhotoModal, setShowProfilePhotoModal] = useState(false);
 
   useEffect(() => {
     // Check if user is already authenticated (commented out in original code)
@@ -175,14 +178,25 @@ export default function RegisterPage() {
       const data = await response.json();
       console.log("Registration successful", data);
       
-      router.push("/login?registered=true");
+      // Sign in automatically after registration
+      const signInRes = await signIn('credentials', {
+        redirect: false,
+        userId: formData.userId,
+        password: formData.password
+      });
+
+      if (signInRes?.error) {
+        throw new Error(signInRes.error || 'Failed to sign in after registration');
+      }
+      
+      // Show profile photo modal or redirect to home page
+      setShowProfilePhotoModal(true);
     } catch (error) {
       console.error("Registration error:", error);
       setFormErrors(prev => ({
         ...prev,
         general: error instanceof Error ? error.message : "Registration failed. Please try again."
       }));
-    } finally {
       setIsLoading(false);
     }
   };
@@ -481,6 +495,17 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {showProfilePhotoModal && (
+        <ProfilePhotoModal
+          isOpen={showProfilePhotoModal}
+          onClose={() => setShowProfilePhotoModal(false)}
+          userId={formData.userId}
+          onSuccess={() => {
+            router.push("/");
+          }}
+        />
+      )}
     </div>
   );
 }
