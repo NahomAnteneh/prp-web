@@ -19,10 +19,17 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // Find user by id
-        const user = await prisma.user.findUnique({
+        // Try to find user by userId first
+        let user = await prisma.user.findUnique({
           where: { userId: credentials.identifier }
         });
+
+        // If not found by userId, try by email
+        if (!user) {
+          user = await prisma.user.findUnique({
+            where: { email: credentials.identifier }
+          });
+        }
 
         if (!user) {
           return null;
@@ -40,6 +47,7 @@ export const authOptions: AuthOptions = {
 
         // Return user object without password
         return {
+          id: user.userId,
           userId: user.userId,
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,

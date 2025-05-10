@@ -64,11 +64,13 @@ export async function GET() {
             },
             repositories: {
               select: {
-                id: true,
                 name: true,
                 description: true,
                 createdAt: true,
                 updatedAt: true,
+                ownerId: true,
+                isPrivate: true,
+                groupUserName: true,
               },
             },
           },

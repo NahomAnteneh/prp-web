@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { db } from "@/lib/db"
 import { z } from "zod"
-
-// Initialize Prisma client
-const prisma = new PrismaClient()
 
 const userIdSchema = z.string().min(1)
 
@@ -15,12 +12,12 @@ const querySchema = z.object({
 
 export async function GET(
   request: Request,
-  context: { params: { userId: string } }
+  context: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
   try {
-    // Await params before accessing its properties
-    const { params } = context;
-    const userId = params.userId;
+    // Resolve params first
+    const resolvedParams = await Promise.resolve(context.params);
+    const userId = resolvedParams.userId;
 
     // Validate userId
     const parsedParams = userIdSchema.safeParse(userId);
@@ -46,38 +43,32 @@ export async function GET(
     const includeGroupRepos = queryParams.includeGroupRepos ?? true
 
     // Get user's groups for group repository lookup
-    let groupIds: string[] = []
+    let groupUserNames: string[] = []
     if (includeGroupRepos) {
-      const userGroups = await prisma.groupMember.findMany({
+      const userGroups = await db.groupMember.findMany({
         where: { userId },
-        select: { groupId: true }
+        select: { groupUserName: true }
       })
-      groupIds = userGroups.map((ug: { groupId: string }) => ug.groupId)
+      groupUserNames = userGroups.map(ug => ug.groupUserName)
     }
 
-    // Fetch repositories - both user-owned and those from their groups
-    const repositories = await prisma.repository.findMany({
+    // Fetch repositories from user's groups
+    const repositories = await db.repository.findMany({
       where: {
-        OR: [
-          { ownerId: userId }, // User's personal repositories
-          // Include group repositories if option is enabled and user belongs to groups
-          ...(includeGroupRepos && groupIds.length > 0 
-            ? [{ groupId: { in: groupIds } }] 
-            : [])
-        ]
+        // Only group repositories
+        groupUserName: { in: groupUserNames }
       },
       select: {
-        id: true,
         name: true,
         description: true,
         isPrivate: true,
         createdAt: true,
         updatedAt: true,
+        ownerId: true,
+        groupUserName: true,
         owner: {
           select: {
-            id: true,
-           name: true,
-           groupUserName: true,
+            name: true,
           },
         },
         _count: {
@@ -95,29 +86,25 @@ export async function GET(
     })
 
     // Format repositories for response
-    const formattedRepositories = repositories.map((repo: any) => ({
-      id: repo.id,
+    const formattedRepositories = repositories.map(repo => ({
       name: repo.name,
       description: repo.description,
       isPrivate: repo.isPrivate,
       createdAt: repo.createdAt,
       updatedAt: repo.updatedAt,
       lastActivity: formatTimeAgo(repo.updatedAt),
-      owner: {
-        id: repo.owner.id,
-        username: repo.owner.username,
-        name: `${repo.owner.firstName} ${repo.owner.lastName}`,
+      ownerId: repo.ownerId,
+      groupUserName: repo.groupUserName,
+      group: {
+        name: repo.owner.name,
+        groupUserName: repo.groupUserName,
       },
-      group: repo.group ? {
-        id: repo.group.id,
-        name: repo.group.name,
-      } : null,
       stats: {
         commits: repo._count.commits,
         branches: repo._count.branches,
         projects: repo._count.projects,
       },
-      isOwner: repo.owner.id === userId,
+      isOwner: repo.ownerId === userId,
     }))
 
     return NextResponse.json(formattedRepositories)

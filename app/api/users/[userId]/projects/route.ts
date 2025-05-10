@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { db } from '@/lib/db';
 import { z } from 'zod';
-
-// Initialize Prisma client
-const prisma = new PrismaClient();
 
 // GET: List all projects for a user (member or advisor)
 export async function GET(
@@ -26,7 +23,7 @@ export async function GET(
     }
 
     // Fetch projects where user is a group member or advisor
-    const projects = await prisma.project.findMany({
+    const projects = await db.project.findMany({
       where: {
         OR: [
           {
@@ -53,12 +50,11 @@ export async function GET(
         createdAt: true,
         updatedAt: true,
         advisorId: true,
-        groupId: true,
+        groupUserName: true,
         group: {
           select: {
-            id: true,
-            name: true,
             groupUserName: true,
+            name: true,
           },
         },
         advisor: {
@@ -105,9 +101,8 @@ export async function GET(
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
       group: {
-        id: project.group.id,
-        name: project.group.name,
         groupUserName: project.group.groupUserName,
+        name: project.group.name,
       },
       advisor: project.advisor
         ? {
@@ -128,17 +123,9 @@ export async function GET(
     return NextResponse.json(formattedProjects);
   } catch (error) {
     console.error('Error fetching user projects:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json(
-        { message: `Database error: ${error.message}`, projects: [] },
-        { status: 500 }
-      );
-    }
     return NextResponse.json(
       { message: 'Internal server error', projects: [] },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

@@ -29,9 +29,10 @@ interface GroupWithRelations extends Group {
   }[];
   invites: GroupInvite[];
   repositories?: Array<{
-    id: string;
     name: string;
+    groupUserName: string;
     description?: string;
+    id?: string; // Keep id for backward compatibility
   }>;
   projects?: Array<{
     id: string;
@@ -248,44 +249,37 @@ export default function GroupPage({ groupData: propGroupData, isVisitor }: Group
             </TabsContent>
 
             <TabsContent value="projects" className="mt-6">
+              <h2 className="text-xl font-bold mb-4">Group Projects</h2>
               <ProjectsList
-                groupId={groupData.id}
+                groupUserName={groupData.groupUserName}
                 isLeader={!isVisitor && userId === groupData.leaderId}
               />
             </TabsContent>
 
             <TabsContent value="repositories" className="mt-6">
-              {groupData && (
-                <RepositoriesList
-                  groupId={groupData.id}
-                  isLeader={!isVisitor && userId === groupData.leaderId}
-                  groupName={groupData.name}
-                />
-              )}
+              <h2 className="text-xl font-bold mb-4">Group Repositories</h2>
+              <RepositoriesList
+                groupUserName={groupData.groupUserName}
+                isLeader={!isVisitor && userId === groupData.leaderId}
+                groupName={groupData.name}
+              />
             </TabsContent>
 
             {!isVisitor && (
               <TabsContent value="settings" className="mt-6">
+                <h2 className="text-xl font-bold mb-4">Group Settings</h2>
                 <GroupSettings
                   group={groupData}
-                  maxGroupSize={maxGroupSize}
-                  isLeader={!!userId && userId === groupData.leaderId}
+                  isLeader={userId === groupData.leaderId}
                   onUpdate={fetchGroupData}
+                  maxGroupSize={maxGroupSize}
                 />
               </TabsContent>
             )}
           </Tabs>
         )}
       </div>
-      {isVisitor ? (
-        <div className="py-4 border-t bg-muted/30">
-          <div className="container mx-auto text-center text-sm text-muted-foreground">
-            <p>You are viewing this group profile as a visitor.</p>
-          </div>
-        </div>
-      ) : (
-        <Footer />
-      )}
+      <Footer />
     </>
   );
 }

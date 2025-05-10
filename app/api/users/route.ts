@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
 export async function GET(req: NextRequest) {
@@ -27,10 +27,10 @@ export async function GET(req: NextRequest) {
       filter.role = role;
     }
 
-    // Add search filter (searching by username, firstName, lastName, email)
+    // Add search filter (searching by userId, firstName, lastName, email)
     if (search) {
       filter.OR = [
-        { username: { contains: search, mode: "insensitive" } },
+        { userId: { contains: search, mode: "insensitive" } },
         { firstName: { contains: search, mode: "insensitive" } },
         { lastName: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Get users with pagination
-    const users = await prisma.user.findMany({
+    const users = await db.user.findMany({
       where: filter,
       select: {
         userId: true,
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Get total count for pagination
-    const totalUsers = await prisma.user.count({ where: filter });
+    const totalUsers = await db.user.count({ where: filter });
     
     return NextResponse.json({
       users,
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
+    const existingUser = await db.user.findFirst({
       where: {
         OR: [
           { userId },
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
-    const newUser = await prisma.user.create({
+    const newUser = await db.user.create({
       data: {
         userId,
         firstName,

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     // Check if groupUserName exists in the Group table
     const existingGroup = await prisma.group.findUnique({
       where: { groupUserName },
-      select: { id: true }, // Minimal select to optimize query
+      select: { groupUserName: true }, // Using groupUserName instead of id since it's the primary key
     });
 
     // Return response based on whether the groupUserName is taken

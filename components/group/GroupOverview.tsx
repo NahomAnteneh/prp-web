@@ -6,7 +6,6 @@ import Link from 'next/link';
 
 // Extended group interface to include the nested properties
 interface ExtendedGroup {
-  id: string;
   name: string;
   groupUserName: string;
   description: string | null;
@@ -14,9 +13,10 @@ interface ExtendedGroup {
   updatedAt: Date;
   leaderId: string;
   repositories?: Array<{
-    id: string;
+    id?: string;
     name: string;
     description?: string;
+    groupUserName?: string;
   }>;
   projects?: Array<{
     id: string;
@@ -125,8 +125,8 @@ export default function GroupOverview({
             {/* Map over Top 3 Repositories */}
             {group.repositories?.slice(0, 3).map((repo) => (
               <Link
-                key={`repo-${repo.id}`}
-                href={`/repositories/${repo.id}`}
+                key={`repo-${repo.id || repo.name}`}
+                href={`/groups/${repo.groupUserName || group.groupUserName}/repositories/${repo.name}`}
                 className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">

@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching available advisors:', error);
+    // console.error('Error fetching available advisors:', error);
     return NextResponse.json(
       { message: 'Error fetching available advisors' },
       { status: 500 }

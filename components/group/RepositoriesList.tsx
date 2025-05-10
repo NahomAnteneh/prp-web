@@ -16,20 +16,14 @@ import { toast } from 'sonner';
 import CreateRepositoryModal from './CreateRepositoryModal';
 
 interface Repository {
-  id: string;
   name: string;
+  groupUserName: string;
   description: string;
-  visibility: 'public' | 'private';
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
-  group: {
-    id: string;
-    name: string;
-  };
   owner: {
-    id: string;
     name: string;
-    groupUserName: string;
   };
 }
 
@@ -44,12 +38,12 @@ interface RepositoryResponse {
 }
 
 interface RepositoriesListProps {
-  groupId: string;
+  groupUserName: string;
   isLeader: boolean;
   groupName: string;
 }
 
-export default function RepositoriesList({ groupId, isLeader, groupName }: RepositoriesListProps) {
+export default function RepositoriesList({ groupUserName, isLeader, groupName }: RepositoriesListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [repositoryData, setRepositoryData] = useState<RepositoryResponse>({
@@ -61,35 +55,13 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
   const fetchRepositories = async (offset: number, limit: number, append: boolean = false) => {
     try {
       setIsLoadingMore(true);
-      const url = `/api/groups/${groupId}/repositories?offset=${offset}&limit=${limit}`;
+      const url = `/api/groups/${groupUserName}/repositories?offset=${offset}&limit=${limit}`;
       const response = await fetch(url);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.message || 'Failed to fetch repositories');
       }
-
-      // Helper function to validate a repository object
-      const isValidRepository = (repo: any): repo is Repository => {
-        return (
-          repo != null &&
-          typeof repo === 'object' &&
-          typeof repo.id === 'string' &&
-          typeof repo.name === 'string' &&
-          typeof repo.description === 'string' &&
-          typeof repo.visibility === 'string' &&
-          ['public', 'private'].includes(repo.visibility) &&
-          typeof repo.createdAt === 'string' &&
-          typeof repo.updatedAt === 'string' &&
-          // typeof repo.group === 'object' &&
-          // typeof repo.group.id === 'string' &&
-          // typeof repo.group.name === 'string' &&
-          typeof repo.owner === 'object' &&
-          typeof repo.owner.id === 'string' &&
-          typeof repo.owner.name === 'string' &&
-          typeof repo.owner.groupUserName === 'string'
-        );
-      };
 
       // Normalize repositories
       const repositories = (Array.isArray(data.repositories) ? data.repositories : []);
@@ -129,7 +101,8 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
 
   useEffect(() => {
     fetchRepositories(0, 5);
-  }, [groupId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupUserName]);
 
   const handleLoadMore = () => {
     if (repositoryData.pagination.hasMore) {
@@ -200,8 +173,8 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
         <CreateRepositoryModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          groupId={groupId}
-          groupUserName={groupName}
+          groupUserName={groupUserName}
+          groupName={groupName}
           onRepositoryCreated={() => fetchRepositories(0, 5)}
         />
       </Card>
@@ -230,14 +203,14 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
       <CardContent>
         <div className="space-y-6">
           {repositoryData.repositories.map((repo) => {
-            if (!repo || !repo.id) {
+            if (!repo || !repo.name) {
               console.warn('Skipping invalid repository:', repo);
               return null;
             }
 
             return (
               <div
-                key={repo.id}
+                key={`${repo.groupUserName}-${repo.name}`}
                 className="rounded-lg border hover:border-primary transition-colors overflow-hidden"
               >
                 <div className="p-5">
@@ -245,57 +218,52 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <h3 className="text-lg font-semibold">
-                          <Link href={`/groups/${repo.group?.id}/repositories/${repo.id}`} className="hover:text-primary transition-colors">
+                          <Link href={`/groups/${repo.groupUserName}/repositories/${repo.name}`} className="hover:text-primary transition-colors">
                             {repo.name}
                           </Link>
                         </h3>
-                        <Badge className={`${getVisibilityColor(repo.visibility)} border`}>
-                          {repo.visibility}
+                        <Badge
+                          className={`${getVisibilityColor(repo.isPrivate ? 'private' : 'public')}`}
+                        >
+                          {repo.isPrivate ? (
+                            <span className="flex items-center gap-1">
+                              <Lock className="h-3 w-3" /> Private
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <Globe className="h-3 w-3" /> Public
+                            </span>
+                          )}
                         </Badge>
                       </div>
-                      <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                        {repo.description || 'No description provided'}
+                      <p className="text-muted-foreground text-sm mb-2">
+                        {repo.description}
                       </p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Created {formatDate(repo.createdAt)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <GitBranch className="h-3.5 w-3.5" />
-                      <span>Group: {repo.group.name}</span>
+                    <div className="flex justify-end mt-2 md:mt-0">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/groups/${repo.groupUserName}/repositories/${repo.name}`}>
+                          <span className="flex items-center gap-1">
+                            View Repository <ExternalLink className="h-3 w-3 ml-1" />
+                          </span>
+                        </Link>
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {repo.visibility === 'public' ? (
-                        <Globe className="h-3.5 w-3.5" />
-                      ) : (
-                        <Lock className="h-3.5 w-3.5" />
-                      )}
-                      <span>Visibility: {repo.visibility}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>Last updated: {formatDate(repo.updatedAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <GitBranch className="h-3.5 w-3.5" />
-                      <span>Owner: {repo.owner.groupUserName}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/groups/${repo.group.id}/repositories/${repo.id}`}>
-                        <ExternalLink className="h-4 w-4 mr-2" /> View Repository
-                      </Link>
-                    </Button>
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+
         {repositoryData.pagination.hasMore && (
-          <div className="text-center mt-6">
+          <div className="mt-6 text-center">
             <Button
               variant="outline"
               onClick={handleLoadMore}
@@ -303,7 +271,7 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
             >
               {isLoadingMore ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
                   Loading...
                 </>
               ) : (
@@ -313,12 +281,11 @@ export default function RepositoriesList({ groupId, isLeader, groupName }: Repos
           </div>
         )}
       </CardContent>
-
       <CreateRepositoryModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        groupId={groupId}
-        groupUserName={groupName}
+        groupUserName={groupUserName}
+        groupName={groupName}
         onRepositoryCreated={() => fetchRepositories(0, 5)}
       />
     </Card>

@@ -67,10 +67,9 @@ export async function GET(req: NextRequest) {
       include: {
         leader: {
           select: {
-            id: true,
+            userId: true,
             firstName: true,
             lastName: true,
-            username: true,
           },
         },
         _count: {
@@ -85,10 +84,9 @@ export async function GET(req: NextRequest) {
           include: {
             user: {
               select: {
-                id: true,
+                userId: true,
                 firstName: true,
                 lastName: true,
-                username: true,
               },
             },
           },
@@ -103,16 +101,15 @@ export async function GET(req: NextRequest) {
 
     // Format the response for better client-side consumption
     const formattedGroups = groups.map((group: {
-      id: string;
+      groupUserName: string;
       name: string;
       description: string | null;
       createdAt: Date;
       leaderId: string;
       leader: {
-        id: string;
+        userId: string;
         firstName: string;
         lastName: string;
-        username: string;
       };
       _count: {
         members: number;
@@ -121,14 +118,13 @@ export async function GET(req: NextRequest) {
       };
       members: Array<{
         user: {
-          id: string;
+          userId: string;
           firstName: string;
           lastName: string;
-          username: string;
         }
       }>;
     }) => ({
-      id: group.id,
+      groupUserName: group.groupUserName,
       name: group.name,
       description: group.description,
       createdAt: group.createdAt,
@@ -140,17 +136,15 @@ export async function GET(req: NextRequest) {
       },
       recentMembers: group.members.map((member: {
         user: {
-          id: string;
+          userId: string;
           firstName: string;
           lastName: string;
-          username: string;
         }
       }) => ({
-        id: member.user.id,
+        userId: member.user.userId,
         firstName: member.user.firstName,
         lastName: member.user.lastName,
-        username: member.user.username,
-        isLeader: member.user.id === group.leaderId,
+        isLeader: member.user.userId === group.leaderId,
       })),
     }));
 

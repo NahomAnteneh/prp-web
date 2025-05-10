@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { db } from "@/lib/db"
 import { z } from "zod"
-
-// Initialize Prisma client
-const prisma = new PrismaClient()
 
 const userIdSchema = z.string().min(1)
 
 export async function GET(
   request: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
   try {
+    // Resolve params first
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
+    
     // Validate userId
-    const parsedParams = userIdSchema.safeParse(params.userId)
+    const parsedParams = userIdSchema.safeParse(userId)
     if (!parsedParams.success) {
       return NextResponse.json(
         { error: "Invalid user ID format" },
@@ -21,19 +22,16 @@ export async function GET(
       )
     }
 
-    const userId = await params.userId
-
     // Find the user's groups
-    const userGroups = await prisma.groupMember.findMany({
+    const userGroups = await db.groupMember.findMany({
       where: {
         userId: userId,
       },
       select: {
         group: {
           select: {
-            id: true,
-            name: true,
             groupUserName: true,
+            name: true,
             description: true,
             leaderId: true,
             createdAt: true,
@@ -70,9 +68,8 @@ export async function GET(
     const isLeader = primaryGroup.leaderId === userId
 
     const response = {
-      id: primaryGroup.id,
-      name: primaryGroup.name,
       groupUserName: primaryGroup.groupUserName,
+      name: primaryGroup.name,
       description: primaryGroup.description,
       memberCount: primaryGroup._count.members,
       projectCount: primaryGroup._count.projects,

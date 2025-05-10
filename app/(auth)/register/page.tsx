@@ -179,13 +179,17 @@ export default function RegisterPage() {
       console.log("Registration successful", data);
       
       // Sign in automatically after registration
+      console.log("Registration successful, attempting auto-login with:", { userId: formData.userId });
       const signInRes = await signIn('credentials', {
         redirect: false,
-        userId: formData.userId,
+        identifier: formData.userId,
         password: formData.password
       });
 
+      console.log("Auto-login result:", signInRes);
+
       if (signInRes?.error) {
+        console.error("Auto-login failed:", signInRes.error);
         throw new Error(signInRes.error || 'Failed to sign in after registration');
       }
       

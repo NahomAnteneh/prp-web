@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { PrismaClient, ProjectStatus, TaskStatus } from "@prisma/client"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 import { getServerSession } from "next-auth"
 
 // Initialize Prisma client
@@ -16,7 +16,7 @@ interface CommitData {
     projects: {
       projectId: string
       repositoryId: string
-      groupId: string
+      groupUserName: string
       assignedAt: Date
     }[]
   }
@@ -99,23 +99,23 @@ export async function GET() {
       select: {
         group: {
           select: {
-            id: true,
+            groupUserName: true,
             name: true,
           },
         },
       },
     })
 
-    const groupIds = userGroups.map((ug) => ug.group.id)
-    const hasGroup = groupIds.length > 0
+    const groupUserNames = userGroups.map((ug) => ug.group.groupUserName)
+    const hasGroup = groupUserNames.length > 0
     const groupName = hasGroup ? userGroups[0].group.name : null
-    console.log(`Dashboard API: User belongs to ${groupIds.length} groups. Has group: ${hasGroup}`)
+    console.log(`Dashboard API: User belongs to ${groupUserNames.length} groups. Has group: ${hasGroup}`)
 
     // Get projects
     const projects = await prisma.project.findMany({
       where: {
-        groupId: {
-          in: groupIds,
+        groupUserName: {
+          in: groupUserNames,
         },
       },
       select: {
@@ -272,6 +272,7 @@ export async function GET() {
             select: {
               id: true,
               title: true,
+              groupUserName: true,
             },
           },
         },
@@ -281,7 +282,7 @@ export async function GET() {
       // Combine and format activities
       const recentActivities = [
         ...recentCommits.map((commit: CommitData) => {
-          const projectId = commit.repository.projects[0]?.projectId || "unknown"; // Extract projectId from nested projects array
+          const projectId = commit.repository.projects[0]?.projectId || "unknown"; 
           return {
             id: `commit-${commit.id}`,
             type: "commit" as const,

@@ -2,9 +2,8 @@
 
 import { useParams, usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Clipboard, Check } from "lucide-react";
+import { Clipboard, Check, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import ShallowLink from "@/components/shallow-link";
 
 interface FileType {
   name: string;
@@ -14,26 +13,25 @@ interface FileType {
 }
 
 interface BreadcrumbsProps {
-  repositoryId: string;
-  commitId: string;
-  fileData: FileType | null; // File data for blob view
+  ownerId: string;
+  repoId: string;
+  branch: string;
+  path?: string[];
+  fileData?: FileType | null; // File data for blob view
 }
 
-export function Breadcrumbs({ repositoryId, commitId, fileData }: BreadcrumbsProps) {
+export function Breadcrumbs({ ownerId, repoId, branch, path = [], fileData }: BreadcrumbsProps) {
   const pathname = usePathname();
   const [isCopied, setIsCopied] = useState(false);
 
-  // Determine if we're in blob (file) view and derive path
+  // Determine if we're in blob (file) view
   const segments = pathname.split("/").filter(Boolean);
-  const isBlobView = useMemo(() => segments[3] === "blob", [segments]);
-  const formattedPath = segments.slice(5).join("/");
-
+  const isBlobView = useMemo(() => segments.includes("blob"), [segments]);
+  
   // Get path segments for breadcrumbs
-  const path = segments
-    .slice(5) // Remove /repository/{repositoryId}/commit/{commitId}/[tree|blob]
-    .filter((segment) => segment !== "tree" && segment !== "blob");
+  const pathSegments = Array.isArray(path) ? path : [];
 
-  // URL for raw file (from fileData.url)
+  // URL for raw file
   const rawUrl = fileData?.url || "";
 
   const handleCopy = async () => {
@@ -45,48 +43,57 @@ export function Breadcrumbs({ repositoryId, commitId, fileData }: BreadcrumbsPro
   };
 
   return (
-    <div className="flex items-stretch gap-2 text-sm text-muted-foreground justify-between">
-      <div className="flex items-center gap-2 p-4">
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap py-1">
         <Link
-          href={`/repository/${repositoryId}`}
-          className="hover:text-foreground transition-colors"
+          href={`/${ownerId}/${repoId}`}
+          className="text-blue-600 hover:underline"
         >
-          {repositoryId}
+          {repoId}
         </Link>
-        {path.map((segment, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <span>/</span>
-            <ShallowLink
-              href={`/repository/${repositoryId}/commit/${commitId}/tree/${path
-                .slice(0, index + 1)
-                .join("/")}`}
-              className="hover:text-foreground transition-colors"
-            >
-              {decodeURIComponent(segment)}
-            </ShallowLink>
+        
+        {pathSegments.length > 0 && (
+          <div className="flex items-center">
+            <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />
+            {pathSegments.map((segment, index) => (
+              <div key={index} className="flex items-center">
+                {index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />}
+                <Link
+                  href={`/${ownerId}/${repoId}/${isBlobView ? 'blob' : 'tree'}/${branch}/${pathSegments
+                    .slice(0, index + 1)
+                    .join("/")}`}
+                  className="text-blue-600 hover:underline"
+                >
+                  {decodeURIComponent(segment)}
+                </Link>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
+      
       {/* Copy button and raw link for text files in blob view */}
-      <div className="flex items-stretch">
-        {isBlobView && fileData && !fileData.isBinary && fileData.content && (
-          <button
-            onClick={handleCopy}
-            className="hover:text-foreground transition-all flex items-center gap-1 border-l px-4 border-l-foreground/20 cursor-pointer"
-          >
-            {isCopied ? <Check size={16} /> : <Clipboard size={16} />}
-            {isCopied ? "Copied!" : "Copy"}
-          </button>
-        )}
-        {isBlobView && rawUrl && (
-          <a
-            href={rawUrl}
-            className="hover:text-foreground transition-colors flex items-center gap-1 border-l border-l-foreground/20 px-4 hover:underline"
-          >
-            View Raw
-          </a>
-        )}
-      </div>
+      {isBlobView && fileData && (
+        <div className="flex items-center">
+          {!fileData.isBinary && fileData.content && (
+            <button
+              onClick={handleCopy}
+              className="hover:bg-muted/50 transition-all flex items-center gap-1 px-2 py-1 rounded-md text-sm"
+            >
+              {isCopied ? <Check size={16} /> : <Clipboard size={16} />}
+              {isCopied ? "Copied!" : "Copy"}
+            </button>
+          )}
+          {rawUrl && (
+            <a
+              href={rawUrl}
+              className="hover:bg-muted/50 transition-all flex items-center gap-1 px-2 py-1 rounded-md text-sm ml-2"
+            >
+              View Raw
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

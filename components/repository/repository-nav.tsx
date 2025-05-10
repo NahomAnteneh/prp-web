@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Code, GitPullRequest } from "lucide-react";
+import { 
+  Code, 
+  GitPullRequest, 
+  CircleDot, 
+  Bookmark, 
+  Shield, 
+  Settings, 
+  PlaySquare,
+  AlertCircle,
+  GitBranchIcon
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,75 +28,52 @@ export function RepositoryNav({ owner, repository }: RepositoryNavProps) {
   // Determine active tab based on the current path
   const isActive = (path: string) => {
     if (path === "code") {
-      // Code is active only on the base path
-      return pathname === basePath;
+      // Code is active only on the base path or when viewing code
+      return pathname === basePath || 
+             pathname.includes(`${basePath}/tree`) || 
+             pathname.includes(`${basePath}/blob`);
     }
     return pathname.includes(`${basePath}/${path}`);
   };
 
+  const navItems = [
+    { name: "Code", path: "code", icon: <Code className="h-4 w-4" /> },
+    { name: "Issues", path: "issues", icon: <CircleDot className="h-4 w-4" /> },
+    { name: "Pull requests", path: "pulls", icon: <GitPullRequest className="h-4 w-4" /> },
+    { name: "Actions", path: "actions", icon: <PlaySquare className="h-4 w-4" /> },
+    { name: "Projects", path: "projects", icon: <Bookmark className="h-4 w-4" /> },
+    { name: "Security", path: "security", icon: <Shield className="h-4 w-4" /> },
+    { name: "Insights", path: "insights", icon: <AlertCircle className="h-4 w-4" /> },
+    { name: "Settings", path: "settings", icon: <Settings className="h-4 w-4" /> },
+  ];
+
   return (
-    <div className="flex items-center overflow-x-auto scrollbar-hide -mx-4 md:mx-0">
-      <Link
-        href={basePath}
-        className={cn("border-b-2 pb-1 cursor-pointer border-transparent", {
-          "border-primary": isActive("code") || isActive("tree") || isActive("blob"),
-        })}
-      >
-        <Button
-          variant="ghost"
-          asChild
-          className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground text-foreground"
+    <div className="flex items-center overflow-x-auto scrollbar-hide -mx-4 md:mx-0 border-b border-foreground/10">
+      {navItems.map((item) => (
+        <Link
+          key={item.path}
+          href={item.path === "code" ? basePath : `${basePath}/${item.path}`}
+          className={cn(
+            "border-b-2 pb-2 pt-2 cursor-pointer border-transparent",
+            {
+              "border-primary": isActive(item.path),
+              "text-foreground": isActive(item.path),
+              "text-muted-foreground": !isActive(item.path),
+            }
+          )}
         >
-          <div className="flex items-center gap-2">
-            <Code className="h-4 w-4" />
-            <span>Code</span>
-          </div>
-        </Button>
-      </Link>
-
-      <Link
-        href={`${basePath}/issues`}
-        className={cn("border-b-2 pb-1 cursor-pointer border-transparent", {
-          "border-primary": isActive("issues"),
-        })}
-      >
-        <Button
-          variant="ghost"
-          asChild
-          className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground text-foreground"
-        >
-          <div className="flex items-center gap-2">
-            <svg
-              viewBox="0 0 16 16"
-              width="16"
-              height="16"
-              className="fill-current"
-            >
-              <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>
-              <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path>
-            </svg>
-            <span>Issues</span>
-          </div>
-        </Button>
-      </Link>
-
-      <Link
-        href={`${basePath}/pulls`}
-        className={cn("border-b-2 pb-1 cursor-pointer border-transparent", {
-          "border-primary": isActive("pulls"),
-        })}
-      >
-        <Button
-          variant="ghost"
-          asChild
-          className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground text-foreground"
-        >
-          <div className="flex items-center gap-2">
-            <GitPullRequest className="h-4 w-4" />
-            <span>Pull requests</span>
-          </div>
-        </Button>
-      </Link>
+          <Button
+            variant="ghost"
+            asChild
+            className="flex items-center gap-2 px-3 py-1 rounded-none hover:bg-transparent hover:text-foreground"
+          >
+            <div className="flex items-center gap-2">
+              {item.icon}
+              <span>{item.name}</span>
+            </div>
+          </Button>
+        </Link>
+      ))}
     </div>
   );
 }

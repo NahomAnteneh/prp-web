@@ -201,14 +201,14 @@ export default function GroupPage() {
 
           <TabsContent value="projects" className="mt-6">
             <ProjectsList
-              groupId={groupData.id}
+              groupUserName={groupData.groupUserName}
               isLeader={userId === groupData.leaderId}
             />
           </TabsContent>
 
           <TabsContent value="repositories" className="mt-6">
             <RepositoriesList
-              groupId={groupData.id}
+              groupUserName={groupData.groupUserName}
               groupName={groupData.name}
               isLeader={userId === groupData.leaderId}
             />

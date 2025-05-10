@@ -90,8 +90,7 @@ export interface User {
 }
 
 export interface Group {
-  id: string;
-  uniqueName: string;
+  groupUserName: string;
   name: string;
   description?: string | null;
   createdAt: Date;
@@ -110,7 +109,7 @@ export interface Group {
 }
 
 export interface GroupMember {
-  groupId: string;
+  groupUserName: string;
   userId: string;
   joinedAt: Date;
 
@@ -129,7 +128,7 @@ export interface Project {
   archived: boolean;
   createdAt: Date;
   updatedAt: Date;
-  groupId: string;
+  groupUserName: string;
   advisorId?: string | null;
 
   // --- Relations ---
@@ -156,7 +155,7 @@ export interface ProjectRepository {
   projectId: string;
   repositoryId: string;
   assignedAt: Date;
-  groupId: string; // ID of the group owning both the project and the repository
+  groupUserName: string; // ID of the group owning both the project and the repository
 
   // --- Relations ---
   project: Project;
@@ -173,12 +172,12 @@ export interface Repository {
   isPrivate: boolean;
   createdAt: Date;
   updatedAt: Date;
-  /** ID of the group that owns this repository. If null, it's a user-owned repository. */
-  groupId?: string | null;
+  /** ID of the group that owns this repository */
+  groupUserName: string;
 
   // --- Relations ---
   owner: User;
-  group?: Group | null;
+  group: Group;
   branches: Branch[];
   commits: Commit[];
   mergeRequests: MergeRequest[];
@@ -349,7 +348,7 @@ export interface AdvisorRequest {
   responseMessage?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  groupId: string; // The group making the request
+  groupUserName: string; // The group making the request
   requestedAdvisorId: string; // The User (potential advisor) being requested
 
   // --- Relations ---
@@ -364,7 +363,7 @@ export interface GroupInvite {
   createdAt: Date;
   usedAt?: Date | null; // Timestamp when the invite was used
   createdById: string; // User who created the invite (usually group leader or member)
-  groupId: string; // Group the invite is for
+  groupUserName: string; // Group the invite is for
   email?: string | null; // Optionally target a specific email
 
   // --- Relations ---

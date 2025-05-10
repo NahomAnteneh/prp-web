@@ -12,6 +12,7 @@ declare module "next-auth" {
 
   // Extend the built-in user types
   interface User {
+    id: string;   // Standard NextAuth property
     userId: string;
     role: Role;
   }

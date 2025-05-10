@@ -13,17 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Folder, ExternalLink, Calendar, User } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { z } from 'zod';
 import CreateProjectModal from './CreateProjectModal';
 
@@ -44,9 +33,8 @@ interface Project {
   createdAt: string;
   updatedAt: string;
   group: {
-    id: string;
-    name: string;
     groupUserName: string;
+    name: string;
   };
   advisor: {
     id: string;
@@ -83,11 +71,11 @@ interface ProjectResponse {
 }
 
 interface ProjectsListProps {
-  groupId: string;
+  groupUserName: string;
   isLeader: boolean;
 }
 
-export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
+export default function ProjectsList({ groupUserName, isLeader }: ProjectsListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [projectData, setProjectData] = useState<ProjectResponse>({
@@ -95,18 +83,11 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
     pagination: { total: 0, limit: 5, offset: 0, hasMore: false }
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
-  // Create project form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [advisorId, setAdvisorId] = useState('');
-  const [titleError, setTitleError] = useState('');
-  const [descriptionError, setDescriptionError] = useState('');
 
   const fetchProjects = async (offset: number, limit: number, append: boolean = false) => {
     try {
       setIsLoadingMore(true);
-      const url = `/api/groups/${groupId}/projects?offset=${offset}&limit=${limit}`;
+      const url = `/api/groups/${groupUserName}/projects?offset=${offset}&limit=${limit}`;
       const response = await fetch(url);
       const data = await response.json();
       
@@ -150,82 +131,14 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
 
   useEffect(() => {
     fetchProjects(0, 5); // Fetch only 5 projects initially
-  }, [groupId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupUserName]);
 
   const handleLoadMore = () => {
     if (projectData.pagination.hasMore) {
       const newOffset = projectData.pagination.offset + projectData.pagination.limit;
       fetchProjects(newOffset, projectData.pagination.limit, true);
     }
-  };
-
-  const handleCreateProject = async () => {
-    // Reset errors
-    setTitleError('');
-    setDescriptionError('');
-
-    // Validate input
-    const validationResult = createProjectSchema.safeParse({
-      title,
-      description: description || undefined,
-      advisorId: advisorId || undefined,
-    });
-
-    if (!validationResult.success) {
-      const errors = validationResult.error.flatten().fieldErrors;
-      if (errors.title) setTitleError(errors.title[0]);
-      if (errors.description) setDescriptionError(errors.description[0]);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/groups/${groupId}/projects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          ...(advisorId && { advisorId }),
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        if (response.status === 400 && data.errors) {
-          const errors = data.errors;
-          if (errors.title) setTitleError(errors.title[0]);
-          if (errors.description) setDescriptionError(errors.description[0]);
-          throw new Error('Invalid input');
-        }
-        throw new Error(data.message || 'Failed to create project');
-      }
-
-      toast.success('Project created', {
-        description: `Project "${data.project.title}" created for group "${data.project.group.groupUserName}".`,
-      });
-      
-      setShowCreateModal(false);
-      resetForm();
-      // Refetch projects from the beginning
-      fetchProjects(0, 5);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error creating project', {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setAdvisorId('');
-    setTitleError('');
-    setDescriptionError('');
   };
 
   const formatDate = (dateString: string) => {
@@ -295,7 +208,7 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
         <CreateProjectModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          groupId={groupId}
+          groupUserName={groupUserName}
           onProjectCreated={() => fetchProjects(0, 5)}
         />
       </Card>
@@ -333,7 +246,7 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       <h3 className="text-lg font-semibold">
-                        <Link href={`/groups/${project.group.id}/projects/${project.id}`} className="hover:text-primary transition-colors">
+                        <Link href={`/groups/${project.group.groupUserName}/projects/${project.id}`} className="hover:text-primary transition-colors">
                           {project.title}
                         </Link>
                       </h3>
@@ -393,7 +306,7 @@ export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
       <CreateProjectModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        groupId={groupId}
+        groupUserName={groupUserName}
         onProjectCreated={() => fetchProjects(0, 5)}
       />
     </Card>

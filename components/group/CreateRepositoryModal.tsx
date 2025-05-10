@@ -7,6 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,12 +24,12 @@ const createRepositorySchema = z.object({
 interface CreateRepositoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  groupId: string;
   groupUserName: string;
+  groupName: string;
   onRepositoryCreated: () => void;
 }
 
-export default function CreateRepositoryModal({ isOpen, onClose, groupId, groupUserName, onRepositoryCreated }: CreateRepositoryModalProps) {
+export default function CreateRepositoryModal({ isOpen, onClose, groupUserName, groupName, onRepositoryCreated }: CreateRepositoryModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -69,7 +70,7 @@ export default function CreateRepositoryModal({ isOpen, onClose, groupId, groupU
 
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${groupId}/repositories`, {
+      const response = await fetch(`/api/groups/${groupUserName}/repositories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,7 +94,7 @@ export default function CreateRepositoryModal({ isOpen, onClose, groupId, groupU
       }
 
       toast.success('Repository created', {
-        description: `Repository "${data.name}" created successfully.`,
+        description: `Repository "${data.name}" created successfully for group "${groupName}".`,
       });
 
       onClose();
@@ -118,7 +119,10 @@ export default function CreateRepositoryModal({ isOpen, onClose, groupId, groupU
     }}>
       <DialogContent className="max-w-lg w-full">
         <DialogHeader>
-          <DialogTitle>Create a new repository</DialogTitle>
+          <DialogTitle>Create a new repository for {groupName}</DialogTitle>
+          <DialogDescription>
+            Create a code repository to store and manage your group's code.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={e => { e.preventDefault(); handleCreateRepository(); }}>
           <div className="space-y-4 py-2">

@@ -8,21 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { GitBranchPlus, GitFork, Loader2, Plus } from 'lucide-react';
+import { 
+  GitBranchPlus, 
+  GitFork, 
+  Loader2, 
+  Plus, 
+  Search,
+  Check,
+  X
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
+import CreateRepositoryModal from '@/components/group/CreateRepositoryModal';
 
+// Update interface to match the API response
 interface Repository {
-  id: string;
   name: string;
-  url: string;
-  description: string;
-  private: boolean;
-  defaultBranch: string;
-  lastUpdated: string;
-  branches: number;
-  mergeRequests: number;
-  ownerId: string;
-  ownerName: string;
-  archived?: boolean;
+  description: string | null;
+  isPrivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  groupUserName?: string;
 }
 
 interface ProjectRepositoriesProps {
@@ -34,12 +41,13 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newRepositoryData, setNewRepositoryData] = useState({
-    name: '',
-    description: '',
-    isPrivate: true
-  });
+  const [isSelectRepoDialogOpen, setIsSelectRepoDialogOpen] = useState(false);
+  const [isCreateRepoModalOpen, setIsCreateRepoModalOpen] = useState(false);
+  const [groupRepositories, setGroupRepositories] = useState<Repository[]>([]);
+  const [loadingGroupRepos, setLoadingGroupRepos] = useState(false);
+  const [selectedRepositories, setSelectedRepositories] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [groupName, setGroupName] = useState('');
 
   useEffect(() => {
     const fetchRepositories = async () => {
@@ -52,10 +60,13 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
         }
         
         const data = await response.json();
-        setRepositories(data);
+        setRepositories(data.repositories || []);
       } catch (error) {
-        console.error('Error fetching repositories:', error);
+        console.error('Error fetching project repositories:', error);
         setError(error instanceof Error ? error.message : 'Something went wrong');
+        toast.error('Error loading repositories', {
+          description: error instanceof Error ? error.message : 'Failed to load repositories'
+        });
       } finally {
         setIsLoading(false);
       }
@@ -64,31 +75,164 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
     fetchRepositories();
   }, [ownerId, projectId]);
 
-  const handleCreateRepository = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newRepositoryData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create repository: ${response.statusText}`);
+  // Fetch group info to get the group name
+  useEffect(() => {
+    const fetchGroupInfo = async () => {
+      try {
+        const response = await fetch(`/api/groups/${ownerId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setGroupName(data.name || '');
+        }
+      } catch (error) {
+        console.error('Error fetching group info:', error);
       }
+    };
+    
+    fetchGroupInfo();
+  }, [ownerId]);
 
-      const newRepository = await response.json();
-      setRepositories([...repositories, newRepository]);
-      setNewRepositoryData({ name: '', description: '', isPrivate: true });
-      setIsDialogOpen(false);
+  const fetchGroupRepositories = async () => {
+    try {
+      setLoadingGroupRepos(true);
+      const response = await fetch(`/api/groups/${ownerId}/repositories`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch group repositories: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Filter out repositories that are already linked to the project
+      const linkedRepoNames = repositories.map(repo => repo.name);
+      const availableRepos = (data.repositories || []).filter(
+        (repo: Repository) => !linkedRepoNames.includes(repo.name)
+      );
+      
+      setGroupRepositories(availableRepos);
     } catch (error) {
-      console.error('Error creating repository:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create repository');
+      console.error('Error fetching group repositories:', error);
+      toast.error('Error loading group repositories', {
+        description: error instanceof Error ? error.message : 'Failed to load group repositories'
+      });
+    } finally {
+      setLoadingGroupRepos(false);
     }
   };
+
+  const handleOpenSelectRepoDialog = () => {
+    fetchGroupRepositories();
+    setSelectedRepositories([]);
+    setIsSelectRepoDialogOpen(true);
+  };
+
+  const handleToggleRepository = (repoName: string) => {
+    setSelectedRepositories(prev => 
+      prev.includes(repoName) 
+        ? prev.filter(name => name !== repoName)
+        : [...prev, repoName]
+    );
+  };
+
+  const handleLinkSelectedRepositories = async () => {
+    if (selectedRepositories.length === 0) {
+      toast.error('Please select at least one repository');
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      // Link each selected repository one by one
+      for (const repoName of selectedRepositories) {
+        const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ repositoryName: repoName }),
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      // Refresh repositories list
+      const refreshResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`);
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setRepositories(refreshData.repositories || []);
+      }
+
+      // Show appropriate toast message
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Successfully linked ${successCount} repositories`);
+      } else if (successCount > 0 && failCount > 0) {
+        toast.success(`Linked ${successCount} repositories, but ${failCount} failed`);
+      } else {
+        toast.error('Failed to link repositories');
+      }
+
+      setIsSelectRepoDialogOpen(false);
+    } catch (error) {
+      console.error('Error linking repositories:', error);
+      toast.error('Error linking repositories', {
+        description: error instanceof Error ? error.message : 'Failed to link repositories'
+      });
+    }
+  };
+
+  const handleRepositoryCreated = async () => {
+    try {
+      // Refresh repositories list
+      const refreshResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`);
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setRepositories(refreshData.repositories || []);
+      }
+      
+      // Fetch the newly created repository and link it to the project
+      const groupReposResponse = await fetch(`/api/groups/${ownerId}/repositories`);
+      if (groupReposResponse.ok) {
+        const groupReposData = await groupReposResponse.json();
+        const latestRepo = groupReposData.repositories?.[0];
+        
+        if (latestRepo) {
+          // Link the newly created repository to the project
+          await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ repositoryName: latestRepo.name }),
+          });
+          
+          // Refresh repositories list again after linking
+          const finalRefreshResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`);
+          if (finalRefreshResponse.ok) {
+            const finalRefreshData = await finalRefreshResponse.json();
+            setRepositories(finalRefreshData.repositories || []);
+          }
+          
+          toast.success('Repository created and linked to project');
+        }
+      }
+    } catch (error) {
+      console.error('Error linking newly created repository:', error);
+      toast.error('Repository created but failed to link to project');
+    }
+  };
+
+  const filteredGroupRepositories = searchQuery 
+    ? groupRepositories.filter(repo => 
+        repo.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (repo.description && repo.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : groupRepositories;
 
   return (
     <Card>
@@ -99,53 +243,23 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
             Connect and manage code repositories for this project.
           </CardDescription>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Repository
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add a new repository</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateRepository} className="space-y-4 pt-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Repository Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., my-project"
-                  value={newRepositoryData.name}
-                  onChange={(e) => setNewRepositoryData({ ...newRepositoryData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  placeholder="Brief description of the repository"
-                  value={newRepositoryData.description}
-                  onChange={(e) => setNewRepositoryData({ ...newRepositoryData, description: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="private"
-                  className="h-4 w-4 rounded border-gray-300"
-                  checked={newRepositoryData.isPrivate}
-                  onChange={(e) => setNewRepositoryData({ ...newRepositoryData, isPrivate: e.target.checked })}
-                />
-                <Label htmlFor="private">Private Repository</Label>
-              </div>
-              <div className="flex justify-end">
-                <Button type="submit">Create Repository</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={handleOpenSelectRepoDialog}
+          >
+            <GitFork className="mr-2 h-4 w-4" />
+            Add Group Repositories
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={() => setIsCreateRepoModalOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Repository
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -163,107 +277,136 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
         ) : repositories.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <GitFork className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No repositories yet</h3>
+            <h3 className="text-lg font-medium">No repositories linked</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-md">
-              Add a repository to store your project code and collaborate with your team.
+              Link a repository to this project to track code changes and collaborate with your team.
             </p>
-            <Button 
-              className="mt-4" 
-              onClick={() => setIsDialogOpen(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Repository
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button 
+                variant="outline"
+                onClick={handleOpenSelectRepoDialog}
+              >
+                <GitFork className="mr-2 h-4 w-4" />
+                Add Group Repositories
+              </Button>
+              <Button 
+                onClick={() => setIsCreateRepoModalOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Repository
+              </Button>
+            </div>
           </div>
         ) : (
-          <Tabs defaultValue="all">
-            <TabsList className="mb-4">
-              <TabsTrigger value="all">All Repositories</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="archived">Archived</TabsTrigger>
-            </TabsList>
-            <TabsContent value="all" className="space-y-4">
-              {repositories.map((repo) => (
-                <div
-                  key={repo.id}
-                  className="flex flex-col gap-2 p-4 rounded-lg border"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{repo.name}</h3>
-                      {repo.private && <Badge variant="outline">Private</Badge>}
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={repo.url} target="_blank" rel="noopener noreferrer">View Repository</a>
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{repo.description}</p>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                    <span>Default branch: {repo.defaultBranch}</span>
-                    <span>Branches: {repo.branches}</span>
-                    <span>Merge requests: {repo.mergeRequests}</span>
-                    <span>Last updated: {new Date(repo.lastUpdated).toLocaleDateString()}</span>
+          <div className="space-y-4">
+            {repositories.map((repo) => (
+              <div
+                key={repo.name}
+                className="flex flex-col gap-2 p-4 rounded-lg border"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium">{repo.name}</h3>
+                    {repo.isPrivate && <Badge variant="outline">Private</Badge>}
                   </div>
                 </div>
-              ))}
-            </TabsContent>
-            <TabsContent value="active" className="space-y-4">
-              {repositories
-                .filter(repo => !repo.archived)
-                .map((repo) => (
-                  <div
-                    key={repo.id}
-                    className="flex flex-col gap-2 p-4 rounded-lg border"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{repo.name}</h3>
-                        {repo.private && <Badge variant="outline">Private</Badge>}
-                      </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={repo.url} target="_blank" rel="noopener noreferrer">View Repository</a>
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{repo.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                      <span>Default branch: {repo.defaultBranch}</span>
-                      <span>Branches: {repo.branches}</span>
-                      <span>Merge requests: {repo.mergeRequests}</span>
-                      <span>Last updated: {new Date(repo.lastUpdated).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                ))}
-            </TabsContent>
-            <TabsContent value="archived" className="space-y-4">
-              {repositories
-                .filter(repo => repo.archived)
-                .map((repo) => (
-                  <div
-                    key={repo.id}
-                    className="flex flex-col gap-2 p-4 rounded-lg border"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{repo.name}</h3>
-                        {repo.private && <Badge variant="outline">Private</Badge>}
-                      </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={repo.url} target="_blank" rel="noopener noreferrer">View Repository</a>
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{repo.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                      <span>Default branch: {repo.defaultBranch}</span>
-                      <span>Branches: {repo.branches}</span>
-                      <span>Merge requests: {repo.mergeRequests}</span>
-                      <span>Last updated: {new Date(repo.lastUpdated).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                ))}
-            </TabsContent>
-          </Tabs>
+                <p className="text-sm text-muted-foreground">{repo.description || "No description provided"}</p>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                  <span>Created: {format(new Date(repo.createdAt), 'MMM d, yyyy')}</span>
+                  <span>Last updated: {format(new Date(repo.updatedAt), 'MMM d, yyyy')}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
+
+      {/* Select Group Repositories Dialog */}
+      <Dialog open={isSelectRepoDialogOpen} onOpenChange={setIsSelectRepoDialogOpen}>
+        <DialogContent className="sm:max-w-md md:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Group Repositories</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search repositories..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <div className="max-h-[400px] overflow-y-auto border rounded-md">
+              {loadingGroupRepos ? (
+                <div className="flex flex-col items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary/70" />
+                  <p className="mt-2 text-sm text-muted-foreground">Loading repositories...</p>
+                </div>
+              ) : filteredGroupRepositories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery ? 'No matching repositories found' : 'No available repositories found'}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filteredGroupRepositories.map((repo) => (
+                    <div 
+                      key={repo.name}
+                      className="flex items-start p-3 hover:bg-muted/50 cursor-pointer"
+                      onClick={() => handleToggleRepository(repo.name)}
+                    >
+                      <Checkbox
+                        checked={selectedRepositories.includes(repo.name)}
+                        className="mt-1 mr-3"
+                        onCheckedChange={() => handleToggleRepository(repo.name)}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">{repo.name}</h3>
+                          {repo.isPrivate && <Badge variant="outline" className="text-xs">Private</Badge>}
+                        </div>
+                        {repo.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{repo.description}</p>
+                        )}
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Last updated: {format(new Date(repo.updatedAt), 'MMM d, yyyy')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsSelectRepoDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleLinkSelectedRepositories}
+                disabled={selectedRepositories.length === 0 || loadingGroupRepos}
+              >
+                Add Selected ({selectedRepositories.length})
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Repository Modal */}
+      <CreateRepositoryModal
+        isOpen={isCreateRepoModalOpen}
+        onClose={() => setIsCreateRepoModalOpen(false)}
+        groupUserName={ownerId}
+        groupName={groupName}
+        onRepositoryCreated={handleRepositoryCreated}
+      />
     </Card>
   );
 } 

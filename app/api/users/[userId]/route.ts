@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient, Prisma, Role } from '@prisma/client';
+import { db } from '@/lib/db';
+import { Role } from '@prisma/client';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 
@@ -26,7 +27,6 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
-  const prisma = new PrismaClient();
   try {
     // Handle params as either direct object or promise
     const resolvedParams = await Promise.resolve(params);
@@ -48,7 +48,7 @@ export async function GET(
     // }
 
     // Fetch user data with group details
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { userId },
       select: {
         userId: true,
@@ -61,7 +61,6 @@ export async function GET(
         updatedAt: true,
         groupsLed: {
           select: {
-            id: true,
             groupUserName: true,
             name: true,
             description: true,
@@ -72,7 +71,6 @@ export async function GET(
           select: {
             group: {
               select: {
-                id: true,
                 groupUserName: true,
                 name: true,
                 description: true,
@@ -127,7 +125,6 @@ export async function GET(
         groups: user._count.groupsMemberOf,
         advisedProjects: user._count.advisedProjects,
         commits: user._count.commitsAuthored,
-        // repositories: user._count.repositoriesOwned,
       },
     };
 
@@ -138,8 +135,6 @@ export async function GET(
       { error: 'Failed to fetch user data' },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -147,7 +142,6 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
-  const prisma = new PrismaClient();
   try {
     // Handle params as either direct object or promise
     const resolvedParams = await Promise.resolve(params);
@@ -181,7 +175,7 @@ export async function PUT(
     const { firstName, lastName, email, password, profileInfo, role } = parsedBody.data;
 
     // Check if user exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await db.user.findUnique({
       where: { userId },
     });
 
@@ -194,7 +188,7 @@ export async function PUT(
 
     // Check email uniqueness if email is being updated
     if (email && email !== existingUser.email) {
-      const emailExists = await prisma.user.findUnique({
+      const emailExists = await db.user.findUnique({
         where: { email },
         select: { userId: true },
       });
@@ -207,7 +201,7 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: Prisma.UserUpdateInput = {};
+    const updateData: any = {};
     if (firstName) updateData.firstName = firstName;
     if (lastName) updateData.lastName = lastName;
     if (email) updateData.email = email;
@@ -218,7 +212,7 @@ export async function PUT(
     }
 
     // Update user
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await db.user.update({
       where: { userId },
       data: updateData,
       select: {
@@ -235,7 +229,7 @@ export async function PUT(
     return NextResponse.json(updatedUser);
   } catch (error) {
     console.error('Error updating user data:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Email is already in use' },
         { status: 400 }
@@ -245,8 +239,6 @@ export async function PUT(
       { error: 'Failed to update user data' },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -254,7 +246,6 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
-  const prisma = new PrismaClient();
   try {
     // Handle params as either direct object or promise
     const resolvedParams = await Promise.resolve(params);
@@ -269,14 +260,14 @@ export async function DELETE(
       );
     }
 
-    // TODO: Add authentication check
+    // TODO: Add authentication check (admin only)
     // const user = req.user;
-    // if (user.userId !== userId && user.role !== 'ADMINISTRATOR') {
+    // if (user.role !== 'ADMINISTRATOR') {
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     // }
 
     // Check if user exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await db.user.findUnique({
       where: { userId },
     });
 
@@ -288,29 +279,18 @@ export async function DELETE(
     }
 
     // Delete user
-    await prisma.user.delete({
+    await db.user.delete({
       where: { userId },
     });
 
     return NextResponse.json({
-      success: true,
-      message: 'User successfully deleted',
+      message: 'User deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting user:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-      return NextResponse.json(
-        {
-          error: 'Cannot delete user because they have related data (e.g., groups, projects). Consider deactivating instead.',
-        },
-        { status: 400 }
-      );
-    }
     return NextResponse.json(
       { error: 'Failed to delete user' },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

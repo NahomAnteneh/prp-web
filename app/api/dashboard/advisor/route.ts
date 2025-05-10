@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { PrismaClient, AdvisorRequestStatus, Role, TaskStatus, ProjectStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 // Initialize Prisma client
 const prisma = new PrismaClient();
 
 type GroupProjectData = {
-  groupId: string;
+  groupUserName: string;
   groupName: string;
   groupDescription: string | null;
   projects: Array<{
@@ -18,19 +18,19 @@ type GroupProjectData = {
     submissionDate: Date | null;
     updatedAt: Date;
     group: {
-      id: string;
+      groupUserName: string;
       name: string;
       description: string | null;
       leader: {
-        id: string;
-        name: string | null;
-        username: string;
+        userId: string;
+        firstName: string;
+        lastName: string;
       };
       members: Array<{
         user: {
-          id: string;
-          name: string | null;
-          username: string;
+          userId: string;
+          firstName: string;
+          lastName: string;
         };
       }>;
     };
@@ -41,8 +41,9 @@ type GroupProjectData = {
       status: TaskStatus;
       deadline: Date | null;
       assignee: {
-        id: string;
-        name: string | null;
+        userId: string;
+        firstName: string;
+        lastName: string;
       } | null;
     }>;
   }>;
@@ -54,7 +55,7 @@ type FeedbackActivity = {
   content: string;
   createdAt: Date;
   author: { userId: string; firstName: string; lastName: string };
-  project: { id: string; title: string; group: { id: string; name: string; groupUserName?: string } } | null;
+  project: { id: string; title: string; group: { groupUserName: string; name: string } } | null;
 }
 
 type TaskActivity = {
@@ -64,7 +65,7 @@ type TaskActivity = {
   status: TaskStatus;
   updatedAt: Date;
   assignee: { userId: string; firstName: string; lastName: string } | null;
-  project: { id: string; title: string; group: { id: string; name: string; groupUserName?: string } };
+  project: { id: string; title: string; group: { groupUserName: string; name: string } };
 }
 
 type Activity = FeedbackActivity | TaskActivity;
@@ -106,9 +107,10 @@ export async function GET() {
         status: true,
         submissionDate: true,
         updatedAt: true,
+        groupUserName: true,
         group: {
           select: {
-            id: true,
+            groupUserName: true,
             name: true,
             description: true,
             leader: {
@@ -163,18 +165,27 @@ export async function GET() {
     };
 
     // Group projects by group
-    const projectsByGroup = advisedProjects.reduce<Record<string, GroupProjectData>>((acc, project) => {
-      if (!acc[project.group.id]) {
-        acc[project.group.id] = {
-          groupId: project.group.id,
-          groupName: project.group.name,
-          groupDescription: project.group.description,
-          projects: [],
-        };
+    const projectsByGroup: Record<string, GroupProjectData> = {};
+    
+    advisedProjects.forEach(project => {
+      if (project.group) {
+        const groupUserName = project.group.groupUserName;
+        
+        if (!projectsByGroup[groupUserName]) {
+          projectsByGroup[groupUserName] = {
+            groupUserName: groupUserName,
+            groupName: project.group.name,
+            groupDescription: project.group.description,
+            projects: [],
+          };
+        }
+        
+        projectsByGroup[groupUserName].projects.push({
+          ...project,
+          group: project.group
+        });
       }
-      acc[project.group.id].projects.push(project as any);
-      return acc;
-    }, {});
+    });
 
     // Get recent activities related to advised projects
     const projectIds = advisedProjects.map(p => p.id);
@@ -190,6 +201,7 @@ export async function GET() {
         id: true,
         content: true,
         createdAt: true,
+        authorId: true,
         author: {
           select: {
             userId: true,
@@ -197,15 +209,16 @@ export async function GET() {
             lastName: true,
           },
         },
+        projectId: true,
         project: {
           select: {
             id: true,
             title: true,
+            groupUserName: true,
             group: {
               select: {
-                id: true,
-                name: true,
                 groupUserName: true,
+                name: true,
               },
             },
           },
@@ -229,6 +242,7 @@ export async function GET() {
         title: true,
         status: true,
         updatedAt: true,
+        assigneeId: true,
         assignee: {
           select: {
             userId: true,
@@ -236,15 +250,16 @@ export async function GET() {
             lastName: true,
           },
         },
+        projectId: true,
         project: {
           select: {
             id: true,
             title: true,
+            groupUserName: true,
             group: {
               select: {
-                id: true,
-                name: true,
                 groupUserName: true,
+                name: true,
               },
             },
           },
@@ -268,9 +283,10 @@ export async function GET() {
         requestMessage: true,
         createdAt: true,
         status: true,
+        groupUserName: true,
         group: {
           select: {
-            id: true,
+            groupUserName: true,
             name: true,
             description: true,
             leader: {
@@ -318,7 +334,14 @@ export async function GET() {
       content: f.content,
       createdAt: f.createdAt,
       author: f.author,
-      project: f.project,
+      project: f.project ? {
+        id: f.project.id,
+        title: f.project.title,
+        group: {
+          groupUserName: f.project.group.groupUserName,
+          name: f.project.group.name
+        }
+      } : null,
     }));
 
     const taskActivities: TaskActivity[] = recentTaskUpdates.map(t => ({
@@ -328,7 +351,14 @@ export async function GET() {
       status: t.status,
       updatedAt: t.updatedAt,
       assignee: t.assignee,
-      project: t.project,
+      project: {
+        id: t.project.id,
+        title: t.project.title,
+        group: {
+          groupUserName: t.project.group.groupUserName,
+          name: t.project.group.name
+        }
+      },
     }));
 
     const allActivities: Activity[] = [...feedbackActivities, ...taskActivities]

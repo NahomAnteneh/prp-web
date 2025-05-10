@@ -23,11 +23,11 @@ const createProjectSchema = z.object({
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  groupId: string;
+  groupUserName: string;
   onProjectCreated: () => void;
 }
 
-export default function CreateProjectModal({ isOpen, onClose, groupId, onProjectCreated }: CreateProjectModalProps) {
+export default function CreateProjectModal({ isOpen, onClose, groupUserName, onProjectCreated }: CreateProjectModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -61,7 +61,7 @@ export default function CreateProjectModal({ isOpen, onClose, groupId, onProject
 
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${groupId}/projects`, {
+      const response = await fetch(`/api/groups/${groupUserName}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

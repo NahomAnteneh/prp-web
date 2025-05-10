@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { db } from "@/lib/db"
 import { z } from "zod"
-
-// Initialize Prisma client
-const prisma = new PrismaClient()
 
 // Define the TaskStatus enum to match the Prisma schema
 enum TaskStatus {
@@ -28,15 +25,15 @@ const querySchema = z.object({
 
 export async function GET(
   request: Request,
-  context: { params: { userId: string } }
+  context: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
   try {
-    // Await params before accessing its properties
-    const { params } = context;
-    const userId = params.userId;
+    // Resolve params first
+    const resolvedParams = await Promise.resolve(context.params);
+    const userId = resolvedParams.userId;
 
     // Validate userId
-    const parsedParams = userIdSchema.safeParse(params.userId)
+    const parsedParams = userIdSchema.safeParse(userId)
     if (!parsedParams.success) {
       return NextResponse.json(
         { error: "Invalid user ID format" },
@@ -99,39 +96,39 @@ export async function GET(
       })
     }
 
-    // Filter by status if providedid
+    // Filter by status if provided
     if (queryParams.status && queryParams.status !== "ALL") {
       whereCondition.status = queryParams.status
     }
 
     // Count total tasks matching the criteria (for pagination info)
-    const totalTasks = await prisma.task.count({
+    const totalTasks = await db.task.count({
       where: whereCondition
     })
 
     // Get task status counts
-    const todoCount = await prisma.task.count({
+    const todoCount = await db.task.count({
       where: {
         ...whereCondition,
         status: TaskStatus.TODO
       }
     })
 
-    const inProgressCount = await prisma.task.count({
+    const inProgressCount = await db.task.count({
       where: {
         ...whereCondition,
         status: TaskStatus.IN_PROGRESS
       }
     })
 
-    const doneCount = await prisma.task.count({
+    const doneCount = await db.task.count({
       where: {
         ...whereCondition,
         status: TaskStatus.DONE
       }
     })
 
-    const blockedCount = await prisma.task.count({
+    const blockedCount = await db.task.count({
       where: {
         ...whereCondition,
         status: TaskStatus.BLOCKED
@@ -139,7 +136,7 @@ export async function GET(
     })
 
     // Fetch tasks with related data
-    const tasks = await prisma.task.findMany({
+    const tasks = await db.task.findMany({
       where: whereCondition,
       include: {
         creator: {
@@ -160,10 +157,10 @@ export async function GET(
           select: {
             id: true,
             title: true,
-            groupId: true,
+            groupUserName: true,
             group: {
               select: {
-                id: true,
+                groupUserName: true,
                 name: true,
               },
             },
@@ -200,20 +197,18 @@ export async function GET(
         updatedAt: task.updatedAt,
         lastUpdated: formatTimeAgo(task.updatedAt),
         creator: {
-          id: task.creator.id,
+          id: task.creator.userId,
           name: `${task.creator.firstName} ${task.creator.lastName}`,
-          username: task.creator.username,
         },
         assignee: task.assignee ? {
-          id: task.assignee.id,
+          id: task.assignee.userId,
           name: `${task.assignee.firstName} ${task.assignee.lastName}`,
-          username: task.assignee.username,
         } : null,
         project: task.project ? {
           id: task.project.id,
           title: task.project.title,
           group: task.project.group ? {
-            id: task.project.group.id,
+            id: task.project.group.groupUserName,
             name: task.project.group.name,
           } : null,
         } : null,
@@ -253,37 +248,10 @@ export async function GET(
 // Helper function to format time ago
 function formatTimeAgo(date: Date): string {
   const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - new Date(date).getTime()) / 1000)
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
   
-  if (diffInSeconds < 0) {
-    // Future date
-    const absDiffInSeconds = Math.abs(diffInSeconds)
-    
-    if (absDiffInSeconds < 60) {
-      return `in ${absDiffInSeconds} second${absDiffInSeconds !== 1 ? 's' : ''}`
-    }
-    
-    const absDiffInMinutes = Math.floor(absDiffInSeconds / 60)
-    if (absDiffInMinutes < 60) {
-      return `in ${absDiffInMinutes} minute${absDiffInMinutes !== 1 ? 's' : ''}`
-    }
-    
-    const absDiffInHours = Math.floor(absDiffInMinutes / 60)
-    if (absDiffInHours < 24) {
-      return `in ${absDiffInHours} hour${absDiffInHours !== 1 ? 's' : ''}`
-    }
-    
-    const absDiffInDays = Math.floor(absDiffInHours / 24)
-    if (absDiffInDays < 30) {
-      return `in ${absDiffInDays} day${absDiffInDays !== 1 ? 's' : ''}`
-    }
-    
-    return `on ${formatDate(date)}`
-  }
-  
-  // Past date
   if (diffInSeconds < 60) {
-    return `${diffInSeconds} second${diffInSeconds !== 1 ? 's' : ''} ago`
+    return `${diffInSeconds} seconds ago`
   }
   
   const diffInMinutes = Math.floor(diffInSeconds / 60)
@@ -301,14 +269,17 @@ function formatTimeAgo(date: Date): string {
     return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`
   }
   
-  return formatDate(date)
+  return new Intl.DateTimeFormat('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  }).format(date)
 }
 
 // Helper function to format date
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', { 
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
-    month: 'short', 
-    day: 'numeric' 
+    month: 'short',
+    day: 'numeric',
   }).format(new Date(date))
 }

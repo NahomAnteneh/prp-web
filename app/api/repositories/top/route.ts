@@ -17,12 +17,6 @@ export async function GET(request: Request) {
       include: {
         owner: {
           select: {
-            firstName: true,
-            lastName: true,
-          },
-        },
-        group: {
-          select: {
             name: true,
           },
         },

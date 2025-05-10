@@ -6,10 +6,12 @@ const prisma = new PrismaClient()
 
 export async function GET(
   request: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
   try {
-    const userId = params.userId
+    // Resolve params first
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
 
     // Parse query parameters
     const url = new URL(request.url)
@@ -29,8 +31,8 @@ export async function GET(
         createdAt: true,
         repository: {
           select: {
-            id: true,
             name: true,
+            groupUserName: true,
             projects: {
               select: {
                 project: {
@@ -64,8 +66,8 @@ export async function GET(
         updatedAt: true,
         repository: {
           select: {
-            id: true,
             name: true,
+            groupUserName: true,
           },
         },
       },
@@ -121,8 +123,8 @@ export async function GET(
         },
         repository: {
           select: {
-            id: true,
             name: true,
+            groupUserName: true,
           },
         },
       },
@@ -147,9 +149,9 @@ export async function GET(
         project: relatedProject?.title,
         projectId: relatedProject?.id,
         relatedTo: commit.repository.name,
-        relatedToId: commit.repository.id,
+        relatedToId: `${commit.repository.name}-${commit.repository.groupUserName}`,
         relatedToType: "repository",
-        link: `/repositories/${commit.repository.id}/commits/${commit.id}`,
+        link: `/repositories/${commit.repository.groupUserName}/${commit.repository.name}/commits/${commit.id}`,
       };
     });
 
@@ -164,9 +166,9 @@ export async function GET(
       project: null,
       projectId: null,
       relatedTo: mr.repository.name,
-      relatedToId: mr.repository.id,
+      relatedToId: `${mr.repository.name}-${mr.repository.groupUserName}`,
       relatedToType: "repository",
-      link: `/repositories/${mr.repository.id}/merge-requests/${mr.id}`,
+      link: `/repositories/${mr.repository.groupUserName}/${mr.repository.name}/merge-requests/${mr.id}`,
     }));
 
     // Map tasks to activity format
@@ -189,7 +191,16 @@ export async function GET(
     const feedbackActivities = feedback.map((fb: any) => {
       const relatedType = fb.project ? "project" : "repository";
       const relatedName = fb.project?.title || fb.repository?.name;
-      const relatedId = fb.project?.id || fb.repository?.id;
+      let relatedId;
+      let linkPath;
+      
+      if (fb.project) {
+        relatedId = fb.project.id;
+        linkPath = `projects/${fb.project.id}/feedback/${fb.id}`;
+      } else {
+        relatedId = `${fb.repository.name}-${fb.repository.groupUserName}`;
+        linkPath = `repositories/${fb.repository.groupUserName}/${fb.repository.name}/feedback/${fb.id}`;
+      }
       
       return {
         id: `feedback-${fb.id}`,
@@ -203,7 +214,7 @@ export async function GET(
         relatedTo: relatedName,
         relatedToId: relatedId,
         relatedToType: relatedType,
-        link: `/${relatedType}s/${relatedId}/feedback/${fb.id}`,
+        link: `/${linkPath}`,
       };
     });
 

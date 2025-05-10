@@ -26,12 +26,31 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Project } from './project-card';
+import { 
+  Settings, 
+  Info, 
+  Archive, 
+  Trash2, 
+  Users, 
+  Shield, 
+  Bell 
+} from 'lucide-react';
+
+interface Project {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  isPrivate: boolean;
+  [key: string]: any; // Allow for other properties
+}
 
 interface ProjectSettingsProps {
   ownerId: string;
   projectId: string;
 }
+
+type SettingsTab = 'general' | 'permissions' | 'notifications' | 'team' | 'danger';
 
 export function ProjectSettings({ ownerId, projectId }: ProjectSettingsProps) {
   const router = useRouter();
@@ -41,6 +60,7 @@ export function ProjectSettings({ ownerId, projectId }: ProjectSettingsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [error, setError] = useState('');
   const [project, setProject] = useState<Project | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -162,7 +182,7 @@ export function ProjectSettings({ ownerId, projectId }: ProjectSettingsProps) {
       setIsDeleteDialogOpen(false);
       
       // Redirect to projects list
-      router.push(`/dashboard/${ownerId}/projects`);
+      router.push(`/${ownerId}/projects`);
     } catch (error) {
       console.error('Error deleting project:', error);
       toast.error('Error deleting project', {
@@ -191,16 +211,10 @@ export function ProjectSettings({ ownerId, projectId }: ProjectSettingsProps) {
     );
   }
 
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Project Settings</CardTitle>
-          <CardDescription>
-            Manage project settings and configurations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'general':
+        return (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -246,60 +260,221 @@ export function ProjectSettings({ ownerId, projectId }: ProjectSettingsProps) {
               {isSaving ? 'Saving Changes...' : 'Save Changes'}
             </Button>
           </form>
-
-          <Separator className="my-8" />
-          
+        );
+      case 'permissions':
+        return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium">Danger Zone</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Actions here cannot be easily undone.
+              <h3 className="text-lg font-medium">Project Permissions</h3>
+              <p className="text-sm text-muted-foreground">
+                Configure who can view and edit this project.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium">Project Visibility</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Control whether this project is visible to others
+                  </p>
+                </div>
+                <Select defaultValue={project?.isPrivate ? "private" : "public"}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private</SelectItem>
+                    <SelectItem value="public">Public</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        );
+      case 'team':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium">Team Settings</h3>
+              <p className="text-sm text-muted-foreground">
+                Manage team members and their roles.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <p className="text-muted-foreground text-sm">
+                Team management features coming soon.
+              </p>
+            </div>
+          </div>
+        );
+      case 'notifications':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium">Notification Settings</h3>
+              <p className="text-sm text-muted-foreground">
+                Configure how you receive notifications for this project.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <p className="text-muted-foreground text-sm">
+                Notification settings coming soon.
+              </p>
+            </div>
+          </div>
+        );
+      case 'danger':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-red-600 dark:text-red-400">Danger Zone</h3>
+              <p className="text-sm text-muted-foreground">
+                These actions are irreversible. Please proceed with caution.
               </p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                variant="outline" 
-                className="border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                onClick={() => setIsArchiveDialogOpen(true)}
-                disabled={form.status === 'ARCHIVED' || isSaving}
-              >
-                Archive Project
-              </Button>
+            <div className="space-y-4">
+              <Card className="border-amber-200 dark:border-amber-800">
+                <CardHeader>
+                  <CardTitle className="text-base">Archive Project</CardTitle>
+                  <CardDescription>
+                    Archiving will make the project read-only and hide it from active projects.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    variant="outline" 
+                    className="border-amber-200 hover:border-amber-300 dark:border-amber-800 dark:hover:border-amber-700"
+                    onClick={() => setIsArchiveDialogOpen(true)}
+                    disabled={form.status === 'ARCHIVED'}
+                  >
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive Project
+                  </Button>
+                </CardContent>
+              </Card>
               
-              <Button 
-                variant="outline" 
-                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                disabled={isSaving}
-              >
-                Delete Project
-              </Button>
+              <Card className="border-red-200 dark:border-red-900">
+                <CardHeader>
+                  <CardTitle className="text-base">Delete Project</CardTitle>
+                  <CardDescription>
+                    Permanently delete this project and all its data. This action cannot be undone.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Project
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-12 gap-6">
+        {/* Sidebar */}
+        <div className="col-span-12 md:col-span-3">
+          <Card>
+            <CardContent className="p-0">
+              <div className="space-y-1 py-2">
+                <Button
+                  variant={activeTab === 'general' ? 'secondary' : 'ghost'}
+                  className="w-full justify-start rounded-none"
+                  onClick={() => setActiveTab('general')}
+                >
+                  <Info className="mr-2 h-4 w-4" />
+                  General
+                </Button>
+                <Button
+                  variant={activeTab === 'permissions' ? 'secondary' : 'ghost'}
+                  className="w-full justify-start rounded-none"
+                  onClick={() => setActiveTab('permissions')}
+                >
+                  <Shield className="mr-2 h-4 w-4" />
+                  Permissions
+                </Button>
+                <Button
+                  variant={activeTab === 'team' ? 'secondary' : 'ghost'}
+                  className="w-full justify-start rounded-none"
+                  onClick={() => setActiveTab('team')}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Team
+                </Button>
+                <Button
+                  variant={activeTab === 'notifications' ? 'secondary' : 'ghost'}
+                  className="w-full justify-start rounded-none"
+                  onClick={() => setActiveTab('notifications')}
+                >
+                  <Bell className="mr-2 h-4 w-4" />
+                  Notifications
+                </Button>
+                <Separator />
+                <Button
+                  variant={activeTab === 'danger' ? 'secondary' : 'ghost'}
+                  className="w-full justify-start rounded-none text-red-600 dark:text-red-400"
+                  onClick={() => setActiveTab('danger')}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Danger Zone
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Main Content */}
+        <div className="col-span-12 md:col-span-9">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {activeTab === 'general' && 'General Settings'}
+                {activeTab === 'permissions' && 'Permission Settings'}
+                {activeTab === 'team' && 'Team Settings'}
+                {activeTab === 'notifications' && 'Notification Settings'}
+                {activeTab === 'danger' && 'Danger Zone'}
+              </CardTitle>
+              <CardDescription>
+                {activeTab === 'general' && 'Manage basic project information'}
+                {activeTab === 'permissions' && 'Control access to your project'}
+                {activeTab === 'team' && 'Manage team members and roles'}
+                {activeTab === 'notifications' && 'Configure project notifications'}
+                {activeTab === 'danger' && 'Critical project actions'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderTabContent()}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <AlertDialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive this project?</AlertDialogTitle>
+            <AlertDialogTitle>Archive Project</AlertDialogTitle>
             <AlertDialogDescription>
-              Archiving will make this project read-only. Team members will no longer be able to make changes.
-              You can restore an archived project later if needed.
+              Are you sure you want to archive this project? It will be marked as archived and become read-only.
+              You can unarchive it later by changing the status back to active.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                handleArchiveProject();
-              }}
-              disabled={isSaving}
+              onClick={handleArchiveProject}
               className="bg-amber-600 hover:bg-amber-700"
             >
-              {isSaving ? 'Archiving...' : 'Archive Project'}
+              Archive
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -308,22 +483,19 @@ export function ProjectSettings({ ownerId, projectId }: ProjectSettingsProps) {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this project?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the project and all associated data.
+              This action cannot be undone. This will permanently delete the project
+              and all associated data including tasks, feedback, and evaluations.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                handleDeleteProject();
-              }}
-              disabled={isSaving}
+              onClick={handleDeleteProject}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isSaving ? 'Deleting...' : 'Delete Project'}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
