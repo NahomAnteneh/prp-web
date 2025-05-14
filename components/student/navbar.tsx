@@ -148,7 +148,8 @@ export default function Navbar() {
         <div className="flex items-center space-x-4">
           {/* Notifications Dropdown */}
           <NotificationDropdown 
-            unreadCount={unreadCount} 
+            unreadCount={unreadCount}
+            userId={userName} 
             onMarkAllAsRead={handleMarkAllAsRead} 
           />
 

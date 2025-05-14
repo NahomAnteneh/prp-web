@@ -24,11 +24,13 @@ interface ApiResponse {
 
 interface NotificationDropdownProps {
   unreadCount: number
+  userId?: string
   onMarkAllAsRead: () => void
 }
 
 export default function NotificationDropdown({ 
   unreadCount, 
+  userId,
   onMarkAllAsRead 
 }: NotificationDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -43,7 +45,7 @@ export default function NotificationDropdown({
     setError(null)
     
     try {
-      const response = await fetch('/api/notifications')
+      const response = await fetch(`/api/${userId}/notifications`)
       
       if (!response.ok) {
         throw new Error(`Failed to fetch notifications: ${response.statusText}`)
@@ -121,7 +123,7 @@ export default function NotificationDropdown({
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api/notifications/mark-read', {
+      const response = await fetch(`/api/${userId}/notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -147,7 +149,7 @@ export default function NotificationDropdown({
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch('/api/notifications/mark-read', {
+      const response = await fetch(`/api/${userId}/notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
