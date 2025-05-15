@@ -27,15 +27,17 @@ export function SearchResultCard({ type, data }: SearchResultCardProps) {
     );
   }
   if (type === 'repository') {
+    // Repository owner might not exist due to DB schema changes
+    const ownerName = data.owner?.name || "Unknown";
+    const ownerPath = data.owner?.groupUserName || "";
+    
     return (
       <Card className="mb-4 p-4 flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <a href={`/${data.group.groupUserName}/${data.name}`} className="font-semibold text-blue-700 hover:underline text-lg">{data.name}</a>
+          <a href={`/${ownerPath}/${data.name}`} className="font-semibold text-blue-700 hover:underline text-lg">{data.name}</a>
         </div>
         <div className="text-sm text-muted-foreground line-clamp-2">{data.description}</div>
         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-          <span>Owner: {data.owner?.firstName} {data.owner?.lastName}</span>
-          {data.group && <span>Group: <a href={`/${data.group.groupUserName}`} className="hover:underline">{data.group.name}</a></span>}
           <span>Commits: {data._count?.commits ?? 0}</span>
           <span>Branches: {data._count?.branches ?? 0}</span>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Group, Role } from "@prisma/client"; // Assuming Role enum is accessible
+import { Group, Role, User } from "@prisma/client"; // Assuming Role enum is accessible
 import { notFound, useParams } from "next/navigation"; // Use useParams hook
 import { useEffect, useState } from "react";
 import StudentProfilePage from "@/components/student/profile/profile-page";
@@ -8,26 +8,12 @@ import AdvisorProfilePage from "@/components/advisor/profile/profile-page";
 import { useSession } from "next-auth/react";
 import GroupPage from "@/components/group/group-page";
 
-// Define an interface for the user data structure
-interface UserData {
-  userId: string;
-  role: Role;
-  firstName?: string;
-  lastName?: string;
-}
-
-// Define an interface for the group data structure
-// interface GroupData {
-//   groupId: string;
-//   name: string;
-// }
-
 export default function UserPage() {
   // Use the useParams hook to get route parameters
   const params = useParams();
   const ownerId = params?.ownerId as string;
   const { data: session, status } = useSession();
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const [userData, setUserData] = useState<User | null>(null);
   const [groupData, setGroupData] = useState<Group | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
 
@@ -60,7 +46,7 @@ export default function UserPage() {
       const userResponse = await fetch(`/api/users/${id}`);
 
       if (userResponse.ok) {
-        const user: UserData = await userResponse.json();
+        const user: User = await userResponse.json();
         setUserData(user); // Set user data on success
       } else if (userResponse.status === 404) {
         console.log(`Entity not found for ID: ${id}`);
@@ -80,11 +66,11 @@ export default function UserPage() {
   if (groupData) {
     return (
       <div>
-        <div className="bg-blue-50 py-2 border-b mb-4">
+        {/* <div className="bg-blue-50 py-2 border-b mb-4">
           <div className="container mx-auto">
             <h1 className="text-lg text-blue-800 font-medium">Viewing Group Profile</h1>
           </div>
-        </div>
+        </div> */}
         <GroupPage groupData={groupData} isVisitor={status !== "authenticated"} />
       </div>
     );
@@ -97,11 +83,11 @@ export default function UserPage() {
     if (userData.role === Role.STUDENT) {
       return (
         <>
-          <div className="bg-blue-50 py-2 border-b mb-4">
+          {/* <div className="bg-blue-50 py-2 border-b mb-4">
             <div className="container mx-auto">
               <h1 className="text-lg text-blue-800 font-medium">Viewing Student Profile</h1>
             </div>
-          </div>
+          </div> */}
           <StudentProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />
         </>
       );
@@ -110,11 +96,11 @@ export default function UserPage() {
     if (userData.role === Role.ADVISOR) {
       return (
         <>
-          <div className="bg-blue-50 py-2 border-b mb-4">
+          {/* <div className="bg-blue-50 py-2 border-b mb-4">
             <div className="container mx-auto">
               <h1 className="text-lg text-blue-800 font-medium">Viewing Advisor Profile</h1>
             </div>
-          </div>
+          </div> */}
           <AdvisorProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />
         </>
       );

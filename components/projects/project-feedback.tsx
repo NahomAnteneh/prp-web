@@ -61,10 +61,11 @@ export function ProjectFeedback({ ownerId, projectId }: ProjectFeedbackProps) {
         }
 
         const data = await response.json();
-        setFeedbackItems(data);
+        setFeedbackItems(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching feedback:', error);
         setError(error instanceof Error ? error.message : 'Something went wrong');
+        setFeedbackItems([]);
       } finally {
         setIsLoading(false);
       }
@@ -217,198 +218,204 @@ export function ProjectFeedback({ ownerId, projectId }: ProjectFeedbackProps) {
         ) : (
           <>
             <div className="flex items-center justify-between mb-4">
-              <Tabs defaultValue="all" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="open">Open</TabsTrigger>
-                  <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-                  <TabsTrigger value="closed">Closed</TabsTrigger>
-                </TabsList>
-                <div className="flex justify-end mt-4">
-                  <Button variant="outline" size="sm">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filter
-                  </Button>
-                </div>
-                <TabsContent value="all" className="space-y-4 mt-4">
-                  {feedbackItems.map((feedback) => (
-                    <div key={feedback.id} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-medium">{feedback.title}</h3>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span>#{feedback.id.substring(0, 6)}</span>
-                            <span>•</span>
-                            <span>
-                              Created by {feedback.author.firstName} {feedback.author.lastName}
-                            </span>
-                            <span>•</span>
-                            <span>{format(new Date(feedback.createdAt), 'MMM d, yyyy')}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge className={getStatusColor(feedback.status)}>
-                            {feedback.status.replace('_', ' ')}
-                          </Badge>
-                          <Badge className={getPriorityColor(feedback.priority)}>
-                            {feedback.priority}
-                          </Badge>
-                        </div>
-                      </div>
-                      <p className="mt-2 text-sm">{feedback.description}</p>
-                      <div className="flex items-center justify-between mt-4">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MessageSquare className="h-3 w-3" />
-                          <span>{feedback.comments}</span>
-                        </div>
-                        {feedback.assignee && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Assigned to:</span>
-                            <span className="text-xs font-medium">
-                              {feedback.assignee.firstName} {feedback.assignee.lastName}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </TabsContent>
-                <TabsContent value="open" className="space-y-4 mt-4">
-                  {feedbackItems
-                    .filter((feedback) => feedback.status === 'OPEN')
-                    .map((feedback) => (
-                      <div key={feedback.id} className="border rounded-lg p-4">
+              <div className="flex-1">
+                <Tabs defaultValue="all" className="w-full">
+                  <div className="flex items-center justify-between">
+                    <TabsList>
+                      <TabsTrigger value="all">All</TabsTrigger>
+                      <TabsTrigger value="open">Open</TabsTrigger>
+                      <TabsTrigger value="in-progress">In Progress</TabsTrigger>
+                      <TabsTrigger value="closed">Closed</TabsTrigger>
+                    </TabsList>
+                    <Button variant="outline" size="sm">
+                      <Filter className="mr-2 h-4 w-4" />
+                      Filter
+                    </Button>
+                  </div>
+                  
+                  <TabsContent value="all" className="space-y-4 mt-4">
+                    {feedbackItems.map((feedback, index) => (
+                      <div key={feedback.id || `feedback-${index}`} className="border rounded-lg p-4">
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="font-medium">{feedback.title}</h3>
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <span>#{feedback.id.substring(0, 6)}</span>
+                              <span>#{feedback.id?.substring(0, 6) || 'unknown'}</span>
                               <span>•</span>
                               <span>
-                                Created by {feedback.author.firstName} {feedback.author.lastName}
+                                Created by {feedback.author?.firstName || ''} {feedback.author?.lastName || ''}
                               </span>
                               <span>•</span>
-                              <span>{format(new Date(feedback.createdAt), 'MMM d, yyyy')}</span>
+                              <span>{feedback.createdAt ? format(new Date(feedback.createdAt), 'MMM d, yyyy') : 'unknown date'}</span>
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Badge className={getStatusColor(feedback.status)}>
-                              {feedback.status.replace('_', ' ')}
+                            <Badge className={getStatusColor(feedback.status || 'OPEN')}>
+                              {(feedback.status || 'OPEN').replace('_', ' ')}
                             </Badge>
-                            <Badge className={getPriorityColor(feedback.priority)}>
-                              {feedback.priority}
+                            <Badge className={getPriorityColor(feedback.priority || 'MEDIUM')}>
+                              {feedback.priority || 'MEDIUM'}
                             </Badge>
                           </div>
                         </div>
-                        <p className="mt-2 text-sm">{feedback.description}</p>
+                        <p className="mt-2 text-sm">{feedback.description || 'No description provided'}</p>
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <MessageSquare className="h-3 w-3" />
-                            <span>{feedback.comments}</span>
+                            <span>{feedback.comments || 0}</span>
                           </div>
                           {feedback.assignee && (
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-muted-foreground">Assigned to:</span>
                               <span className="text-xs font-medium">
-                                {feedback.assignee.firstName} {feedback.assignee.lastName}
+                                {feedback.assignee?.firstName || ''} {feedback.assignee?.lastName || ''}
                               </span>
                             </div>
                           )}
                         </div>
                       </div>
                     ))}
-                </TabsContent>
-                <TabsContent value="in-progress" className="space-y-4 mt-4">
-                  {feedbackItems
-                    .filter((feedback) => feedback.status === 'IN_PROGRESS')
-                    .map((feedback) => (
-                      <div key={feedback.id} className="border rounded-lg p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-medium">{feedback.title}</h3>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <span>#{feedback.id.substring(0, 6)}</span>
-                              <span>•</span>
-                              <span>
-                                Created by {feedback.author.firstName} {feedback.author.lastName}
-                              </span>
-                              <span>•</span>
-                              <span>{format(new Date(feedback.createdAt), 'MMM d, yyyy')}</span>
+                  </TabsContent>
+                  
+                  <TabsContent value="open" className="space-y-4 mt-4">
+                    {feedbackItems
+                      .filter((feedback) => feedback?.status === 'OPEN')
+                      .map((feedback, index) => (
+                        <div key={feedback.id || `open-feedback-${index}`} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="font-medium">{feedback.title}</h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <span>#{feedback.id?.substring(0, 6) || 'unknown'}</span>
+                                <span>•</span>
+                                <span>
+                                  Created by {feedback.author?.firstName || ''} {feedback.author?.lastName || ''}
+                                </span>
+                                <span>•</span>
+                                <span>{feedback.createdAt ? format(new Date(feedback.createdAt), 'MMM d, yyyy') : 'unknown date'}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge className={getStatusColor(feedback.status || 'OPEN')}>
+                                {(feedback.status || 'OPEN').replace('_', ' ')}
+                              </Badge>
+                              <Badge className={getPriorityColor(feedback.priority || 'MEDIUM')}>
+                                {feedback.priority || 'MEDIUM'}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Badge className={getStatusColor(feedback.status)}>
-                              {feedback.status.replace('_', ' ')}
-                            </Badge>
-                            <Badge className={getPriorityColor(feedback.priority)}>
-                              {feedback.priority}
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="mt-2 text-sm">{feedback.description}</p>
-                        <div className="flex items-center justify-between mt-4">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MessageSquare className="h-3 w-3" />
-                            <span>{feedback.comments}</span>
-                          </div>
-                          {feedback.assignee && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Assigned to:</span>
-                              <span className="text-xs font-medium">
-                                {feedback.assignee.firstName} {feedback.assignee.lastName}
-                              </span>
+                          <p className="mt-2 text-sm">{feedback.description || 'No description provided'}</p>
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <MessageSquare className="h-3 w-3" />
+                              <span>{feedback.comments || 0}</span>
                             </div>
-                          )}
+                            {feedback.assignee && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Assigned to:</span>
+                                <span className="text-xs font-medium">
+                                  {feedback.assignee?.firstName || ''} {feedback.assignee?.lastName || ''}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                </TabsContent>
-                <TabsContent value="closed" className="space-y-4 mt-4">
-                  {feedbackItems
-                    .filter((feedback) => feedback.status === 'CLOSED')
-                    .map((feedback) => (
-                      <div key={feedback.id} className="border rounded-lg p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-medium">{feedback.title}</h3>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <span>#{feedback.id.substring(0, 6)}</span>
-                              <span>•</span>
-                              <span>
-                                Created by {feedback.author.firstName} {feedback.author.lastName}
-                              </span>
-                              <span>•</span>
-                              <span>{format(new Date(feedback.createdAt), 'MMM d, yyyy')}</span>
+                      ))}
+                  </TabsContent>
+                  
+                  <TabsContent value="in-progress" className="space-y-4 mt-4">
+                    {feedbackItems
+                      .filter((feedback) => feedback?.status === 'IN_PROGRESS')
+                      .map((feedback, index) => (
+                        <div key={feedback.id || `in-progress-feedback-${index}`} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="font-medium">{feedback.title}</h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <span>#{feedback.id?.substring(0, 6) || 'unknown'}</span>
+                                <span>•</span>
+                                <span>
+                                  Created by {feedback.author?.firstName || ''} {feedback.author?.lastName || ''}
+                                </span>
+                                <span>•</span>
+                                <span>{feedback.createdAt ? format(new Date(feedback.createdAt), 'MMM d, yyyy') : 'unknown date'}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge className={getStatusColor(feedback.status || 'OPEN')}>
+                                {(feedback.status || 'OPEN').replace('_', ' ')}
+                              </Badge>
+                              <Badge className={getPriorityColor(feedback.priority || 'MEDIUM')}>
+                                {feedback.priority || 'MEDIUM'}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Badge className={getStatusColor(feedback.status)}>
-                              {feedback.status.replace('_', ' ')}
-                            </Badge>
-                            <Badge className={getPriorityColor(feedback.priority)}>
-                              {feedback.priority}
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="mt-2 text-sm">{feedback.description}</p>
-                        <div className="flex items-center justify-between mt-4">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MessageSquare className="h-3 w-3" />
-                            <span>{feedback.comments}</span>
-                          </div>
-                          {feedback.assignee && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Assigned to:</span>
-                              <span className="text-xs font-medium">
-                                {feedback.assignee.firstName} {feedback.assignee.lastName}
-                              </span>
+                          <p className="mt-2 text-sm">{feedback.description || 'No description provided'}</p>
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <MessageSquare className="h-3 w-3" />
+                              <span>{feedback.comments || 0}</span>
                             </div>
-                          )}
+                            {feedback.assignee && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Assigned to:</span>
+                                <span className="text-xs font-medium">
+                                  {feedback.assignee?.firstName || ''} {feedback.assignee?.lastName || ''}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                </TabsContent>
-              </Tabs>
+                      ))}
+                  </TabsContent>
+                  
+                  <TabsContent value="closed" className="space-y-4 mt-4">
+                    {feedbackItems
+                      .filter((feedback) => feedback?.status === 'CLOSED')
+                      .map((feedback, index) => (
+                        <div key={feedback.id || `closed-feedback-${index}`} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="font-medium">{feedback.title}</h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <span>#{feedback.id?.substring(0, 6) || 'unknown'}</span>
+                                <span>•</span>
+                                <span>
+                                  Created by {feedback.author?.firstName || ''} {feedback.author?.lastName || ''}
+                                </span>
+                                <span>•</span>
+                                <span>{feedback.createdAt ? format(new Date(feedback.createdAt), 'MMM d, yyyy') : 'unknown date'}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge className={getStatusColor(feedback.status || 'OPEN')}>
+                                {(feedback.status || 'OPEN').replace('_', ' ')}
+                              </Badge>
+                              <Badge className={getPriorityColor(feedback.priority || 'MEDIUM')}>
+                                {feedback.priority || 'MEDIUM'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-sm">{feedback.description || 'No description provided'}</p>
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <MessageSquare className="h-3 w-3" />
+                              <span>{feedback.comments || 0}</span>
+                            </div>
+                            {feedback.assignee && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Assigned to:</span>
+                                <span className="text-xs font-medium">
+                                  {feedback.assignee?.firstName || ''} {feedback.assignee?.lastName || ''}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </TabsContent>
+                </Tabs>
+              </div>
             </div>
           </>
         )}

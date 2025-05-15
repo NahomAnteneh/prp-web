@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Settings, FileText, FolderGit2, UserCheck, LayoutDashboard, MessageSquare } from 'lucide-react';
+import { Loader2, Settings, FileText, FolderGit2, UserCheck, LayoutDashboard, MessageSquare, CheckSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import Navbar from '@/components/student/navbar';
@@ -16,7 +16,8 @@ import {
   ProjectDocuments,
   ProjectAdvisor,
   ProjectFeedback,
-  ProjectSettings
+  ProjectSettings,
+  ProjectTasks
 } from '@/components/projects';
 
 // Define proper interface for the project data
@@ -150,7 +151,7 @@ export default function ProjectDetailsPage() {
             </Card>
 
             <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="mt-6">
-              <TabsList className="w-full grid grid-cols-6">
+              <TabsList className="w-full grid grid-cols-7">
                 <TabsTrigger value="overview" className="flex items-center gap-2">
                   <LayoutDashboard className="h-4 w-4" />
                   <span className="hidden sm:inline">Overview</span>
@@ -160,6 +161,11 @@ export default function ProjectDetailsPage() {
                   <FolderGit2 className="h-4 w-4" />
                   <span className="hidden sm:inline">Repositories</span>
                   <span className="sm:hidden">Repos</span>
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4" />
+                  <span className="hidden sm:inline">Tasks</span>
+                  <span className="sm:hidden">Tasks</span>
                 </TabsTrigger>
                 <TabsTrigger value="advisor" className="flex items-center gap-2">
                   <UserCheck className="h-4 w-4" />
@@ -185,6 +191,10 @@ export default function ProjectDetailsPage() {
               
               <TabsContent value="repositories" className="mt-6">
                 <ProjectRepositories ownerId={ownerId} projectId={projectId} />
+              </TabsContent>
+              
+              <TabsContent value="tasks" className="mt-6">
+                <ProjectTasks ownerId={ownerId} projectId={projectId} />
               </TabsContent>
               
               <TabsContent value="advisor" className="mt-6">

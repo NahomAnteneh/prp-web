@@ -28,6 +28,11 @@ export default function Navbar() {
   useEffect(() => {
     async function fetchNavbarData() {
       try {
+        if (!userName) {
+          // Skip fetching if userName is not available yet
+          return;
+        }
+        
         const notifications = await fetch(`/api/users/${userName}/notifications`)
         if (notifications.ok) {
           const data = await notifications.json()
@@ -39,12 +44,21 @@ export default function Navbar() {
         console.error("Error fetching navbar data:", error)
       }
     }
+    
     setDisplayName(userName || "Student")
-    fetchNavbarData()
+    
+    // Only call fetchNavbarData if userName exists
+    if (userName) {
+      fetchNavbarData()
+    }
   }, [userName])
 
   const handleMarkAllAsRead = async () => {
     try {
+      if (!userName) {
+        return;
+      }
+      
       const response = await fetch(`/api/users/${userName}/notifications`, {
         method: "POST",
         headers: {
@@ -156,7 +170,7 @@ export default function Navbar() {
           {/* User Menu */}
           <div className="hidden md:flex items-center">
             <Link 
-              href={`/${userName}`}
+              href={userName ? `/${userName}` : "/"}
               className="flex items-center border rounded-full px-3 py-1 bg-accent/20 hover:bg-accent/30 transition-colors"
             >
               <User className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -190,7 +204,7 @@ export default function Navbar() {
           <div className="flex flex-col space-y-3">
             {/* Show user info in mobile menu */}
             <Link 
-              href={`/${userName}`}
+              href={userName ? `/${userName}` : "/"}
               className="flex items-center border rounded-full px-3 py-2 bg-accent/20 mb-2 hover:bg-accent/30 transition-colors"
             >
               <User className="h-4 w-4 mr-2 text-muted-foreground" />

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Announcement } from "@prisma/client"
+import { cn } from "@/lib/utils"
 
 // export interface Announcement {
 //   id: string
@@ -37,6 +38,30 @@ export default function Announcements({ announcements }: AnnouncementsProps) {
       day: 'numeric',
       year: 'numeric'
     }).format(date)
+  }
+
+  // Get priority-based styling
+  const getPriorityStyles = (priority: number) => {
+    if (priority > 2) {
+      return {
+        borderClass: "border-l-4 border-l-red-600",
+        bgClass: "bg-red-50"
+      }
+    } else if (priority > 1) {
+      return {
+        borderClass: "border-l-4 border-l-orange-500",
+        bgClass: "bg-orange-50"
+      }
+    } else if (priority > 0) {
+      return {
+        borderClass: "border-l-4 border-l-blue-400",
+        bgClass: "bg-blue-50" 
+      }
+    }
+    return {
+      borderClass: "",
+      bgClass: ""
+    }
   }
 
   // Sort announcements by priority (highest first) and then by date (newest first)
@@ -73,47 +98,50 @@ export default function Announcements({ announcements }: AnnouncementsProps) {
         <CardDescription>Important updates from administrators</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {sortedAnnouncements.map((announcement) => (
-          <div 
-            key={announcement.id} 
-            className="border rounded-lg overflow-hidden"
-          >
+        {sortedAnnouncements.map((announcement) => {
+          const { borderClass, bgClass } = getPriorityStyles(announcement.priority)
+          return (
             <div 
-              className="flex items-center justify-between p-3 cursor-pointer"
-              onClick={() => toggleAnnouncement(announcement.id)}
+              key={announcement.id} 
+              className={cn("border rounded-lg overflow-hidden", borderClass)}
             >
-              <div className="flex items-center space-x-2">
-                <div>
-                  <h3 className="font-medium">{announcement.title}</h3>
-                  <div className="flex items-center mt-1">
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(announcement.createdAt)}
-                    </span>
-                    {announcement.priority > 0 && (
-                      <Badge 
-                        variant={announcement.priority > 1 ? "destructive" : "secondary"} 
-                        className="ml-2"
-                      >
-                        {announcement.priority > 1 ? 'Important' : 'Notice'}
-                      </Badge>
-                    )}
+              <div 
+                className={cn("flex items-center justify-between p-3 cursor-pointer", bgClass)}
+                onClick={() => toggleAnnouncement(announcement.id)}
+              >
+                <div className="flex items-center space-x-2">
+                  <div>
+                    <h3 className="font-medium">{announcement.title}</h3>
+                    <div className="flex items-center mt-1">
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(announcement.createdAt)}
+                      </span>
+                      {announcement.priority > 0 && (
+                        <Badge 
+                          variant={announcement.priority > 1 ? "destructive" : "secondary"} 
+                          className="ml-2"
+                        >
+                          {announcement.priority > 1 ? 'Important' : 'Notice'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <Button variant="ghost" size="icon">
+                  {expandedAnnouncementId === announcement.id ? 
+                    <ChevronDown className="h-4 w-4" /> : 
+                    <ChevronRight className="h-4 w-4" />
+                  }
+                </Button>
               </div>
-              <Button variant="ghost" size="icon">
-                {expandedAnnouncementId === announcement.id ? 
-                  <ChevronDown className="h-4 w-4" /> : 
-                  <ChevronRight className="h-4 w-4" />
-                }
-              </Button>
+              {expandedAnnouncementId === announcement.id && (
+                <div className="p-3 pt-0 border-t">
+                  <p className="text-sm whitespace-pre-line">{announcement.content}</p>
+                </div>
+              )}
             </div>
-            {expandedAnnouncementId === announcement.id && (
-              <div className="p-3 pt-0 border-t">
-                <p className="text-sm whitespace-pre-line">{announcement.content}</p>
-              </div>
-            )}
-          </div>
-        ))}
+          )
+        })}
         
         <div className="flex justify-center pt-2">
           <Link href="/announcements">

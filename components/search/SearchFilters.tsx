@@ -16,15 +16,9 @@ interface SearchFiltersProps {
   role?: string;
   setRole?: (role: string) => void;
   className?: string;
+  disabled?: boolean;
 }
 
-// const typeOptions = [
-//   { value: 'projects', label: 'Projects' },
-//   { value: 'repositories', label: 'Repositories' },
-//   { value: 'groups', label: 'Groups' },
-//   { value: 'students', label: 'Students' },
-//   { value: 'advisors', label: 'Advisors' },
-// ];
 
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },
@@ -65,6 +59,7 @@ export function SearchFilters({
   role,
   setRole,
   className,
+  disabled = false,
 }: SearchFiltersProps) {
   const safeStatus = status || 'all';
   const safeDept = dept || 'all';
@@ -107,7 +102,7 @@ export function SearchFilters({
       </Select> */}
       
       {setStatus && (
-        <Select value={safeStatus} onValueChange={handleStatusChange}>
+        <Select value={safeStatus} onValueChange={handleStatusChange} disabled={disabled}>
           <SelectTrigger className="w-36">
             {statusOptions.find(opt => opt.value === safeStatus)?.label || 'All Statuses'}
           </SelectTrigger>
@@ -120,7 +115,7 @@ export function SearchFilters({
       )}
       
       {setDept && (
-        <Select value={safeDept} onValueChange={handleDeptChange}>
+        <Select value={safeDept} onValueChange={handleDeptChange} disabled={disabled}>
           <SelectTrigger className="w-36">
             {departmentOptions.find(opt => opt.value === safeDept)?.label || 'All Departments'}
           </SelectTrigger>
@@ -133,7 +128,7 @@ export function SearchFilters({
       )}
       
       {setBatch && (
-        <Select value={safeBatch} onValueChange={handleBatchChange}>
+        <Select value={safeBatch} onValueChange={handleBatchChange} disabled={disabled}>
           <SelectTrigger className="w-28">
             {batchOptions.find(opt => opt.value === safeBatch)?.label || 'All Batches'}
           </SelectTrigger>
@@ -146,7 +141,7 @@ export function SearchFilters({
       )}
       
       {setRole && (
-        <Select value={safeRole} onValueChange={handleRoleChange}>
+        <Select value={safeRole} onValueChange={handleRoleChange} disabled={disabled}>
           <SelectTrigger className="w-32">
             {safeRole === 'all' 
               ? 'All Roles' 

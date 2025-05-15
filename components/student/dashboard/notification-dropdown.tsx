@@ -41,6 +41,12 @@ export default function NotificationDropdown({
 
   // Fetch notifications from API
   const fetchNotifications = async () => {
+    if (!userId) {
+      setError("User ID not available");
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true)
     setError(null)
     
@@ -120,6 +126,10 @@ export default function NotificationDropdown({
   }
 
   const handleMarkAllAsRead = async () => {
+    if (!userId) {
+      return;
+    }
+    
     setIsLoading(true)
     
     try {
@@ -148,6 +158,10 @@ export default function NotificationDropdown({
   }
 
   const handleMarkAsRead = async (notificationId: string) => {
+    if (!userId) {
+      return;
+    }
+    
     try {
       const response = await fetch(`/api/${userId}/notifications`, {
         method: 'POST',

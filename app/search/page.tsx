@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-// import { SearchBar } from '@/components/SearchBar';
+import React, { useState, useEffect, useCallback } from 'react';
+import { SearchBar } from '@/components/SearchBar';
 import { SearchFilters, SearchType } from '@/components/search/SearchFilters';
 import { SearchResultsList } from '@/components/search/SearchResultsList';
 import { SearchPagination } from '@/components/search/SearchPagination';
@@ -19,6 +19,7 @@ const typeToResultType = {
   groups: 'group',
   students: 'student',
   advisors: 'advisor',
+  users: 'user',
 } as const;
 
 type Pagination = {
@@ -47,11 +48,12 @@ export default function SearchPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [sidebarCounts, setSidebarCounts] = useState<SidebarCounts>({});
   const [loading, setLoading] = useState(false);
-  const [sortBy, setSortBy] = useState('best');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'best');
+  const [sortOrder, setSortOrder] = useState(searchParams.get('sortOrder') || 'desc');
   const [searchTimeMs, setSearchTimeMs] = useState<number | undefined>(undefined);
 
-  const isVisitor = status === 'authenticated';
+  const isVisitor = status !== 'authenticated';
 
   // Sync state with URL params when searchParams change
   useEffect(() => {
@@ -96,12 +98,13 @@ export default function SearchPage() {
   }, [query, type, searchStatus, dept, batch, role, page, sortBy, sortOrder, router]);
 
   // Fetch data when query or filters change
-  useEffect(() => {
+  const fetchSearchResults = useCallback(async () => {
     if (!query || query.trim() === '') {
       setResults([]);
       setPagination(null);
       setSidebarCounts({});
       setLoading(false);
+      setInitialLoad(false);
       return;
     }
 
@@ -119,28 +122,30 @@ export default function SearchPage() {
     if (sortOrder && sortBy !== 'best') params.set('sortOrder', sortOrder);
 
     const start = performance.now();
-    fetch(`/api/search?${params.toString()}`)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Search request failed: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        setResults(data.data || []);
-        setPagination(data.pagination || null);
-        setSidebarCounts(data.meta?.sidebarCounts || {});
-        setSearchTimeMs(Math.round(performance.now() - start));
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Search error:', error);
-        setResults([]);
-        setPagination(null);
-        setSidebarCounts({});
-        setLoading(false);
-      });
+    try {
+      const res = await fetch(`/api/search?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Search request failed: ${res.status}`);
+      }
+      const data = await res.json();
+      setResults(data.data || []);
+      setPagination(data.pagination || null);
+      setSidebarCounts(data.meta?.sidebarCounts || {});
+      setSearchTimeMs(Math.round(performance.now() - start));
+    } catch (error) {
+      console.error('Search error:', error);
+      setResults([]);
+      setPagination(null);
+      setSidebarCounts({});
+    } finally {
+      setLoading(false);
+      setInitialLoad(false);
+    }
   }, [query, type, searchStatus, dept, batch, role, page, sortBy, sortOrder]);
+
+  useEffect(() => {
+    fetchSearchResults();
+  }, [fetchSearchResults]);
 
   // Reset page to 1 on filter change
   useEffect(() => {
@@ -149,7 +154,7 @@ export default function SearchPage() {
 
   return (
     <>
-      {isVisitor ? <NavBar /> : <Navbar />}
+      {isVisitor ? <Navbar /> : <NavBar />}
       <div className="flex w-full max-w-7xl mx-auto px-4 py-8">
         {(!query || query.trim() === '') ? (
           <SearchLanding setQuery={setQuery} setType={(t) => setType(t as SearchType)} />
@@ -159,9 +164,10 @@ export default function SearchPage() {
               counts={sidebarCounts}
               currentType={type}
               onTypeChange={t => setType(t as SearchType)}
+              loading={initialLoad}
             />
             <main className="flex-1 pl-8">
-              {/* <div className="mb-4">
+              <div className="mb-4">
                 <SearchBar
                   className="w-full"
                   defaultValue={query}
@@ -171,7 +177,7 @@ export default function SearchPage() {
                     setPage(1);
                   }}
                 />
-              </div> */}
+              </div>
               <SearchSummaryBar
                 totalCount={pagination?.totalCount || 0}
                 searchTimeMs={searchTimeMs}
@@ -181,6 +187,7 @@ export default function SearchPage() {
                   setSortBy(by);
                   setSortOrder(order);
                 }}
+                loading={loading}
               />
               <div className="mb-6">
                 <SearchFilters
@@ -194,6 +201,7 @@ export default function SearchPage() {
                   setBatch={['students', 'users'].includes(type) ? setBatch : undefined}
                   role={type === 'users' ? role : undefined}
                   setRole={type === 'users' ? setRole : undefined}
+                  disabled={loading}
                 />
               </div>
               <SearchResultsList
@@ -206,6 +214,7 @@ export default function SearchPage() {
                   currentPage={pagination.currentPage}
                   totalPages={pagination.totalPages}
                   onPageChange={setPage}
+                  disabled={loading}
                 />
               )}
             </main>

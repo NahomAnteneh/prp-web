@@ -4,6 +4,7 @@ export * from './project-documents';
 export * from './project-advisor';
 export * from './project-feedback';
 export * from './project-settings';
+export * from './project-tasks';
 export * from './document-context-menu';
 export * from './document-preview';
 export * from './multi-file-upload-modal';

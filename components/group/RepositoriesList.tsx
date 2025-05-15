@@ -19,7 +19,7 @@ interface Repository {
   name: string;
   groupUserName: string;
   description: string;
-  isPrivate: boolean;
+  isPrivate: string | boolean;
   createdAt: string;
   updatedAt: string;
   owner: {
@@ -62,9 +62,46 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
       if (!response.ok) {
         throw new Error(data.message || 'Failed to fetch repositories');
       }
+      
+      // Log the raw repository data from API
+      console.log('Raw API response:', data);
+      console.log('Raw repositories from API:', data.repositories);
+      
+      // Show the actual isPrivate values before conversion
+      if (Array.isArray(data.repositories) && data.repositories.length > 0) {
+        console.log('First repository raw data:', data.repositories[0]);
+        console.log('isPrivate value:', data.repositories[0].isPrivate);
+        console.log('isPrivate type:', typeof data.repositories[0].isPrivate);
+      }
 
       // Normalize repositories
-      const repositories = (Array.isArray(data.repositories) ? data.repositories : []);
+      const repositories = (Array.isArray(data.repositories) ? data.repositories : []).map((repo: any) => {
+        // Handle the string values from the API ('private' or 'public') 
+        // or boolean values if they exist
+        let convertedIsPrivate: boolean;
+        
+        if (repo.isPrivate === undefined) {
+          convertedIsPrivate = false;
+        } else if (typeof repo.isPrivate === 'boolean') {
+          convertedIsPrivate = repo.isPrivate;
+        } else if (typeof repo.isPrivate === 'string') {
+          convertedIsPrivate = repo.isPrivate === 'private';
+        } else {
+          convertedIsPrivate = Boolean(repo.isPrivate);
+        }
+        
+        return {
+          ...repo,
+          isPrivate: convertedIsPrivate
+        };
+      });
+      
+      // Debug the isPrivate property after conversion
+      console.log('Repository data:', repositories.map((repo: Repository) => ({
+        name: repo.name,
+        isPrivate: repo.isPrivate,
+        typeOfIsPrivate: typeof repo.isPrivate
+      })));
 
       const normalizedData: RepositoryResponse = {
         repositories,
@@ -119,14 +156,11 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
     });
   };
 
-  const getVisibilityColor = (visibility: string) => {
-    switch (visibility.toLowerCase()) {
-      case 'public':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800';
-      case 'private':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
+  const getVisibilityColor = (isPrivate: boolean) => {
+    if (isPrivate) {
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
+    } else {
+      return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800';
     }
   };
 
@@ -222,10 +256,23 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
                             {repo.name}
                           </Link>
                         </h3>
+                        {/* Debug isPrivate value at render time (invisible to user) */}
+                        {(() => { 
+                          // Convert to boolean if it's still a string at render time
+                          const isPrivateBoolean = typeof repo.isPrivate === 'string' 
+                            ? repo.isPrivate === 'private'
+                            : Boolean(repo.isPrivate);
+                          console.log(`Rendering ${repo.name} with isPrivate=${repo.isPrivate} (${typeof repo.isPrivate})`);
+                          return null;
+                        })()}
                         <Badge
-                          className={`${getVisibilityColor(repo.isPrivate ? 'private' : 'public')}`}
+                          className={`${getVisibilityColor(typeof repo.isPrivate === 'string' 
+                            ? repo.isPrivate === 'private' 
+                            : Boolean(repo.isPrivate))}`}
                         >
-                          {repo.isPrivate ? (
+                          {typeof repo.isPrivate === 'string' 
+                            ? repo.isPrivate === 'private'
+                            : Boolean(repo.isPrivate) ? (
                             <span className="flex items-center gap-1">
                               <Lock className="h-3 w-3" /> Private
                             </span>

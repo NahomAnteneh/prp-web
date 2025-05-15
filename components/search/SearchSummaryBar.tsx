@@ -1,4 +1,5 @@
 import React from 'react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface SearchSummaryBarProps {
   totalCount: number;
@@ -6,6 +7,7 @@ interface SearchSummaryBarProps {
   sortBy: string;
   sortOrder: string;
   onSortChange: (sortBy: string, sortOrder: string) => void;
+  loading?: boolean;
 }
 
 const sortOptions = [
@@ -17,7 +19,14 @@ const sortOptions = [
   { value: 'name-desc', label: 'Name (Z-A)' },
 ];
 
-export function SearchSummaryBar({ totalCount, searchTimeMs, sortBy, sortOrder, onSortChange }: SearchSummaryBarProps) {
+export function SearchSummaryBar({ 
+  totalCount, 
+  searchTimeMs, 
+  sortBy, 
+  sortOrder, 
+  onSortChange,
+  loading = false 
+}: SearchSummaryBarProps) {
   const currentSort = sortOptions.find(opt => {
     if (opt.value === 'best') return sortBy === 'best';
     const [field, order] = opt.value.split('-');
@@ -27,9 +36,18 @@ export function SearchSummaryBar({ totalCount, searchTimeMs, sortBy, sortOrder, 
   return (
     <div className="flex items-center justify-between border-b pb-2 mb-4">
       <div className="text-sm text-muted-foreground">
-        <span className="font-semibold text-foreground">{totalCount.toLocaleString()}</span> results
-        {searchTimeMs !== undefined && (
-          <span className="ml-2">({searchTimeMs} ms)</span>
+        {loading ? (
+          <div className="flex items-center gap-2">
+            <Spinner className="h-3 w-3" /> 
+            <span>Loading results...</span>
+          </div>
+        ) : (
+          <>
+            <span className="font-semibold text-foreground">{totalCount.toLocaleString()}</span> results
+            {searchTimeMs !== undefined && (
+              <span className="ml-2">({searchTimeMs} ms)</span>
+            )}
+          </>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -47,6 +65,7 @@ export function SearchSummaryBar({ totalCount, searchTimeMs, sortBy, sortOrder, 
               onSortChange(field, order);
             }
           }}
+          disabled={loading}
         >
           {sortOptions.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>

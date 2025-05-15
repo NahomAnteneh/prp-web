@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { 
   GitBranchIcon, 
   UsersIcon, 
-  Code, 
+  CodeIcon, 
   InfoIcon, 
   BookOpenIcon, 
   StarIcon, 
@@ -23,7 +23,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RepositoryHeader } from "@/components/repository/repository-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import ExplorerView from "@/components/repository/explorer/explorer-view";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 // Type definitions
 interface Repository {
@@ -64,11 +65,14 @@ interface TreeNode {
   type: "file" | "directory";
 }
 
-interface FileType {
-  name: string;
-  content?: string;
-  url?: string;
-  isBinary: boolean;
+interface Commit {
+  id: string;
+  message: string;
+  createdAt: string;
+  author: {
+    firstName: string;
+    lastName: string;
+  } | null;
 }
 
 export default function MainRepoPage() {
@@ -82,47 +86,71 @@ export default function MainRepoPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("code");
   const [fileTree, setFileTree] = useState<TreeNode[]>([]);
-  const [fileData, setFileData] = useState<FileType | null>(null);
   const [isFileTreeLoading, setIsFileTreeLoading] = useState(true);
-  const [lastCommit, setLastCommit] = useState<any>(null);
+  const [lastCommit, setLastCommit] = useState<Commit | null>(null);
+
+  // Configure marked with secure defaults
+  useEffect(() => {
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+      sanitize: false, // We'll use DOMPurify instead
+    });
+  }, []);
 
   // Fetch repository data
   useEffect(() => {
-    if (!ownerId || !repoId) return;
+    if (!ownerId || !repoId) {
+      setError("Invalid repository parameters");
+      setIsLoading(false);
+      return;
+    }
 
     async function fetchData() {
       setIsLoading(true);
+      setError(null);
+      
       try {
         // Fetch repository overview
         const repoResponse = await fetch(`/api/groups/${ownerId}/repositories/${repoId}/overview`);
         
         if (!repoResponse.ok) {
-          throw new Error("Failed to fetch repository data");
+          throw new Error(`Failed to fetch repository data: ${repoResponse.status}`);
         }
         
-        const repoData = await repoResponse.json();
+        const repoData: Repository = await repoResponse.json();
         setRepoData(repoData);
         
         // Fetch README if we have a default branch
         if (repoData.defaultBranch) {
-          const readmeResponse = await fetch(
-            `/api/groups/${ownerId}/repositories/${repoId}/readme/${repoData.defaultBranch.name}`
-          );
-          
-          if (readmeResponse.ok) {
-            const { content } = await readmeResponse.json();
-            setReadme(content);
+          try {
+            const readmeResponse = await fetch(
+              `/api/groups/${ownerId}/repositories/${repoId}/readme/${repoData.defaultBranch.name}`
+            );
+            
+            if (readmeResponse.ok) {
+              const { content } = await readmeResponse.json();
+              // Sanitize and convert markdown to HTML
+              const htmlContent = DOMPurify.sanitize(await marked(content));
+              setReadme(htmlContent);
+            }
+          } catch (readmeError) {
+            console.warn("Failed to load README:", readmeError);
           }
 
           // Fetch file tree
           setIsFileTreeLoading(true);
-          const treeResponse = await fetch(
-            `/api/groups/${ownerId}/repositories/${repoId}/tree/${repoData.defaultBranch.name}`
-          );
-          
-          if (treeResponse.ok) {
-            const { tree } = await treeResponse.json();
-            setFileTree(tree);
+          try {
+            const treeResponse = await fetch(
+              `/api/groups/${ownerId}/repositories/${repoId}/tree/${repoData.defaultBranch.name}`
+            );
+            
+            if (treeResponse.ok) {
+              const { tree } = await treeResponse.json();
+              setFileTree(tree as TreeNode[]);
+            }
+          } catch (treeError) {
+            console.warn("Failed to load file tree:", treeError);
           }
           
           // Fetch last commit
@@ -131,13 +159,13 @@ export default function MainRepoPage() {
               `/api/groups/${ownerId}/repositories/${repoId}/commits/${repoData.defaultBranch.name}?limit=1`
             );
             if (commitsResponse.ok) {
-              const commits = await commitsResponse.json();
-              if (commits && commits.length > 0) {
+              const commits: Commit[] = await commitsResponse.json();
+              if (commits?.length > 0) {
                 setLastCommit(commits[0]);
               }
             }
-          } catch (err) {
-            console.error("Error fetching commits:", err);
+          } catch (commitError) {
+            console.warn("Failed to load commits:", commitError);
           }
         }
       } catch (err) {
@@ -154,47 +182,47 @@ export default function MainRepoPage() {
 
   if (isLoading) {
     return (
-      <>
+      <div className="min-h-screen bg-background">
         <RepositoryHeader owner={ownerId} repository={repoId} session={session} />
-        <div className="container mx-auto py-6 max-w-6xl">
-          <Skeleton className="h-10 w-64 mb-2" />
-          <Skeleton className="h-5 w-full mb-1" />
+        <div className="container mx-auto py-8 max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Skeleton className="h-10 w-64 mb-4" />
+          <Skeleton className="h-5 w-full mb-2" />
           <Skeleton className="h-5 w-3/4" />
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-32 w-full rounded-lg" />
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   if (error || !repoData) {
     return (
-      <>
+      <div className="min-h-screen bg-background">
         <RepositoryHeader owner={ownerId} repository={repoId} session={session} />
-        <div className="container mx-auto py-6 max-w-6xl">
-          <div className="p-4 text-red-600">
+        <div className="container mx-auto py-8 max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="p-4 bg-red-50 text-red-600 rounded-lg">
             {error || "Failed to load repository"}
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   const defaultBranchName = repoData.defaultBranch?.name || "main";
 
   return (
-    <>
+    <div className="min-h-screen bg-background">
       <RepositoryHeader owner={ownerId} repository={repoId} session={session} />
-      <div className="container mx-auto py-6 max-w-6xl">
+      <div className="container mx-auto py-8 max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Repository Info Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold">{repoData.name}</h1>
-            <div className="flex items-center space-x-2">
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+            <h1 className="text-3xl font-bold tracking-tight">{repoData.name}</h1>
+            <div className="flex items-center space-x-3">
               <Button variant="outline" size="sm" className="flex items-center gap-2">
                 <StarIcon className="h-4 w-4" />
                 <span>Star</span>
@@ -205,46 +233,50 @@ export default function MainRepoPage() {
               </Button>
             </div>
           </div>
-          <p className="text-muted-foreground">{repoData.description}</p>
+          <p className="text-muted-foreground text-base">{repoData.description || "No description provided"}</p>
           
-          <div className="flex items-center mt-4 text-sm text-muted-foreground flex-wrap gap-y-2">
+          <div className="flex flex-wrap items-center mt-4 text-sm text-muted-foreground gap-4">
             {repoData.isPrivate ? (
-              <Badge variant="outline" className="mr-4 bg-amber-100 text-amber-800 hover:bg-amber-100">Private</Badge>
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 hover:bg-amber-100 px-2 py-1">
+                Private
+              </Badge>
             ) : (
-              <Badge variant="outline" className="mr-4 bg-green-100 text-green-800 hover:bg-green-100">Public</Badge>
+              <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100 px-2 py-1">
+                Public
+              </Badge>
             )}
             
-            <span className="flex items-center mr-4">
+            <span className="flex items-center">
               <StarIcon className="h-4 w-4 mr-1" />
               <span>0 stars</span>
             </span>
             
-            <span className="flex items-center mr-4">
+            <span className="flex items-center">
               <GitForkIcon className="h-4 w-4 mr-1" />
               <span>0 forks</span>
             </span>
             
-            <span className="flex items-center mr-4">
+            <span className="flex items-center">
               <EyeIcon className="h-4 w-4 mr-1" />
               <span>0 watchers</span>
             </span>
             
-            <span className="flex items-center mr-4">
+            <span className="flex items-center">
               <GitBranchIcon className="h-4 w-4 mr-1" />
-              <span>{repoData.stats?.branches} branch{repoData.stats?.branches !== 1 ? 'es' : ''}</span>
+              <span>{repoData.stats?.branches || 0} branch{repoData.stats?.branches !== 1 ? 'es' : ''}</span>
             </span>
             
-            <span className="flex items-center mr-4">
+            <span className="flex items-center">
               <UsersIcon className="h-4 w-4 mr-1" />
-              <span>{repoData.contributors?.length} contributor{repoData.contributors?.length !== 1 ? 's' : ''}</span>
+              <span>{repoData.contributors?.length || 0} contributor{repoData.contributors?.length !== 1 ? 's' : ''}</span>
             </span>
           </div>
         </div>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+          <TabsList className="grid w-full grid-cols-3 sticky top-0 bg-background z-10 pb-2 mb-4 border-b">
             <TabsTrigger value="code" className="flex items-center gap-2">
-              <Code className="h-4 w-4" />
+              <CodeIcon className="h-4 w-4" />
               <span>Code</span>
             </TabsTrigger>
             <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -257,10 +289,10 @@ export default function MainRepoPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="code" className="mt-6">
-            <div className="border rounded-md overflow-hidden">
+          <TabsContent value="code" className="mt-4">
+            <div className="border rounded-lg shadow-sm overflow-hidden">
               {/* Branch selector and code navigation */}
-              <div className="bg-muted/40 border-b p-3 flex items-center justify-between">
+              <div className="bg-muted/40 border-b p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center">
                   <Button variant="outline" size="sm" className="flex items-center gap-2">
                     <GitBranchIcon className="h-4 w-4" />
@@ -276,16 +308,18 @@ export default function MainRepoPage() {
               
               {/* Last commit info */}
               {lastCommit && (
-                <div className="bg-background border-b p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                <div className="bg-background border-b p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
                         <UsersIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <span className="font-medium">
-                        {lastCommit.author ? `${lastCommit.author.firstName} ${lastCommit.author.lastName}` : 'Unknown'}
+                        {lastCommit.author 
+                          ? `${lastCommit.author.firstName} ${lastCommit.author.lastName}` 
+                          : 'Unknown'}
                       </span>
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground text-sm">
                         {lastCommit.message && lastCommit.message.length > 60 
                           ? `${lastCommit.message.substring(0, 60)}...` 
                           : lastCommit.message || 'No commit message'}
@@ -309,7 +343,7 @@ export default function MainRepoPage() {
                 {isFileTreeLoading ? (
                   <div className="p-4">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-2 mb-2">
+                      <div key={i} className="flex items-center gap-2 mb-3">
                         {i % 2 === 0 ? (
                           <FileIcon className="h-4 w-4 text-muted-foreground" />
                         ) : (
@@ -319,11 +353,13 @@ export default function MainRepoPage() {
                       </div>
                     ))}
                   </div>
+                ) : fileTree.length === 0 ? (
+                  <div className="p-4 text-muted-foreground text-sm">
+                    No files found in this repository.
+                  </div>
                 ) : (
                   <div className="divide-y">
-                    {fileTree
-                      .sort((a, b) => {
-                        // Sort directories first, then files
+                    {fileTree.sort((a, b) => {
                         if (a.type !== b.type) {
                           return a.type === "directory" ? -1 : 1;
                         }
@@ -333,22 +369,21 @@ export default function MainRepoPage() {
                         const pathParts = item.path.split('/');
                         const name = pathParts[pathParts.length - 1];
                         
-                        // Only show top-level items
                         if (pathParts.length !== 1) return null;
                         
                         return (
                           <Link 
                             key={index}
                             href={`/${ownerId}/${repoId}/${item.type === 'directory' ? 'tree' : 'blob'}/${defaultBranchName}/${item.path}`}
-                            className="flex items-center justify-between p-3 hover:bg-muted/20"
+                            className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                               {item.type === 'directory' ? (
                                 <FolderIcon className="h-4 w-4 text-blue-500" />
                               ) : (
                                 <FileIcon className="h-4 w-4 text-muted-foreground" />
                               )}
-                              <span>{name}</span>
+                              <span className="text-sm">{name}</span>
                             </div>
                             {item.type === 'directory' && (
                               <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
@@ -362,13 +397,13 @@ export default function MainRepoPage() {
             </div>
           </TabsContent>
           
-          <TabsContent value="overview" className="mt-6">
-            <div className="border rounded-md p-4">
-              <h2 className="text-xl font-semibold mb-3">About</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+          <TabsContent value="overview" className="mt-4">
+            <div className="border rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold mb-4">About</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
                   <div>
-                    <h3 className="font-medium text-lg mb-1">Owner</h3>
+                    <h3 className="font-medium text-lg mb-2">Owner</h3>
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                         <UsersIcon className="h-5 w-5 text-muted-foreground" />
@@ -379,7 +414,7 @@ export default function MainRepoPage() {
                   
                   {repoData.group && (
                     <div>
-                      <h3 className="font-medium text-lg mb-1">Group</h3>
+                      <h3 className="font-medium text-lg mb-2">Group</h3>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                           <UsersIcon className="h-5 w-5 text-muted-foreground" />
@@ -390,23 +425,27 @@ export default function MainRepoPage() {
                   )}
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h3 className="font-medium text-lg mb-1">Contributors</h3>
+                    <h3 className="font-medium text-lg mb-2">Contributors</h3>
                     <div className="flex flex-wrap gap-2">
-                      {repoData.contributors?.map(contributor => (
-                        <div key={contributor.userId} className="flex items-center gap-2 bg-muted/30 p-2 rounded-md">
-                          <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
-                            <UsersIcon className="h-4 w-4 text-muted-foreground" />
+                      {repoData.contributors?.length ? (
+                        repoData.contributors.map(contributor => (
+                          <div key={contributor.userId} className="flex items-center gap-2 bg-muted/30 p-2 rounded-md">
+                            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                              <UsersIcon className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <span>{contributor.firstName} {contributor.lastName}</span>
                           </div>
-                          <span>{contributor.firstName} {contributor.lastName}</span>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground">No contributors yet</p>
+                      )}
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium text-lg mb-1">Statistics</h3>
+                    <h3 className="font-medium text-lg mb-2">Statistics</h3>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="bg-muted/30 p-2 rounded-md">
                         <div className="text-sm text-muted-foreground">Commits</div>
@@ -423,12 +462,12 @@ export default function MainRepoPage() {
             </div>
           </TabsContent>
           
-          <TabsContent value="readme" className="mt-6">
-            <div className="border rounded-md overflow-hidden">
-              <div className="bg-muted/40 border-b p-3">
+          <TabsContent value="readme" className="mt-4">
+            <div className="border rounded-lg shadow-sm overflow-hidden">
+              <div className="bg-muted/40 border-b p-4">
                 <h2 className="font-semibold">README.md</h2>
               </div>
-              <div className="p-4 bg-background">
+              <div className="p-6 bg-background">
                 <div className="prose max-w-none">
                   {readme ? (
                     <div dangerouslySetInnerHTML={{ __html: readme }} />
@@ -441,6 +480,6 @@ export default function MainRepoPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </>
+    </div>
   );
 }

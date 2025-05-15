@@ -27,11 +27,23 @@ const typeToResultType = {
   advisors: 'advisor',
 } as const;
 
+// Helper to create text search conditions
+function createTextSearchCondition(query: string | undefined, fields: string[]): any[] {
+  if (!query || query.trim() === '') return [];
+  
+  return fields.map(field => ({
+    [field]: { contains: query, mode: 'insensitive' }
+  }));
+}
+
 export async function GET(req: NextRequest) {
   try {
     // Parse query parameters
     const url = new URL(req.url);
     const queryParams = Object.fromEntries(url.searchParams.entries());
+    
+    // Create a cache key from the query parameters for potential HTTP caching
+    const cacheKey = JSON.stringify(queryParams);
     
     // Validate query parameters
     const validationResult = searchQuerySchema.safeParse(queryParams);
@@ -63,6 +75,43 @@ export async function GET(req: NextRequest) {
     // Define search conditions based on type
     let searchResults;
     let totalCount = 0;
+    
+    // Keep track of all query promises to execute them in parallel where possible
+    let countPromises: Promise<any>[] = [];
+    
+    // Efficient helper functions for filtering
+    const addBatchFilter = (where: any, batchValue?: string) => {
+      if (batchValue && batchValue.trim() !== '') {
+        if (!where.profileInfo) {
+          where.profileInfo = {};
+        }
+        where.profileInfo.path = ['batchYear'];
+        where.profileInfo.equals = batchValue;
+      }
+      return where;
+    };
+    
+    const addDeptFilter = (where: any, deptValue?: string) => {
+      if (deptValue && deptValue.trim() !== '') {
+        if (where.profileInfo) {
+          // If we already have a profileInfo filter, use AND logic
+          where.AND = [
+            {
+              profileInfo: {
+                path: ['department'],
+                equals: deptValue,
+              }
+            }
+          ];
+        } else {
+          where.profileInfo = {
+            path: ['department'],
+            equals: deptValue,
+          };
+        }
+      }
+      return where;
+    };
 
     switch (type) {
       case 'projects':
@@ -73,10 +122,7 @@ export async function GET(req: NextRequest) {
 
         // Text search
         if (query) {
-          projectWhere.OR = [
-            { title: { contains: query, mode: 'insensitive' } },
-            { description: { contains: query, mode: 'insensitive' } },
-          ];
+          projectWhere.OR = createTextSearchCondition(query, ['title', 'description']);
         }
 
         // Status filter
@@ -89,15 +135,14 @@ export async function GET(req: NextRequest) {
           projectWhere.advisorId = advisorId;
         }
 
-        // Execute search transaction with optimized includes
-        const projectResults = await db.$transaction([
+        // Execute search in parallel
+        const [projectCount, projectData] = await Promise.all([
           db.project.count({ where: projectWhere }),
           db.project.findMany({
             where: projectWhere,
             include: {
               group: {
                 select: {
-                  id: true,
                   name: true,
                   groupUserName: true,
                 },
@@ -113,11 +158,11 @@ export async function GET(req: NextRequest) {
             orderBy,
             skip,
             take: limit,
-          }),
+          })
         ]);
 
-        totalCount = projectResults[0];
-        searchResults = projectResults[1];
+        totalCount = projectCount;
+        searchResults = projectData;
         break;
 
       case 'repositories':
@@ -128,25 +173,17 @@ export async function GET(req: NextRequest) {
 
         // Text search
         if (query) {
-          repoWhere.OR = [
-            { name: { contains: query, mode: 'insensitive' } },
-            { description: { contains: query, mode: 'insensitive' } },
-          ];
+          repoWhere.OR = createTextSearchCondition(query, ['name', 'description']);
         }
 
-        // Execute search with aggregation
-        const repoResults = await db.$transaction([
+        // Execute search in parallel
+        const [repoCount, repoData] = await Promise.all([
           db.repository.count({ where: repoWhere }),
           db.repository.findMany({
             where: repoWhere,
             include: {
-              owner: {
-                select: {
-                  id: true,
-                  name: true,
-                  groupUserName: true
-                },
-              },
+              // Repository owner is either a user or group
+              // Need to handle appropriately in the UI
               _count: {
                 select: {
                   commits: true,
@@ -157,11 +194,11 @@ export async function GET(req: NextRequest) {
             orderBy,
             skip,
             take: limit,
-          }),
+          })
         ]);
 
-        totalCount = repoResults[0];
-        searchResults = repoResults[1];
+        totalCount = repoCount;
+        searchResults = repoData;
         break;
 
       case 'groups':
@@ -170,15 +207,11 @@ export async function GET(req: NextRequest) {
 
         // Text search
         if (query) {
-          groupWhere.OR = [
-            { name: { contains: query, mode: 'insensitive' } },
-            { description: { contains: query, mode: 'insensitive' } },
-            { groupUserName: { contains: query, mode: 'insensitive' } },
-          ];
+          groupWhere.OR = createTextSearchCondition(query, ['name', 'description', 'groupUserName']);
         }
 
-        // Execute search with aggregation
-        const groupResults = await db.$transaction([
+        // Execute search in parallel
+        const [groupCount, groupData] = await Promise.all([
           db.group.count({ where: groupWhere }),
           db.group.findMany({
             where: groupWhere,
@@ -200,11 +233,11 @@ export async function GET(req: NextRequest) {
             orderBy,
             skip,
             take: limit,
-          }),
+          })
         ]);
 
-        totalCount = groupResults[0];
-        searchResults = groupResults[1];
+        totalCount = groupCount;
+        searchResults = groupData;
         break;
 
       case 'students':
@@ -215,44 +248,15 @@ export async function GET(req: NextRequest) {
 
         // Text search
         if (query) {
-          studentWhere.OR = [
-            { firstName: { contains: query, mode: 'insensitive' } },
-            { lastName: { contains: query, mode: 'insensitive' } },
-            { userId: { contains: query, mode: 'insensitive' } },
-            { email: { contains: query, mode: 'insensitive' } },
-          ];
+          studentWhere.OR = createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']);
         }
 
-        // Batch filter - only apply if not empty
-        if (batch && batch.trim() !== '') {
-          studentWhere.profileInfo = {
-            path: ['batchYear'],
-            equals: batch,
-          };
-        }
+        // Apply filters
+        addBatchFilter(studentWhere, batch);
+        addDeptFilter(studentWhere, dept);
 
-        // Department filter - only apply if not empty
-        if (dept && dept.trim() !== '') {
-          if (studentWhere.profileInfo) {
-            // If we already have a profileInfo filter, we need to use AND logic
-            studentWhere.AND = [
-              {
-                profileInfo: {
-                  path: ['department'],
-                  equals: dept,
-                }
-              }
-            ];
-          } else {
-            studentWhere.profileInfo = {
-              path: ['department'],
-              equals: dept,
-            };
-          }
-        }
-
-        // Execute search
-        const studentResults = await db.$transaction([
+        // Execute search in parallel
+        const [studentCount, studentData] = await Promise.all([
           db.user.count({ where: studentWhere }),
           db.user.findMany({
             where: studentWhere,
@@ -272,11 +276,11 @@ export async function GET(req: NextRequest) {
             orderBy,
             skip,
             take: limit,
-          }),
+          })
         ]);
 
-        totalCount = studentResults[0];
-        searchResults = studentResults[1];
+        totalCount = studentCount;
+        searchResults = studentData;
         break;
 
       case 'advisors':
@@ -287,24 +291,14 @@ export async function GET(req: NextRequest) {
 
         // Text search
         if (query) {
-          advisorWhere.OR = [
-            { firstName: { contains: query, mode: 'insensitive' } },
-            { lastName: { contains: query, mode: 'insensitive' } },
-            { userId: { contains: query, mode: 'insensitive' } },
-            { email: { contains: query, mode: 'insensitive' } },
-          ];
+          advisorWhere.OR = createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']);
         }
 
-        // Department filter - only apply if not empty
-        if (dept && dept.trim() !== '') {
-          advisorWhere.profileInfo = {
-            path: ['department'],
-            equals: dept,
-          };
-        }
+        // Apply filters
+        addDeptFilter(advisorWhere, dept);
 
-        // Execute search
-        const advisorResults = await db.$transaction([
+        // Execute search in parallel
+        const [advisorCount, advisorData] = await Promise.all([
           db.user.count({ where: advisorWhere }),
           db.user.findMany({
             where: advisorWhere,
@@ -324,11 +318,11 @@ export async function GET(req: NextRequest) {
             orderBy,
             skip,
             take: limit,
-          }),
+          })
         ]);
 
-        totalCount = advisorResults[0];
-        searchResults = advisorResults[1];
+        totalCount = advisorCount;
+        searchResults = advisorData;
         break;
 
       case 'users':
@@ -340,12 +334,7 @@ export async function GET(req: NextRequest) {
 
         // Text search
         if (query) {
-          userWhere.OR = [
-            { firstName: { contains: query, mode: 'insensitive' } },
-            { lastName: { contains: query, mode: 'insensitive' } },
-            { userId: { contains: query, mode: 'insensitive' } },
-            { email: { contains: query, mode: 'insensitive' } },
-          ];
+          userWhere.OR = createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']);
         }
 
         // Role filter - only apply if not empty
@@ -366,36 +355,12 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // Batch filter
-        if (batch && batch.trim() !== '') {
-          userWhere.profileInfo = {
-            path: ['batchYear'],
-            equals: batch,
-          };
-        }
+        // Apply filters
+        addBatchFilter(userWhere, batch);
+        addDeptFilter(userWhere, dept);
 
-        // Department filter
-        if (dept && dept.trim() !== '') {
-          if (userWhere.profileInfo) {
-            // If we already have a profileInfo filter, we need to use AND logic
-            userWhere.AND = [
-              {
-                profileInfo: {
-                  path: ['department'],
-                  equals: dept,
-                }
-              }
-            ];
-          } else {
-            userWhere.profileInfo = {
-              path: ['department'],
-              equals: dept,
-            };
-          }
-        }
-
-        // Execute search
-        const userResults = await db.$transaction([
+        // Execute search in parallel
+        const [userCount, userData] = await Promise.all([
           db.user.count({ where: userWhere }),
           db.user.findMany({
             where: userWhere,
@@ -416,11 +381,11 @@ export async function GET(req: NextRequest) {
             orderBy,
             skip,
             take: limit,
-          }),
+          })
         ]);
 
-        totalCount = userResults[0];
-        searchResults = userResults[1];
+        totalCount = userCount;
+        searchResults = userData;
         break;
 
       default:
@@ -435,17 +400,89 @@ export async function GET(req: NextRequest) {
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    // --- New: Get counts for all categories for sidebar badges ---
-    const sidebarCounts = await db.$transaction([
-      db.project.count({ where: query ? { OR: [ { title: { contains: query, mode: 'insensitive' } }, { description: { contains: query, mode: 'insensitive' } } ] } : {} }),
-      db.repository.count({ where: query ? { OR: [ { name: { contains: query, mode: 'insensitive' } }, { description: { contains: query, mode: 'insensitive' } } ] } : {} }),
-      db.group.count({ where: query ? { OR: [ { name: { contains: query, mode: 'insensitive' } }, { description: { contains: query, mode: 'insensitive' } }, { groupUserName: { contains: query, mode: 'insensitive' } } ] } : {} }),
-      db.user.count({ where: { role: { in: ['STUDENT'] }, ...(query ? { OR: [ { firstName: { contains: query, mode: 'insensitive' } }, { lastName: { contains: query, mode: 'insensitive' } }, { userId: { contains: query, mode: 'insensitive' } }, { email: { contains: query, mode: 'insensitive' } } ] } : {}) } }),
-      db.user.count({ where: { role: { in: ['ADVISOR'] }, ...(query ? { OR: [ { firstName: { contains: query, mode: 'insensitive' } }, { lastName: { contains: query, mode: 'insensitive' } }, { userId: { contains: query, mode: 'insensitive' } }, { email: { contains: query, mode: 'insensitive' } } ] } : {}) } }),
-      db.user.count({ where: { role: { in: ['ADVISOR', 'EVALUATOR', 'STUDENT'] }, ...(query ? { OR: [ { firstName: { contains: query, mode: 'insensitive' } }, { lastName: { contains: query, mode: 'insensitive' } }, { userId: { contains: query, mode: 'insensitive' } }, { email: { contains: query, mode: 'insensitive' } } ] } : {}) } }),
+    // Only compute sidebar counts when on first page or explicitly requested
+    // This avoids unnecessary counts on pagination
+    if (page > 1 && !queryParams.includeCounts) {
+      // Return response without sidebar counts for better performance during pagination
+      const response = NextResponse.json({
+        data: searchResults,
+        type: typeToResultType[type],
+        pagination: {
+          totalCount,
+          totalPages,
+          currentPage: page,
+          limit,
+          hasNextPage,
+          hasPrevPage,
+        },
+        meta: {
+          query,
+          type,
+          filters: {
+            status,
+            advisorId,
+            batch,
+            dept,
+            role,
+          }
+        }
+      });
+      
+      // Add cache header for 1 minute
+      response.headers.set('Cache-Control', 'public, max-age=60');
+      return response;
+    }
+
+    // Compute sidebar counts for all categories in parallel for efficiency
+    const projectFilter = query ? {
+      OR: createTextSearchCondition(query, ['title', 'description']),
+      isPrivate: false
+    } : { isPrivate: false };
+
+    const repoFilter = query ? {
+      OR: createTextSearchCondition(query, ['name', 'description']),
+      isPrivate: false
+    } : { isPrivate: false };
+
+    const groupFilter = query ? {
+      OR: createTextSearchCondition(query, ['name', 'description', 'groupUserName']),
+    } : {};
+
+    const studentFilter = {
+      role: 'STUDENT' as const,
+      ...(query && { OR: createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']) })
+    };
+
+    const advisorFilter = {
+      role: 'ADVISOR' as const,
+      ...(query && { OR: createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']) })
+    };
+
+    const userRoles = ['ADVISOR', 'EVALUATOR', 'STUDENT'] as const;
+    const userFilter = {
+      role: { in: userRoles },
+      ...(query && { OR: createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']) })
+    };
+
+    // Run all sidebar count queries in parallel
+    const [
+      projectCount,
+      repoCount,
+      groupCount,
+      studentCount,
+      advisorCount,
+      userCount
+    ] = await Promise.all([
+      db.project.count({ where: projectFilter }),
+      db.repository.count({ where: repoFilter }),
+      db.group.count({ where: groupFilter }),
+      db.user.count({ where: studentFilter }),
+      db.user.count({ where: advisorFilter }),
+      db.user.count({ where: userFilter })
     ]);
 
-    return NextResponse.json({
+    // Create the response with full data including sidebar counts
+    const response = NextResponse.json({
       data: searchResults,
       type: typeToResultType[type],
       pagination: {
@@ -467,15 +504,20 @@ export async function GET(req: NextRequest) {
           role,
         },
         sidebarCounts: {
-          projects: sidebarCounts[0],
-          repositories: sidebarCounts[1],
-          groups: sidebarCounts[2],
-          students: sidebarCounts[3],
-          advisors: sidebarCounts[4],
-          users: sidebarCounts[5],
+          projects: projectCount,
+          repositories: repoCount,
+          groups: groupCount,
+          students: studentCount,
+          advisors: advisorCount,
+          users: userCount,
         }
       }
     });
+    
+    // Add cache headers - 60 seconds for search results
+    response.headers.set('Cache-Control', 'public, max-age=60');
+    
+    return response;
   } catch (error) {
     console.error('Error in search API:', error);
     return NextResponse.json(

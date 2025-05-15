@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
 import { z } from 'zod';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -21,7 +21,7 @@ export async function GET(
   try {
     const { groupUserName, projectId } = await params;
 
-    const group = await prisma.group.findUnique({
+    const group = await db.group.findUnique({
       where: { groupUserName },
       select: { groupUserName: true },
     });
@@ -34,7 +34,7 @@ export async function GET(
     }
 
     // Check if project exists and belongs to the specified group
-    const project = await prisma.project.findFirst({
+    const project = await db.project.findFirst({
       where: {
         id: projectId,
         groupUserName,
@@ -49,7 +49,7 @@ export async function GET(
     }
 
     // Get tasks for this project
-    const tasks = await prisma.task.findMany({
+    const tasks = await db.task.findMany({
       where: {
         projectId,
       },
@@ -101,7 +101,7 @@ export async function POST(
 
     const { groupUserName, projectId } = await params;
 
-    const group = await prisma.group.findUnique({
+    const group = await db.group.findUnique({
       where: { groupUserName },
       select: { groupUserName: true },
     });
@@ -114,7 +114,7 @@ export async function POST(
     }
 
     // Check if project exists and belongs to the specified group
-    const project = await prisma.project.findFirst({
+    const project = await db.project.findFirst({
       where: {
         id: projectId,
         groupUserName,
@@ -143,7 +143,7 @@ export async function POST(
 
     // If assigneeId is provided, check if user exists and is a member of the group
     if (assigneeId) {
-      const isMember = await prisma.groupMember.findUnique({
+      const isMember = await db.groupMember.findUnique({
         where: {
           groupUserName_userId: {
             groupUserName,
@@ -161,7 +161,7 @@ export async function POST(
     }
 
     // Create task
-    const task = await prisma.task.create({
+    const task = await db.task.create({
       data: {
         title,
         description,

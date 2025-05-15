@@ -12,11 +12,11 @@ interface CommitData {
   message: string
   timestamp: Date
   repository: {
-    id: string
+    name: string
     projects: {
-      projectId: string
-      repositoryId: string
       groupUserName: string
+      projectId: string
+      repositoryName: string
       assignedAt: Date
     }[]
   }
@@ -26,7 +26,7 @@ interface MergeRequestData {
   id: string
   title: string
   createdAt: Date
-  repositoryId: string
+  repositoryName: string
 }
 
 
@@ -207,7 +207,7 @@ export async function GET() {
           timestamp: true,
           repository: {
             select: {
-              id: true,
+              name: true,
               projects: true,
             },
           },
@@ -228,7 +228,7 @@ export async function GET() {
           id: true,
           title: true,
           createdAt: true,
-          repositoryId: true,
+          repositoryName: true,
         },
       })
       console.log(`Dashboard API: Found ${recentMergeRequests.length} recent merge requests`)
@@ -287,7 +287,7 @@ export async function GET() {
             id: `commit-${commit.id}`,
             type: "commit" as const,
             title: `Committed: ${commit.message.length > 50 ? commit.message.substring(0, 47) + '...' : commit.message}`,
-            description: `Repository #${commit.repository.id}`,
+            description: `Repository: ${commit.repository.name}`,
             timestamp: commit.timestamp,
             link: `/repository/${projectId}/commits/${commit.id}`,
           };
@@ -296,16 +296,16 @@ export async function GET() {
           id: `mr-${mr.id}`,
           type: "merge_request" as const,
           title: `Merge Request: ${mr.title}`,
-          description: `Repository #${mr.repositoryId}`,
+          description: `Repository: ${mr.repositoryName}`,
           timestamp: mr.createdAt,
-          link: `/repository/${mr.repositoryId}/merge-requests/${mr.id}`,
+          link: `/repository/${mr.repositoryName}/merge-requests/${mr.id}`,
         })),
         ...recentFeedback.map((fb) => ({
           id: `feedback-${fb.id}`,
           type: "feedback" as const,
           title: fb.author.userId === userId 
             ? `Feedback provided on ${fb.project?.title || 'project'}`
-            : `Feedback received from ${fb.author?.firstName + ' ' + fb.author?.firstName || 'Anonymous'}`,
+            : `Feedback received from ${fb.author?.firstName + ' ' + fb.author?.lastName || 'Anonymous'}`,
           description: fb.content.length > 60 ? fb.content.substring(0, 57) + '...' : fb.content,
           timestamp: fb.createdAt,
           link: `/feedback/${fb.id}`,
