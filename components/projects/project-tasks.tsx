@@ -9,16 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
+import {
   Calendar,
   CheckCircle2,
-  ClipboardList, 
-  Clock, 
-  Filter, 
-  Loader2, 
+  ClipboardList,
+  Clock,
+  Filter,
+  Loader2,
   Plus,
   Timer,
-  User
+  User,
+  AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -33,10 +34,10 @@ interface GroupMember {
 interface Task {
   id: string;
   title: string;
-  description: string;
-  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED';
+  description?: string;
+  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  deadline: string;
+  deadline?: string;
   createdAt: string;
   updatedAt: string;
   assigneeId?: string;
@@ -57,12 +58,14 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [error, setError] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    priority: 'MEDIUM',
+    priority: 'MEDIUM' as 'LOW' | 'MEDIUM' | 'HIGH',
     assigneeId: '',
-    deadline: ''
+    deadline: '',
   });
 
   // Fetch tasks
@@ -71,13 +74,12 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
       try {
         setIsLoading(true);
         const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/tasks`);
-
         if (!response.ok) {
-          throw new Error(`Failed to fetch tasks: ${response.statusText}`);
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Failed to fetch tasks: ${response.statusText}`);
         }
-
         const data = await response.json();
-        setTasks(Array.isArray(data) ? data : []);
+        setTasks(data.tasks || []);
       } catch (error) {
         console.error('Error fetching tasks:', error);
         setError(error instanceof Error ? error.message : 'Something went wrong');
@@ -96,15 +98,15 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
       try {
         setIsLoadingMembers(true);
         const response = await fetch(`/api/groups/${ownerId}/members`);
-
         if (!response.ok) {
-          throw new Error(`Failed to fetch group members: ${response.statusText}`);
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Failed to fetch group members: ${response.statusText}`);
         }
-
         const data = await response.json();
-        setGroupMembers(Array.isArray(data) ? data : []);
+        setGroupMembers(data || []);
       } catch (error) {
         console.error('Error fetching group members:', error);
+        setError(error instanceof Error ? error.message : 'Something went wrong');
         setGroupMembers([]);
       } finally {
         setIsLoadingMembers(false);
@@ -116,36 +118,50 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreatingTask(true);
+    setCreateError('');
     try {
+      // Convert deadline to ISO 8601 (e.g., "2025-06-01" -> "2025-06-01T00:00:00Z")
+      const deadline = newTask.deadline ? new Date(newTask.deadline).toISOString() : undefined;
+
       const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newTask),
+        body: JSON.stringify({
+          ...newTask,
+          deadline,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create task: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to create task: ${response.statusText}`);
       }
 
-      const createdTask = await response.json();
-      setTasks([createdTask, ...tasks]);
+      const data = await response.json();
+      setTasks([data.task, ...tasks]);
       setNewTask({
         title: '',
         description: '',
         priority: 'MEDIUM',
         assigneeId: '',
-        deadline: ''
+        deadline: '',
       });
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating task:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create task');
+      setCreateError(error instanceof Error ? error.message : 'Failed to create task');
+    } finally {
+      setIsCreatingTask(false);
     }
   };
 
-  const handleUpdateTaskStatus = async (taskId: string, newStatus: 'TODO' | 'IN_PROGRESS' | 'COMPLETED') => {
+  const handleUpdateTaskStatus = async (
+    taskId: string,
+    newStatus: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
+  ) => {
     try {
       const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/tasks/${taskId}`, {
         method: 'PATCH',
@@ -156,16 +172,14 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to update task: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to update task: ${response.statusText}`);
       }
 
-      // Update local state
-      setTasks(tasks.map(task => 
-        task.id === taskId ? { ...task, status: newStatus } : task
-      ));
+      setTasks(tasks.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
     } catch (error) {
       console.error('Error updating task:', error);
-      alert(error instanceof Error ? error.message : 'Failed to update task');
+      setCreateError(error instanceof Error ? error.message : 'Failed to update task');
     }
   };
 
@@ -190,26 +204,30 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
       case 'COMPLETED':
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'BLOCKED':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800/20 dark:text-gray-400';
     }
   };
 
-  const isTaskOverdue = (deadline: string) => {
+  const isTaskOverdue = (deadline?: string) => {
+    if (!deadline) return false;
     return new Date(deadline) < new Date() && new Date(deadline).getTime() !== 0;
   };
 
   const getAssigneeName = (assigneeId?: string) => {
     if (!assigneeId) return 'Unassigned';
-    const assignee = groupMembers.find(member => member.userId === assigneeId);
+    const assignee = groupMembers.find((member) => member.userId === assigneeId);
     return assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unknown';
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'No date set';
     try {
       return format(new Date(dateString), 'MMM d, yyyy');
     } catch (error) {
-      return 'No date set';
+      return 'Invalid date';
     }
   };
 
@@ -218,9 +236,7 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Tasks</CardTitle>
-          <CardDescription>
-            Create and manage tasks for this project
-          </CardDescription>
+          <CardDescription>Create and manage tasks for this project</CardDescription>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -234,6 +250,12 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
               <DialogTitle>Create New Task</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
+              {createError && (
+                <div className="flex items-center gap-2 text-sm text-red-500">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{createError}</span>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -252,7 +274,6 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                   rows={3}
                   value={newTask.description}
                   onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -260,9 +281,11 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                   <Label htmlFor="priority">Priority</Label>
                   <select
                     id="priority"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                    onChange={(e) =>
+                      setNewTask({ ...newTask, priority: e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' })
+                    }
                   >
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -276,7 +299,6 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                     type="date"
                     value={newTask.deadline}
                     onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                    required
                   />
                 </div>
               </div>
@@ -284,20 +306,41 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                 <Label htmlFor="assignee">Assign To</Label>
                 <select
                   id="assignee"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   value={newTask.assigneeId}
                   onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
                 >
                   <option value="">Unassigned</option>
-                  {!isLoadingMembers && groupMembers.map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.firstName} {member.lastName}
-                    </option>
-                  ))}
+                  {isLoadingMembers ? (
+                    <option disabled>Loading members...</option>
+                  ) : (
+                    groupMembers.map((member) => (
+                      <option key={member.userId} value={member.userId}>
+                        {member.firstName} {member.lastName}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
-              <div className="flex justify-end">
-                <Button type="submit">Create Task</Button>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  disabled={isCreatingTask}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isCreatingTask}>
+                  {isCreatingTask ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Task'
+                  )}
+                </Button>
               </div>
             </form>
           </DialogContent>
@@ -311,7 +354,8 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-10">
-            <p className="text-sm text-red-500">{error}</p>
+            <AlertCircle className="h-10 w-10 text-red-500" />
+            <p className="mt-4 text-sm text-red-500">{error}</p>
             <p className="mt-2 text-xs text-muted-foreground">
               Please try again later or contact support if the problem persists.
             </p>
@@ -323,10 +367,7 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
             <p className="text-sm text-muted-foreground mt-1 max-w-md">
               Create tasks to track work items and assign them to team members.
             </p>
-            <Button 
-              className="mt-4" 
-              onClick={() => setIsDialogOpen(true)}
-            >
+            <Button className="mt-4" onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               New Task
             </Button>
@@ -341,21 +382,25 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                     <TabsTrigger value="todo">To Do</TabsTrigger>
                     <TabsTrigger value="in-progress">In Progress</TabsTrigger>
                     <TabsTrigger value="completed">Completed</TabsTrigger>
+                    <TabsTrigger value="blocked">Blocked</TabsTrigger>
                   </TabsList>
                   <Button variant="outline" size="sm">
                     <Filter className="mr-2 h-4 w-4" />
                     Filter
                   </Button>
                 </div>
-                
+
                 <TabsContent value="all" className="space-y-4 mt-4">
-                  {tasks.map((task, index) => (
-                    <div key={task.id || `task-${index}`} className="border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                  {tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
+                    >
                       <div className="flex justify-between">
                         <div>
                           <h3 className="font-medium flex items-center">
                             {task.title}
-                            {isTaskOverdue(task?.deadline || '') && task.status !== 'COMPLETED' && (
+                            {isTaskOverdue(task.deadline) && task.status !== 'COMPLETED' && (
                               <span className="inline-flex ml-2 items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
                                 Overdue
                               </span>
@@ -363,16 +408,12 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                           </h3>
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <User className="h-3 w-3" />
-                            <span>Assigned to: {getAssigneeName(task?.assigneeId)}</span>
+                            <span>Assigned to: {getAssigneeName(task.assigneeId)}</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Badge className={getStatusColor(task?.status || 'TODO')}>
-                            {task?.status || 'TODO'}
-                          </Badge>
-                          <Badge className={getPriorityColor(task?.priority || 'MEDIUM')}>
-                            {task?.priority || 'MEDIUM'}
-                          </Badge>
+                          <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
+                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
                         </div>
                       </div>
                       <p className="mt-2 text-sm line-clamp-2">{task.description || 'No description'}</p>
@@ -380,18 +421,18 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {formatDate(task?.deadline || '')}
+                            {formatDate(task.deadline)}
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            Created {formatDate(task?.createdAt || '')}
+                            Created {formatDate(task.createdAt)}
                           </span>
                         </div>
                         <div className="flex gap-2">
                           {task.status !== 'COMPLETED' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleUpdateTaskStatus(task.id, 'COMPLETED')}
                             >
                               <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -399,13 +440,23 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                             </Button>
                           )}
                           {task.status === 'TODO' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
                             >
                               <Timer className="h-3 w-3 mr-1" />
                               Start
+                            </Button>
+                          )}
+                          {task.status !== 'BLOCKED' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateTaskStatus(task.id, 'BLOCKED')}
+                            >
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Block
                             </Button>
                           )}
                         </div>
@@ -413,17 +464,20 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                     </div>
                   ))}
                 </TabsContent>
-                
+
                 <TabsContent value="todo" className="space-y-4 mt-4">
                   {tasks
-                    .filter((task) => task?.status === 'TODO')
-                    .map((task, index) => (
-                      <div key={task.id || `todo-task-${index}`} className="border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                    .filter((task) => task.status === 'TODO')
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
+                      >
                         <div className="flex justify-between">
                           <div>
                             <h3 className="font-medium flex items-center">
                               {task.title}
-                              {isTaskOverdue(task?.deadline || '') && (
+                              {isTaskOverdue(task.deadline) && (
                                 <span className="inline-flex ml-2 items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
                                   Overdue
                                 </span>
@@ -431,49 +485,60 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                             </h3>
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                               <User className="h-3 w-3" />
-                              <span>Assigned to: {getAssigneeName(task?.assigneeId)}</span>
+                              <span>Assigned to: {getAssigneeName(task.assigneeId)}</span>
                             </div>
                           </div>
-                          <Badge className={getPriorityColor(task?.priority || 'MEDIUM')}>
-                            {task?.priority || 'MEDIUM'}
-                          </Badge>
+                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
                         </div>
                         <p className="mt-2 text-sm line-clamp-2">{task.description || 'No description'}</p>
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {formatDate(task?.deadline || '')}
+                              {formatDate(task.deadline)}
                             </span>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
-                          >
-                            <Timer className="h-3 w-3 mr-1" />
-                            Start
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
+                            >
+                              <Timer className="h-3 w-3 mr-1" />
+                              Start
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateTaskStatus(task.id, 'BLOCKED')}
+                            >
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Block
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
-                    {tasks.filter(task => task?.status === 'TODO').length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-6 text-center">
-                        <p className="text-sm text-muted-foreground">No to-do tasks</p>
-                      </div>
-                    )}
+                  {tasks.filter((task) => task.status === 'TODO').length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No to-do tasks</p>
+                    </div>
+                  )}
                 </TabsContent>
-                
+
                 <TabsContent value="in-progress" className="space-y-4 mt-4">
                   {tasks
-                    .filter((task) => task?.status === 'IN_PROGRESS')
-                    .map((task, index) => (
-                      <div key={task.id || `progress-task-${index}`} className="border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                    .filter((task) => task.status === 'IN_PROGRESS')
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
+                      >
                         <div className="flex justify-between">
                           <div>
                             <h3 className="font-medium flex items-center">
                               {task.title}
-                              {isTaskOverdue(task?.deadline || '') && (
+                              {isTaskOverdue(task.deadline) && (
                                 <span className="inline-flex ml-2 items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
                                   Overdue
                                 </span>
@@ -481,78 +546,138 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                             </h3>
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                               <User className="h-3 w-3" />
-                              <span>Assigned to: {getAssigneeName(task?.assigneeId)}</span>
+                              <span>Assigned to: {getAssigneeName(task.assigneeId)}</span>
                             </div>
                           </div>
-                          <Badge className={getPriorityColor(task?.priority || 'MEDIUM')}>
-                            {task?.priority || 'MEDIUM'}
-                          </Badge>
+                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
                         </div>
                         <p className="mt-2 text-sm line-clamp-2">{task.description || 'No description'}</p>
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {formatDate(task?.deadline || '')}
+                              {formatDate(task.deadline)}
                             </span>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleUpdateTaskStatus(task.id, 'COMPLETED')}
-                          >
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Complete
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateTaskStatus(task.id, 'COMPLETED')}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Complete
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateTaskStatus(task.id, 'BLOCKED')}
+                            >
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Block
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
-                    {tasks.filter(task => task?.status === 'IN_PROGRESS').length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-6 text-center">
-                        <p className="text-sm text-muted-foreground">No in-progress tasks</p>
-                      </div>
-                    )}
+                  {tasks.filter((task) => task.status === 'IN_PROGRESS').length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No in-progress tasks</p>
+                    </div>
+                  )}
                 </TabsContent>
-                
+
                 <TabsContent value="completed" className="space-y-4 mt-4">
                   {tasks
-                    .filter((task) => task?.status === 'COMPLETED')
-                    .map((task, index) => (
-                      <div key={task.id || `completed-task-${index}`} className="border rounded-lg p-4 hover:border-primary/50 transition-colors opacity-75">
+                    .filter((task) => task.status === 'COMPLETED')
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="border rounded-lg p-4 hover:border-primary/50 transition-colors opacity-75"
+                      >
                         <div className="flex justify-between">
                           <div>
-                            <h3 className="font-medium flex items-center">
-                              {task.title}
-                            </h3>
+                            <h3 className="font-medium flex items-center">{task.title}</h3>
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                               <User className="h-3 w-3" />
-                              <span>Completed by: {getAssigneeName(task?.assigneeId)}</span>
+                              <span>Completed by: {getAssigneeName(task.assigneeId)}</span>
                             </div>
                           </div>
-                          <Badge className={getPriorityColor(task?.priority || 'MEDIUM')}>
-                            {task?.priority || 'MEDIUM'}
-                          </Badge>
+                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
                         </div>
                         <p className="mt-2 text-sm line-clamp-2">{task.description || 'No description'}</p>
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {formatDate(task?.deadline || '')}
+                              {formatDate(task.deadline)}
                             </span>
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" />
-                              Completed on {formatDate(task?.updatedAt || '')}
+                              Completed on {formatDate(task.updatedAt)}
                             </span>
                           </div>
                         </div>
                       </div>
                     ))}
-                    {tasks.filter(task => task?.status === 'COMPLETED').length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-6 text-center">
-                        <p className="text-sm text-muted-foreground">No completed tasks</p>
+                  {tasks.filter((task) => task.status === 'COMPLETED').length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No completed tasks</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="blocked" className="space-y-4 mt-4">
+                  {tasks
+                    .filter((task) => task.status === 'BLOCKED')
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
+                      >
+                        <div className="flex justify-between">
+                          <div>
+                            <h3 className="font-medium flex items-center">
+                              {task.title}
+                              {isTaskOverdue(task.deadline) && (
+                                <span className="inline-flex ml-2 items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
+                                  Overdue
+                                </span>
+                              )}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <User className="h-3 w-3" />
+                              <span>Assigned to: {getAssigneeName(task.assigneeId)}</span>
+                            </div>
+                          </div>
+                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                        </div>
+                        <p className="mt-2 text-sm line-clamp-2">{task.description || 'No description'}</p>
+                        <div className="flex items-center justify-between mt-4">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(task.deadline)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateTaskStatus(task.id, 'TODO')}
+                            >
+                              <Timer className="h-3 w-3 mr-1" />
+                              Unblock
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    ))}
+                  {tasks.filter((task) => task.status === 'BLOCKED').length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No blocked tasks</p>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>
@@ -561,4 +686,4 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
       </CardContent>
     </Card>
   );
-} 
+}
