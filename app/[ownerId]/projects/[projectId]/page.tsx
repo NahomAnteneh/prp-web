@@ -102,7 +102,7 @@ export default function ProjectDetailsPage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : error || !project ? (
-          <div className="container mx-auto py-10 text-center">
+          <div className="container max-w-6xl mx-auto py-10 text-center">
             <div className="p-6 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400 mb-2">
                 Error Loading Project
@@ -113,7 +113,7 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
         ) : (
-          <div className="container mx-auto py-10">
+          <div className="container max-w-6xl mx-auto py-10">
             <Card className="mb-6">
               <CardHeader>
                 <div className="flex justify-between items-start flex-wrap gap-2">

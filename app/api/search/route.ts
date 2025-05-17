@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { formatTimeAgo } from '@/lib/utils';
 import { z } from 'zod';
+import type { Role } from '@prisma/client';
 
 // Schema for search parameters
 const searchQuerySchema = z.object({
@@ -182,12 +184,17 @@ export async function GET(req: NextRequest) {
           db.repository.findMany({
             where: repoWhere,
             include: {
-              // Repository owner is either a user or group
-              // Need to handle appropriately in the UI
+              owner: {
+                select: {
+                  name: true,
+                  leaderId: true,
+                },
+              },
               _count: {
                 select: {
                   commits: true,
                   branches: true,
+                  projects: true,
                 },
               },
             },
@@ -197,8 +204,29 @@ export async function GET(req: NextRequest) {
           })
         ]);
 
+        // Format repositories to match our standard format
+        const formattedRepos = repoData.map(repo => ({
+          name: repo.name,
+          description: repo.description,
+          isPrivate: repo.isPrivate,
+          createdAt: repo.createdAt,
+          updatedAt: repo.updatedAt,
+          lastActivity: formatTimeAgo(repo.updatedAt),
+          ownerId: repo.ownerId,
+          groupUserName: repo.groupUserName,
+          group: {
+            name: repo.owner.name,
+            leaderId: repo.owner.leaderId,
+          },
+          stats: {
+            commits: repo._count.commits,
+            branches: repo._count.branches,
+            projects: repo._count.projects,
+          },
+        }));
+
         totalCount = repoCount;
-        searchResults = repoData;
+        searchResults = formattedRepos;
         break;
 
       case 'groups':
@@ -449,16 +477,16 @@ export async function GET(req: NextRequest) {
     } : {};
 
     const studentFilter = {
-      role: 'STUDENT' as const,
+      role: 'STUDENT' as Role,
       ...(query && { OR: createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']) })
     };
 
     const advisorFilter = {
-      role: 'ADVISOR' as const,
+      role: 'ADVISOR' as Role,
       ...(query && { OR: createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']) })
     };
 
-    const userRoles = ['ADVISOR', 'EVALUATOR', 'STUDENT'] as const;
+    const userRoles: Role[] = ['STUDENT', 'ADVISOR', 'EVALUATOR'];
     const userFilter = {
       role: { in: userRoles },
       ...(query && { OR: createTextSearchCondition(query, ['firstName', 'lastName', 'userId', 'email']) })

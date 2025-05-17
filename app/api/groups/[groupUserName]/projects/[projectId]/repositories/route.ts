@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { formatTimeAgo } from '@/lib/utils';
 import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
@@ -28,7 +29,11 @@ export async function GET(
     // Check if group exists
     const group = await db.group.findUnique({
       where: { groupUserName },
-      select: { groupUserName: true },
+      select: { 
+        groupUserName: true,
+        name: true,
+        leaderId: true,
+      },
     });
 
     if (!group) {
@@ -94,23 +99,43 @@ export async function GET(
             isPrivate: true,
             createdAt: true,
             updatedAt: true,
+            ownerId: true,
+            _count: {
+              select: {
+                commits: true,
+                branches: true,
+                projects: true,
+              },
+            },
           },
         },
       },
     });
 
-    const repositories = projectRepositories.map(pr => ({
+    // Format repositories for consistent response
+    const formattedRepositories = projectRepositories.map(pr => ({
       name: pr.repository.name,
-      groupUserName: pr.groupUserName,
       description: pr.repository.description,
       isPrivate: pr.repository.isPrivate,
       createdAt: pr.repository.createdAt,
       updatedAt: pr.repository.updatedAt,
+      lastActivity: formatTimeAgo(pr.repository.updatedAt),
+      ownerId: pr.repository.ownerId,
+      groupUserName: pr.groupUserName,
       assignedAt: pr.assignedAt,
+      group: {
+        name: group.name,
+        leaderId: group.leaderId,
+      },
+      stats: {
+        commits: pr.repository._count.commits,
+        branches: pr.repository._count.branches,
+        projects: pr.repository._count.projects,
+      },
     }));
 
     return NextResponse.json({
-      repositories,
+      repositories: formattedRepositories,
     });
   } catch (error) {
     console.error('Error fetching project repositories:', error);
@@ -131,7 +156,11 @@ export async function POST(
 
     const group = await db.group.findUnique({
       where: { groupUserName },
-      select: { groupUserName: true },
+      select: { 
+        groupUserName: true,
+        name: true,
+        leaderId: true,
+      },
     });
 
     if (!group) {
@@ -177,6 +206,15 @@ export async function POST(
           groupUserName,
         },
       },
+      include: {
+        _count: {
+          select: {
+            commits: true,
+            branches: true,
+            projects: true,
+          },
+        },
+      },
     });
 
     if (!repository) {
@@ -214,17 +252,40 @@ export async function POST(
           select: {
             name: true,
             description: true,
+            isPrivate: true,
+            createdAt: true,
+            updatedAt: true,
+            ownerId: true,
           },
         },
       },
     });
 
+    // Format repository for consistent response
+    const formattedRepository = {
+      name: projectRepository.repository.name,
+      description: projectRepository.repository.description,
+      isPrivate: projectRepository.repository.isPrivate,
+      createdAt: projectRepository.repository.createdAt,
+      updatedAt: projectRepository.repository.updatedAt,
+      lastActivity: formatTimeAgo(projectRepository.repository.updatedAt),
+      ownerId: projectRepository.repository.ownerId,
+      groupUserName: projectRepository.groupUserName,
+      assignedAt: projectRepository.assignedAt,
+      group: {
+        name: group.name,
+        leaderId: group.leaderId,
+      },
+      stats: {
+        commits: repository._count.commits,
+        branches: repository._count.branches,
+        projects: repository._count.projects + 1, // +1 for newly linked project
+      },
+    };
+
     return NextResponse.json({
       message: 'Repository linked to project successfully',
-      repository: {
-        name: projectRepository.repository.name,
-        description: projectRepository.repository.description,
-      },
+      repository: formattedRepository,
     }, { status: 201 });
   } catch (error) {
     console.error('Error linking repository to project:', error);

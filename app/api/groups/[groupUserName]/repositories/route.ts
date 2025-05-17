@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { formatTimeAgo } from '@/lib/utils';
 import { z } from 'zod';
 
 // Schema for creating a new repository
@@ -57,6 +58,7 @@ export async function GET(
         owner: {
           select: {
             name: true,
+            leaderId: true,
           },
         },
         projects: {
@@ -67,6 +69,13 @@ export async function GET(
                 title: true,
               },
             },
+          },
+        },
+        _count: {
+          select: {
+            commits: true,
+            branches: true,
+            projects: true,
           },
         },
       },
@@ -82,11 +91,33 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({
-      repositories: repositories.map((repo) => ({
-        ...repo,
-        isPrivate: repo.isPrivate ? 'private' : 'public',
+    // Format repositories for consistent response
+    const formattedRepositories = repositories.map(repo => ({
+      name: repo.name,
+      description: repo.description,
+      isPrivate: repo.isPrivate,
+      createdAt: repo.createdAt,
+      updatedAt: repo.updatedAt,
+      lastActivity: formatTimeAgo(repo.updatedAt),
+      ownerId: repo.ownerId,
+      groupUserName: repo.groupUserName,
+      group: {
+        name: repo.owner.name,
+        leaderId: repo.owner.leaderId,
+      },
+      projects: repo.projects.map(p => ({
+        id: p.project.id,
+        title: p.project.title,
       })),
+      stats: {
+        commits: repo._count.commits,
+        branches: repo._count.branches,
+        projects: repo._count.projects,
+      },
+    }));
+
+    return NextResponse.json({
+      repositories: formattedRepositories,
       pagination: {
         total,
         offset,
@@ -129,6 +160,7 @@ export async function POST(
       select: {
         groupUserName: true,
         name: true,
+        leaderId: true,
       },
     });
 
@@ -163,7 +195,7 @@ export async function POST(
 
     const { name, description, isPrivate } = validationResult.data;
 
-    // Create repository with initial commit in a transaction
+    // Create repository without initial commit in a transaction
     const result = await db.$transaction(async (tx) => {
       // Check if a repository with this name already exists for this group
       const existingRepo = await tx.repository.findUnique({
@@ -192,49 +224,34 @@ export async function POST(
           owner: {
             select: {
               name: true,
+              leaderId: true,
             },
           },
-        },
-      });
-
-      // Create initial commit
-      const initialCommit = await tx.commit.create({
-        data: {
-          id: `commit-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
-          message: 'Initial commit',
-          timestamp: new Date(),
-          repositoryName: repository.name,
-          repositoryGroup: repository.groupUserName,
-          authorId: session?.user.userId ?? 'unknown-author', // Provide a fallback value for authorId
-          parentCommitIDs: [],
-        },
-      });
-
-      // Create main branch
-      await tx.branch.create({
-        data: {
-          name: 'main',
-          repositoryName: repository.name,
-          repositoryGroup: repository.groupUserName,
-          headCommitId: initialCommit.id,
         },
       });
 
       return repository;
     });
 
-    // Format response
+    // Format response using consistent format
     const formattedRepository = {
       name: result.name,
       description: result.description,
-      isPrivate: result.isPrivate ? 'private' : 'public',
+      isPrivate: result.isPrivate,
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
+      lastActivity: formatTimeAgo(result.updatedAt),
+      ownerId: result.ownerId,
       groupUserName: result.groupUserName,
       group: {
         name: group.name,
+        leaderId: group.leaderId,
       },
-      ownerId: result.ownerId,
+      stats: {
+        commits: 0, // No initial commit
+        branches: 0, // No initial branch
+        projects: 0,
+      },
     };
 
     return NextResponse.json(
@@ -251,12 +268,12 @@ export async function POST(
     if (error instanceof Error && error.message.includes('already exists')) {
       return NextResponse.json(
         { message: error.message },
-        { status: 409 }
+        { status: 409 } // Conflict status code
       );
     }
-    
+
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Failed to create repository' },
       { status: 500 }
     );
   }

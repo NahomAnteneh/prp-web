@@ -3,8 +3,29 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Repository } from '@prisma/client';
 import Link from 'next/link';
+
+// Updated interface based on standardized API response
+interface Repository {
+  name: string;
+  description: string;
+  isPrivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastActivity: string;
+  ownerId: string;
+  groupUserName: string;
+  group: {
+    name: string;
+    leaderId: string;
+    groupUserName?: string;
+  };
+  stats: {
+    commits: number;
+    branches: number;
+    projects: number;
+  };
+}
 
 interface TopRepositoriesProps {
   limit?: number;
@@ -40,22 +61,25 @@ export function TopRepositories({ limit = 5 }: TopRepositoriesProps) {
       <h2 className="text-2xl font-bold text-center">Top Repositories</h2>
       <div className="grid gap-4 max-w-3xl mx-auto">
         {repositories.map((repo) => (
-          <Link href={`/repositories/${repo.id}`} key={repo.id}>
+          <Link href={`/${repo.groupUserName}/${repo.name}`} key={`${repo.groupUserName}-${repo.name}`}>
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="line-clamp-1">{repo.name}</CardTitle>
                 <CardDescription className="line-clamp-2">
-                  {repo.description}
+                  {repo.description || "No description provided"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {repo.isPrivate && (
                     <Badge variant="secondary">Private</Badge>
                   )}
                   <Badge variant="outline">
-                    {repo.groupId ? 'Group Repository' : 'Personal Repository'}
+                    {repo.group.name}
                   </Badge>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {repo.lastActivity}
+                  </span>
                 </div>
               </CardContent>
             </Card>

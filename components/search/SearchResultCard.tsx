@@ -27,19 +27,23 @@ export function SearchResultCard({ type, data }: SearchResultCardProps) {
     );
   }
   if (type === 'repository') {
-    // Repository owner might not exist due to DB schema changes
-    const ownerName = data.owner?.name || "Unknown";
-    const ownerPath = data.owner?.groupUserName || "";
-    
+    // Use the standardized repository format
     return (
       <Card className="mb-4 p-4 flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <a href={`/${ownerPath}/${data.name}`} className="font-semibold text-blue-700 hover:underline text-lg">{data.name}</a>
+          <a href={`/${data.groupUserName}/${data.name}`} className="font-semibold text-blue-700 hover:underline text-lg">{data.name}</a>
+          {data.isPrivate && <Badge variant="outline" className="ml-2 text-xs">Private</Badge>}
         </div>
-        <div className="text-sm text-muted-foreground line-clamp-2">{data.description}</div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-          <span>Commits: {data._count?.commits ?? 0}</span>
-          <span>Branches: {data._count?.branches ?? 0}</span>
+        <div className="text-sm text-muted-foreground line-clamp-2">{data.description || "No description provided"}</div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+            <span>Commits: {data.stats?.commits ?? 0}</span>
+            <span>Branches: {data.stats?.branches ?? 0}</span>
+            <span>Group: <a href={`/${data.groupUserName}`} className="hover:underline">{data.group?.name}</a></span>
+          </div>
+          {data.lastActivity && (
+            <span className="text-xs text-muted-foreground">{data.lastActivity}</span>
+          )}
         </div>
       </Card>
     );

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { formatTimeAgo } from "@/lib/utils"
 import { z } from "zod"
 
 const userIdSchema = z.string().min(1)
@@ -115,34 +116,4 @@ export async function GET(
       { status: 500 }
     )
   }
-}
-
-// Helper function to format time ago
-function formatTimeAgo(date: Date): string {
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  
-  if (diffInSeconds < 60) {
-    return `${diffInSeconds} seconds ago`
-  }
-  
-  const diffInMinutes = Math.floor(diffInSeconds / 60)
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`
-  }
-  
-  const diffInHours = Math.floor(diffInMinutes / 60)
-  if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`
-  }
-  
-  const diffInDays = Math.floor(diffInHours / 24)
-  if (diffInDays < 30) {
-    return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`
-  }
-  
-  return new Intl.DateTimeFormat('en-US', { 
-    month: 'short', 
-    day: 'numeric' 
-  }).format(date)
 }

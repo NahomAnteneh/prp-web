@@ -4,16 +4,16 @@ import * as React from 'react';
 import { useDropzone } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, FileIcon } from 'lucide-react';
 
-export interface FileUploadProps extends React.HTMLAttributes<HTMLDivElement> {
-  onChange: (files: File[]) => void;
+export interface FileUploadProps {
   value?: File[];
+  onChange: (files: File[]) => void;
   multiple?: boolean;
   maxFiles?: number;
-  maxSize?: number;
-  accept?: Record<string, string[]>;
+  maxSize?: number; // In bytes
   disabled?: boolean;
+  accept?: Record<string, string[]>;
   className?: string;
 }
 
@@ -27,7 +27,7 @@ export function FileUpload({
   disabled = false,
   className,
   ...props
-}: FileUploadProps) {
+}: FileUploadProps & Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'>) {
   const [files, setFiles] = React.useState<File[]>(value);
 
   React.useEffect(() => {
@@ -105,33 +105,27 @@ export function FileUpload({
 
       {files.length > 0 && (
         <div className="space-y-2">
-          {files.map((file, index) => (
+          {files.map((file, i) => (
             <div
-              key={index}
-              className="flex items-center justify-between p-2 border rounded-md"
+              key={i}
+              className="flex items-center justify-between bg-muted p-3 rounded-md text-sm"
             >
-              <div className="flex items-center space-x-2 truncate">
-                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-muted rounded-md">
-                  <span className="text-xs font-medium">
-                    {file.name.split('.').pop()?.toUpperCase()}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(file.size / 1024).toFixed(2)} KB
-                  </p>
-                </div>
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <FileIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{file.name}</span>
+                <span className="text-muted-foreground">
+                  ({Math.round(file.size / 1024)} KB)
+                </span>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => removeFile(index)}
+                className="h-7 w-7"
+                onClick={() => removeFile(i)}
                 disabled={disabled}
               >
                 <X className="h-4 w-4" />
-                <span className="sr-only">Remove file</span>
               </Button>
             </div>
           ))}

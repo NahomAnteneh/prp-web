@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { formatTimeAgo } from '@/lib/utils';
 import { z } from 'zod';
 
 // Schema for repository updates
@@ -55,6 +56,13 @@ export async function GET(
             },
           },
         },
+        _count: {
+          select: {
+            commits: true,
+            branches: true,
+            projects: true,
+          },
+        },
       },
     });
 
@@ -65,7 +73,34 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(repository);
+    // Format repository for consistent response structure
+    const formattedRepository = {
+      name: repository.name,
+      description: repository.description,
+      isPrivate: repository.isPrivate,
+      createdAt: repository.createdAt,
+      updatedAt: repository.updatedAt,
+      lastActivity: formatTimeAgo(repository.updatedAt),
+      ownerId: repository.ownerId,
+      groupUserName: repository.groupUserName,
+      group: {
+        name: repository.owner.name,
+        leaderId: repository.owner.leaderId,
+      },
+      branches: repository.branches,
+      projects: repository.projects.map(p => ({
+        id: p.project.id,
+        title: p.project.title,
+        status: p.project.status,
+      })),
+      stats: {
+        commits: repository._count.commits,
+        branches: repository._count.branches,
+        projects: repository._count.projects,
+      },
+    };
+
+    return NextResponse.json(formattedRepository);
   } catch (error) {
     console.error('Error fetching repository:', error);
     return NextResponse.json(
@@ -126,12 +161,41 @@ export async function PATCH(
         owner: {
           select: {
             name: true,
+            leaderId: true,
+          },
+        },
+        _count: {
+          select: {
+            commits: true,
+            branches: true,
+            projects: true,
           },
         },
       },
     });
 
-    return NextResponse.json(updatedRepository);
+    // Format updated repository for consistent response
+    const formattedRepository = {
+      name: updatedRepository.name,
+      description: updatedRepository.description,
+      isPrivate: updatedRepository.isPrivate,
+      createdAt: updatedRepository.createdAt,
+      updatedAt: updatedRepository.updatedAt,
+      lastActivity: formatTimeAgo(updatedRepository.updatedAt),
+      ownerId: updatedRepository.ownerId,
+      groupUserName: updatedRepository.groupUserName,
+      group: {
+        name: updatedRepository.owner.name,
+        leaderId: updatedRepository.owner.leaderId,
+      },
+      stats: {
+        commits: updatedRepository._count.commits,
+        branches: updatedRepository._count.branches,
+        projects: updatedRepository._count.projects,
+      },
+    };
+
+    return NextResponse.json(formattedRepository);
   } catch (error) {
     console.error('Error updating repository:', error);
     return NextResponse.json(

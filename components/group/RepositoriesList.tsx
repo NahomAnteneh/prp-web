@@ -10,21 +10,30 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GitBranch, ExternalLink, Calendar, Lock, Globe } from 'lucide-react';
+import { GitBranch, ExternalLink, Calendar, Lock, Globe, Code } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import CreateRepositoryModal from './CreateRepositoryModal';
 
 interface Repository {
   name: string;
-  groupUserName: string;
   description: string;
-  isPrivate: string | boolean;
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
-  owner: {
+  lastActivity: string;
+  ownerId: string;
+  groupUserName: string;
+  group: {
     name: string;
+    leaderId: string;
   };
+  stats: {
+    commits: number;
+    branches: number;
+    projects: number;
+  };
+  projects?: { id: string; title: string }[];
 }
 
 interface RepositoryResponse {
@@ -76,31 +85,20 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
 
       // Normalize repositories
       const repositories = (Array.isArray(data.repositories) ? data.repositories : []).map((repo: any) => {
-        // Handle the string values from the API ('private' or 'public') 
-        // or boolean values if they exist
-        let convertedIsPrivate: boolean;
-        
-        if (repo.isPrivate === undefined) {
-          convertedIsPrivate = false;
-        } else if (typeof repo.isPrivate === 'boolean') {
-          convertedIsPrivate = repo.isPrivate;
-        } else if (typeof repo.isPrivate === 'string') {
-          convertedIsPrivate = repo.isPrivate === 'private';
-        } else {
-          convertedIsPrivate = Boolean(repo.isPrivate);
-        }
-        
+        // Our API now consistently returns isPrivate as boolean
         return {
           ...repo,
-          isPrivate: convertedIsPrivate
+          // Make sure isPrivate is a boolean if it somehow isn't
+          isPrivate: typeof repo.isPrivate === 'boolean' ? repo.isPrivate : Boolean(repo.isPrivate)
         };
       });
       
-      // Debug the isPrivate property after conversion
-      console.log('Repository data:', repositories.map((repo: Repository) => ({
+      // Debug the repository data
+      console.log('Repository data processed:', repositories.map((repo: Repository) => ({
         name: repo.name,
         isPrivate: repo.isPrivate,
-        typeOfIsPrivate: typeof repo.isPrivate
+        typeOfIsPrivate: typeof repo.isPrivate,
+        lastActivity: repo.lastActivity
       })));
 
       const normalizedData: RepositoryResponse = {
@@ -256,41 +254,21 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
                             {repo.name}
                           </Link>
                         </h3>
-                        {/* Debug isPrivate value at render time (invisible to user) */}
-                        {(() => { 
-                          // Convert to boolean if it's still a string at render time
-                          const isPrivateBoolean = typeof repo.isPrivate === 'string' 
-                            ? repo.isPrivate === 'private'
-                            : Boolean(repo.isPrivate);
-                          console.log(`Rendering ${repo.name} with isPrivate=${repo.isPrivate} (${typeof repo.isPrivate})`);
-                          return null;
-                        })()}
                         <Badge
-                          className={`${getVisibilityColor(typeof repo.isPrivate === 'string' 
-                            ? repo.isPrivate === 'private' 
-                            : Boolean(repo.isPrivate))}`}
+                          className={`${getVisibilityColor(repo.isPrivate)} border`}
                         >
-                          {typeof repo.isPrivate === 'string' 
-                            ? repo.isPrivate === 'private'
-                            : Boolean(repo.isPrivate) ? (
-                            <span className="flex items-center gap-1">
-                              <Lock className="h-3 w-3" /> Private
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <Globe className="h-3 w-3" /> Public
-                            </span>
-                          )}
+                          {repo.isPrivate ? <Lock className="h-3 w-3 mr-1" /> : <Globe className="h-3 w-3 mr-1" />}
+                          {repo.isPrivate ? 'Private' : 'Public'}
                         </Badge>
                       </div>
                       <p className="text-muted-foreground text-sm mb-2">
                         {repo.description}
                       </p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Created {formatDate(repo.createdAt)}
-                        </span>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="text-sm text-muted-foreground flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {repo.lastActivity}
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end mt-2 md:mt-0">
@@ -301,6 +279,18 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
                           </span>
                         </Link>
                       </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mt-3 text-sm text-muted-foreground">
+                    <div className="flex space-x-4">
+                      <span className="flex items-center">
+                        <GitBranch className="h-4 w-4 mr-1" />
+                        {repo.stats.branches} branch{repo.stats.branches !== 1 ? 'es' : ''}
+                      </span>
+                      <span className="flex items-center">
+                        <Code className="h-4 w-4 mr-1" />
+                        {repo.stats.commits} commit{repo.stats.commits !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                 </div>

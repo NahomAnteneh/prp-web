@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 // Validation schema for creating a repository
 const createRepositorySchema = z.object({
@@ -30,6 +31,7 @@ interface CreateRepositoryModalProps {
 }
 
 export default function CreateRepositoryModal({ isOpen, onClose, groupUserName, groupName, onRepositoryCreated }: CreateRepositoryModalProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -94,11 +96,14 @@ export default function CreateRepositoryModal({ isOpen, onClose, groupUserName, 
       }
 
       toast.success('Repository created', {
-        description: `Repository "${data.name}" created successfully for group "${groupName}".`,
+        description: `Repository "${data.repository.name}" created successfully for group "${groupName}".`,
       });
 
       onClose();
       resetForm();
+      // Redirect to the new repository page
+      router.push(`/${data.repository.groupUserName}/${data.repository.name}`);
+      // Also call the callback to update the UI if needed
       onRepositoryCreated();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Something went wrong';

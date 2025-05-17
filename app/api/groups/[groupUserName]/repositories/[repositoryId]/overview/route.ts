@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { formatTimeAgo } from '@/lib/utils';
 
 export async function GET(
   req: NextRequest,
@@ -37,8 +38,6 @@ export async function GET(
       },
     });
 
-    console.log('Repository:', repository);
-
     if (!repository) {
       return NextResponse.json(
         { error: 'Repository not found or does not belong to the specified group' },
@@ -73,6 +72,7 @@ export async function GET(
           select: {
             commits: true,
             branches: true,
+            projects: true,
           },
         },
       },
@@ -107,18 +107,21 @@ export async function GET(
 
         return {
           name: repo.name,
-          groupUserName: repo.groupUserName,
           description: repo.description,
           isPrivate: repo.isPrivate,
-          owner: repo.owner
-            ? {
-                name: repo.owner.name,
-                leaderId: repo.owner.leaderId,
-              }
-            : null,
+          createdAt: repo.createdAt,
+          updatedAt: repo.updatedAt,
+          lastActivity: formatTimeAgo(repo.updatedAt),
+          ownerId: repo.ownerId,
+          groupUserName: repo.groupUserName,
+          group: {
+            name: repo.owner.name,
+            leaderId: repo.owner.leaderId,
+          },
           stats: {
             commits: repo._count.commits,
             branches: repo._count.branches,
+            projects: repo._count.projects || 0,
           },
           defaultBranch: defaultBranch
             ? {
