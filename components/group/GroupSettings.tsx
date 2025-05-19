@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, Trash2, UserPlus, Image, Users, Settings, User } from 'lucide-react';
+import { Loader2, Trash2, UserPlus, Image, Users, Settings, User, Code } from 'lucide-react';
 import { z } from 'zod';
 import { Group, GroupInvite } from '@prisma/client';
 import {
@@ -47,6 +47,7 @@ const inviteSchema = z.object({
 
 interface GroupSettingsProps {
   group: Group & {
+    id: string;
     members: { userId: string; userName?: string; displayName?: string; email?: string; role?: string }[];
     invites: GroupInvite[];
   };
@@ -59,7 +60,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
   const { data: session } = useSession();
   const [activeSection, setActiveSection] = useState('general');
   const [isLoading, setIsLoading] = useState(false);
-  const [groupUserName, setGroupUserName] = useState(group.groupUserName);
+  const [groupUserName, setGroupUserName] = useState(group.groupUserName || '');
   const [groupUserNameError, setGroupUserNameError] = useState('');
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
@@ -81,6 +82,29 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
     canCreateRepositories: false,
     canInviteMembers: false,
   });
+
+  // Fetch active invites when component mounts
+  useEffect(() => {
+    if (isLeader && group.groupUserName) {
+      fetchActiveInvites();
+    }
+  }, [group.groupUserName, isLeader]);
+
+  // Function to fetch active invites from the API
+  const fetchActiveInvites = async () => {
+    if (!group.groupUserName) return;
+
+    try {
+      const response = await fetch(`/api/groups/${group.groupUserName}/invite-code`);
+      const data = await response.json();
+
+      if (response.ok && data.invitations) {
+        setInvites(data.invitations);
+      }
+    } catch (error) {
+      console.error('Failed to fetch active invites:', error);
+    }
+  };
 
   // Sidebar navigation items
   const navItems = [
@@ -130,9 +154,16 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       return;
     }
 
+    if (!group.groupUserName) {
+      toast.error('Group username is missing', {
+        description: 'Unable to update group username. Please try refreshing the page.',
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groupUserName: groupUserName.trim() }),
@@ -167,12 +198,19 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       return;
     }
 
+    if (!group.groupUserName) {
+      toast.error('Group username is missing', {
+        description: 'Unable to update profile picture. Please try refreshing the page.',
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const formData = new FormData();
       formData.append('profilePicture', profilePicture);
 
-      const response = await fetch(`/api/groups/${group.id}/profile-picture`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/profile-picture`, {
         method: 'POST',
         body: formData,
       });
@@ -201,14 +239,6 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
 
   // Create invite
   const handleCreateInvite = async () => {
-    setInviteError('');
-    const validationResult = inviteSchema.safeParse({ email: inviteEmail || undefined });
-
-    if (!validationResult.success) {
-      setInviteError(validationResult.error.flatten().fieldErrors.email?.[0] || '');
-      return;
-    }
-
     if (group.members.length >= maxGroupSize) {
       toast.error('Group is full', {
         description: `Cannot invite more members. Maximum group size is ${maxGroupSize}.`,
@@ -216,12 +246,22 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       return;
     }
 
+    if (!group.groupUserName) {
+      toast.error('Group username is missing', {
+        description: 'Unable to create invite. Please try refreshing the page.',
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/invites`, {
+      // Use the correct API endpoint for generating invitation codes
+      const response = await fetch(`/api/groups/${group.groupUserName}/invite-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim() || null }),
+        body: JSON.stringify({ 
+          groupUserName: group.groupUserName 
+        }),
       });
 
       const data = await response.json();
@@ -230,17 +270,16 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
         throw new Error(data.message || 'Failed to create invite');
       }
 
-      toast.success('Invite created', {
-        description: inviteEmail
-          ? `Invitation sent to ${inviteEmail}.`
-          : `Invitation code generated: ${data.code}`,
+      toast.success('Invite code generated', {
+        description: `Invitation code: ${data.inviteCode}`,
       });
-      setInvites([...invites, data]);
-      setInviteEmail('');
+      
+      // Refresh the list of invites from the server
+      fetchActiveInvites();
       setShowInviteDialog(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error creating invite', {
+      toast.error('Error generating invite code', {
         description: errorMessage,
       });
     } finally {
@@ -250,9 +289,16 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
 
   // Revoke invite
   const handleRevokeInvite = async (inviteId: string) => {
+    if (!group.groupUserName) {
+      toast.error('Group username is missing', {
+        description: 'Unable to revoke invite. Please try refreshing the page.',
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/invites/${inviteId}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/invites/${inviteId}`, {
         method: 'DELETE',
       });
 
@@ -265,7 +311,9 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       toast.success('Invite revoked', {
         description: 'The invitation has been revoked.',
       });
-      setInvites(invites.filter((invite) => invite.id !== inviteId));
+      
+      // Refresh the invites list instead of manually filtering
+      fetchActiveInvites();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
       toast.error('Error revoking invite', {
@@ -278,9 +326,16 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
 
   // Delete group
   const handleDeleteGroup = async () => {
+    if (!group.groupUserName) {
+      toast.error('Group username is missing', {
+        description: 'Unable to delete group. Please try refreshing the page.',
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}`, {
         method: 'DELETE',
       });
 
@@ -311,14 +366,22 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
   const handleUpdateMemberRole = async () => {
     if (!memberToEdit) return;
     
+    if (!group.groupUserName) {
+      toast.error('Group username is missing', {
+        description: 'Unable to update member role. Please try refreshing the page.',
+      });
+      return;
+    }
+    
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/members/${memberToEdit.userId}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/members/${memberToEdit.userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           role: selectedRole,
-          permissions: selectedRole === 'custom' ? memberPermissions : roles.find(r => r.id === selectedRole)?.permissions
+          permissions: selectedRole === 'custom' ? memberPermissions : roles.find(r => r.id === selectedRole)?.permissions,
+          groupUserName: group.groupUserName
         }),
       });
 
@@ -329,7 +392,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       }
 
       toast.success('Member role updated', {
-        description: `Member role has been updated.`,
+        description: `Member role has been updated to ${selectedRole}.`,
       });
       onUpdate();
       setShowRoleDialog(false);
@@ -396,7 +459,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium">Group Username</Label>
-              <p className="text-sm text-muted-foreground">{group.groupUserName}</p>
+              <p className="text-sm text-muted-foreground">{group.groupUserName || 'Not set'}</p>
             </div>
             <div>
               <Label className="text-sm font-medium">Members</Label>
@@ -414,7 +477,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
     <div className="flex flex-col md:flex-row gap-6">
       {/* Sidebar */}
       <aside className="w-full md:w-64 shrink-0">
-        <Card className="border border-gray-200 dark:border-gray-700">
+        <Card className="border border-gray-200 dark:border-gray-700 sticky top-4 shadow-sm">
           <CardContent className="p-4">
             {/* Mobile Dropdown */}
             <div className="md:hidden mb-4">
@@ -422,13 +485,16 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                 value={activeSection}
                 onValueChange={setActiveSection}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white dark:bg-gray-800">
                   <SelectValue placeholder="Select a section" />
                 </SelectTrigger>
                 <SelectContent>
                   {navItems.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.label}
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -458,17 +524,19 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
 
       {/* Main Content */}
       <main className="flex-1">
-        <Card className="border border-gray-200 dark:border-gray-700">
+        <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
           <CardContent className="p-6">
             {activeSection === 'general' && (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-lg font-semibold mb-2">Group Username</h2>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Update your group's unique username.
+                    Update your group's unique username. This will be used for your repositories and projects.
                   </p>
                   <div className="max-w-md space-y-2">
+                    <Label htmlFor="groupUserName">Username</Label>
                     <Input
+                      id="groupUserName"
                       value={groupUserName}
                       onChange={(e) => {
                         setGroupUserName(e.target.value);
@@ -485,7 +553,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                     <Button
                       onClick={handleUpdateGroupUserName}
                       disabled={isLoading || groupUserName === group.groupUserName}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      className="bg-blue-600 hover:bg-blue-700 text-white mt-2"
                     >
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -500,7 +568,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                   <p className="text-sm text-muted-foreground mb-4">
                     Upload a profile picture for your group (JPEG, PNG, or GIF, max 5MB).
                   </p>
-                  <div className="flex items-center gap-4 max-w-md">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 max-w-md">
                     {profilePicturePreview ? (
                       <img
                         src={profilePicturePreview}
@@ -512,8 +580,10 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                         <Users className="h-8 w-8 text-gray-500 dark:text-gray-400" />
                       </div>
                     )}
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-2 w-full">
+                      <Label htmlFor="profilePicture">Upload image</Label>
                       <Input
+                        id="profilePicture"
                         type="file"
                         accept="image/jpeg,image/png,image/gif"
                         onChange={handleProfilePictureChange}
@@ -548,40 +618,52 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                     disabled={group.members.length >= maxGroupSize || isLoading}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
-                    <UserPlus className="h-4 w-4 mr-2" /> Invite Member
+                    <Code className="h-4 w-4 mr-2" /> Generate Invitation Code
                   </Button>
                 </div>
                 {invites.length > 0 && (
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-md font-semibold mb-2">Active Invites</h3>
-                    <ul className="space-y-4">
+                    <h3 className="text-md font-semibold mb-4">Active Invites</h3>
+                    <div className="grid gap-4 md:grid-cols-2">
                       {invites.map((invite) => (
-                        <li
+                        <div
                           key={invite.id}
-                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700"
+                          className="flex flex-col p-4 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
                         >
-                          <div>
-                            <p className="text-sm font-medium">
-                              {invite.email
-                                ? `Email: ${invite.email}`
-                                : `Code: ${invite.code}`}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Expires: {new Date(invite.expiresAt).toLocaleDateString()}
-                            </p>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">Invitation Code</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRevokeInvite(invite.id)}
+                              disabled={isLoading}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 h-8 w-8 p-0"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRevokeInvite(invite.id)}
-                            disabled={isLoading}
-                            className="border-gray-300 dark:border-gray-600 text-red-600 hover:text-red-700"
-                          >
-                            Revoke
-                          </Button>
-                        </li>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-mono text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                              {invite.code}
+                            </p>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => {
+                                navigator.clipboard.writeText(invite.code);
+                                toast.success('Copied to clipboard');
+                              }}
+                            >
+                              <Image className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-auto">
+                            Expires: {new Date(invite.expiresAt).toLocaleDateString()}
+                          </p>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
               </div>
@@ -596,26 +678,31 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                   </p>
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
                     <h3 className="text-md font-semibold mb-4">Members</h3>
-                    <ul className="space-y-4">
+                    <div className="space-y-4">
                       {group.members.map((member) => (
-                        <li
+                        <div
                           key={member.userId}
-                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
                         >
-                          <div className="flex items-center space-x-3">
-                            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0">
                               <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                             </div>
                             <div>
                               <p className="text-sm font-medium">
                                 {member.displayName || member.userName || 'Unknown User'}
+                                {member.userId === group.leaderId && (
+                                  <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100">
+                                    Leader
+                                  </span>
+                                )}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {member.email || 'No email available'}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2 ml-13">
                             <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 py-1 px-2 rounded-full">
                               {member.role || 'Member'}
                             </span>
@@ -623,15 +710,15 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                               variant="outline"
                               size="sm"
                               onClick={() => handleOpenRoleDialog(member)}
-                              disabled={isLoading || member.userId === session?.user.userId}
+                              disabled={isLoading || member.userId === session?.user.userId || member.userId === group.leaderId}
                               className="border-gray-300 dark:border-gray-600"
                             >
                               Edit Role
                             </Button>
                           </div>
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -640,8 +727,8 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
             {activeSection === 'danger' && (
               <div>
                 <h2 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h2>
-                <div className="border border-red-300 dark:border-red-800 rounded-md p-6">
-                  <div className="flex items-center justify-between">
+                <div className="border border-red-300 dark:border-red-800 rounded-md p-6 bg-red-50 dark:bg-red-900/10">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium">Delete this group</p>
                       <p className="text-sm text-muted-foreground">
@@ -650,7 +737,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                     </div>
                     <Button
                       variant="outline"
-                      className="border-red-300 dark:border-red-800 text-red-600 hover:text-red-700"
+                      className="border-red-300 dark:border-red-800 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 sm:self-start"
                       onClick={() => setShowDeleteDialog(true)}
                       disabled={isLoading}
                     >
@@ -668,29 +755,19 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="border-gray-200 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Invite a Member</DialogTitle>
+            <DialogTitle>Generate Invitation Code</DialogTitle>
             <DialogDescription>
-              Invite a new member by email or generate an invitation code.
+              Create an invitation code that can be shared with new members
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="inviteEmail">Email (Optional)</Label>
-              <Input
-                id="inviteEmail"
-                value={inviteEmail}
-                onChange={(e) => {
-                  setInviteEmail(e.target.value);
-                  setInviteError('');
-                }}
-                placeholder="Enter email address"
-                className={`border-gray-300 dark:border-gray-600 ${inviteError ? 'border-red-500' : ''}`}
-              />
-              {inviteError && <p className="text-sm text-red-500">{inviteError}</p>}
-              <p className="text-sm text-muted-foreground">
-                Leave blank to generate an invitation code that can be shared manually.
-              </p>
-            </div>
+            <p className="text-sm">
+              This will generate a unique invitation code that you can share with new members. 
+              They can use this code to join your group.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              The code will expire after 24 hours.
+            </p>
           </div>
           <DialogFooter>
             <Button
@@ -708,7 +785,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                'Create Invite'
+                'Generate Code'
               )}
             </Button>
           </DialogFooter>

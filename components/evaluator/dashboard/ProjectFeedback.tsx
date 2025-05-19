@@ -56,7 +56,7 @@ export default function ProjectFeedback() {
     try {
       setRefreshing(true);
       
-      const response = await fetch('/api/evaluator/feedback');
+      const response = await fetch('/api/evaluator/project-feedback');
       
       if (!response.ok) {
         throw new Error(`Failed to fetch feedback: ${response.statusText}`);
@@ -64,14 +64,18 @@ export default function ProjectFeedback() {
       
       const data = await response.json();
       
-      // Transform the dates in the response
-      const transformedFeedbacks = data.map((feedback: any) => ({
-        ...feedback,
-        createdAt: new Date(feedback.createdAt),
-        responses: feedback.responses.map((response: any) => ({
+      // Transform the data format to match our component
+      const transformedFeedbacks = data.map((item: any) => ({
+        id: item.id,
+        projectTitle: item.targetName || 'Untitled Project',
+        groupName: item.groupName || 'Unknown Group',
+        content: item.content,
+        status: item.status,
+        createdAt: new Date(item.createdAt),
+        responses: item.responses?.map((response: any) => ({
           ...response,
           createdAt: new Date(response.createdAt),
-        })),
+        })) || [],
       }));
       
       setFeedbacks(transformedFeedbacks);
@@ -87,7 +91,7 @@ export default function ProjectFeedback() {
 
   const sendFeedbackResponse = async (feedbackId: string, content: string) => {
     try {
-      const response = await fetch(`/api/evaluator/feedback/${feedbackId}/respond`, {
+      const response = await fetch(`/api/evaluator/project-feedback/${feedbackId}/respond`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,12 +109,16 @@ export default function ProjectFeedback() {
       setFeedbacks(prevFeedbacks => 
         prevFeedbacks.map(feedback => 
           feedback.id === feedbackId ? {
-            ...updatedFeedback,
-            createdAt: new Date(updatedFeedback.createdAt),
-            responses: updatedFeedback.responses.map((response: any) => ({
-              ...response,
-              createdAt: new Date(response.createdAt),
-            })),
+            ...feedback,
+            content: updatedFeedback.content,
+            status: updatedFeedback.status,
+            responses: [
+              ...feedback.responses,
+              ...(updatedFeedback.responses || []).map((response: any) => ({
+                ...response,
+                createdAt: new Date(response.createdAt),
+              })),
+            ],
           } : feedback
         )
       );
@@ -130,7 +138,7 @@ export default function ProjectFeedback() {
 
   const updateFeedbackStatus = async (feedbackId: string, status: 'OPEN' | 'ADDRESSED' | 'CLOSED') => {
     try {
-      const response = await fetch(`/api/evaluator/feedback/${feedbackId}/status`, {
+      const response = await fetch(`/api/evaluator/project-feedback/${feedbackId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -148,12 +156,8 @@ export default function ProjectFeedback() {
       setFeedbacks(prevFeedbacks => 
         prevFeedbacks.map(feedback => 
           feedback.id === feedbackId ? {
-            ...updatedFeedback,
-            createdAt: new Date(updatedFeedback.createdAt),
-            responses: updatedFeedback.responses.map((response: any) => ({
-              ...response,
-              createdAt: new Date(response.createdAt),
-            })),
+            ...feedback,
+            status: updatedFeedback.status,
           } : feedback
         )
       );

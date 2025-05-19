@@ -57,11 +57,16 @@ export default function CompletedEvaluations() {
       
       const data = await response.json();
       
-      // Transform the dates in the response
+      // Transform the API data to match our component's expected format
       const transformedEvaluations = data.map((evaluation: any) => ({
-        ...evaluation,
-        submissionDate: new Date(evaluation.submissionDate),
+        id: evaluation.id,
+        projectTitle: evaluation.projectTitle,
+        groupName: evaluation.groupName,
+        submissionDate: evaluation.submissionDate ? new Date(evaluation.submissionDate) : new Date(),
         evaluationDate: new Date(evaluation.evaluationDate),
+        score: evaluation.score || 0,
+        category: getEvaluationCategory(evaluation.score || 0),
+        feedbackCount: evaluation.criteria?.length || 0
       }));
       
       setEvaluations(transformedEvaluations);
@@ -73,6 +78,15 @@ export default function CompletedEvaluations() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  // Helper function to categorize evaluations based on score
+  const getEvaluationCategory = (score: number): string => {
+    if (score >= 90) return 'Excellent';
+    if (score >= 80) return 'Good';
+    if (score >= 70) return 'Satisfactory';
+    if (score >= 60) return 'Needs Improvement';
+    return 'Unsatisfactory';
   };
 
   const downloadEvaluationReport = async (evaluationId: string) => {
