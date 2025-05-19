@@ -94,6 +94,14 @@ export async function GET(
         archived: true,
         createdAt: true,
         updatedAt: true,
+        advisorId: true,
+        advisor: {
+          select: {
+            userId: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         group: {
           select: {
             groupUserName: true,
@@ -136,6 +144,10 @@ export async function GET(
       archived: project.archived,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
+      advisor: project.advisor ? {
+        id: project.advisor.userId,
+        name: `${project.advisor.firstName} ${project.advisor.lastName}`,
+      } : null,
       group: {
         groupUserName: project.group.groupUserName,
         name: project.group.name,

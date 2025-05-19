@@ -93,7 +93,7 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
         const membersData = await membersResponse.json();
 
         setTasks(tasksData.tasks || []);
-        setGroupMembers(membersData || []);
+        setGroupMembers(membersData.members || []);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error instanceof Error ? error.message : 'Failed to load project data');
@@ -185,19 +185,6 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
   };
 
   // Helper functions
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'HIGH':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      case 'MEDIUM':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
-      case 'LOW':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/20 dark:text-gray-400';
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'TODO':
@@ -208,6 +195,19 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
       case 'BLOCKED':
         return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/20 dark:text-gray-400';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'HIGH':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      case 'MEDIUM':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+      case 'LOW':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800/20 dark:text-gray-400';
     }
@@ -448,9 +448,7 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                         id="priority"
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         value={newTask.priority}
-                        onChange={(e) =>
-                          setNewTask({ ...newTask, priority: e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' })
-                        }
+                        onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' })}
                       >
                         <option value="LOW">Low</option>
                         <option value="MEDIUM">Medium</option>
@@ -526,10 +524,10 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
               <div className="flex items-center justify-between mb-6">
                 <TabsList>
                   <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="todo">To Do</TabsTrigger>
-                  <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-                  <TabsTrigger value="completed">Completed</TabsTrigger>
-                  <TabsTrigger value="blocked">Blocked</TabsTrigger>
+                  <TabsTrigger value="TODO">To Do</TabsTrigger>
+                  <TabsTrigger value="IN_PROGRESS">In Progress</TabsTrigger>
+                  <TabsTrigger value="DONE">Completed</TabsTrigger>
+                  <TabsTrigger value="BLOCKED">Blocked</TabsTrigger>
                 </TabsList>
                 <Button variant="outline" size="sm" className="h-9">
                   <Filter className="mr-2 h-4 w-4" />
@@ -541,19 +539,19 @@ export function ProjectTasks({ ownerId, projectId }: ProjectTasksProps) {
                 <TaskList tasks={tasks} />
               </TabsContent>
 
-              <TabsContent value="todo">
+              <TabsContent value="TODO">
                 <TaskList tasks={tasks.filter((task) => task.status === 'TODO')} />
               </TabsContent>
 
-              <TabsContent value="in-progress">
+              <TabsContent value="IN_PROGRESS">
                 <TaskList tasks={tasks.filter((task) => task.status === 'IN_PROGRESS')} />
               </TabsContent>
 
-              <TabsContent value="completed">
+              <TabsContent value="DONE">
                 <TaskList tasks={tasks.filter((task) => task.status === 'DONE')} />
               </TabsContent>
 
-              <TabsContent value="blocked">
+              <TabsContent value="BLOCKED">
                 <TaskList tasks={tasks.filter((task) => task.status === 'BLOCKED')} />
               </TabsContent>
             </Tabs>

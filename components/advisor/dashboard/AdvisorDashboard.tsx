@@ -292,7 +292,7 @@ export default function AdvisorDashboard() {
   const handleAcceptRequest = async (requestId: string) => {
     try {
       setProcessingRequestId(requestId);
-      const response = await fetch('/api/advisor-requests/handle', {
+      const response = await fetch('/api/advisor/requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -333,7 +333,7 @@ export default function AdvisorDashboard() {
   const handleRejectRequest = async (requestId: string) => {
     try {
       setProcessingRequestId(requestId);
-      const response = await fetch('/api/advisor-requests/handle', {
+      const response = await fetch('/api/advisor/requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -338,7 +338,7 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       <h3 className="text-lg font-semibold">
-                        <Link href={`/groups/${project.group.id}/projects/${project.id}`} className="hover:text-primary transition-colors">
+                        <Link href={`/${project.group.groupUserName}/projects/${project.id}`} className="hover:text-primary transition-colors">
                           {project.title}
                         </Link>
                       </h3>
@@ -373,7 +373,7 @@ export default function ProjectsList({ userId, isOwner = false }: ProjectsListPr
                 
                 <div className="flex justify-between items-center">
                   <Button asChild size="sm" variant="outline">
-                    <Link href={`/projects/${project.id}`}>
+                    <Link href={`/${project.group.groupUserName}/projects/${project.id}`}>
                       <ExternalLink className="h-4 w-4 mr-2" /> View Project
                     </Link>
                   </Button>

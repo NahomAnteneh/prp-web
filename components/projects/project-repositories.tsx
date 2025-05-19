@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { 
   GitBranchPlus, 
   GitFork, 
@@ -15,21 +16,39 @@ import {
   Plus, 
   Search,
   Check,
-  X
+  X,
+  Globe,
+  Lock,
+  Calendar,
+  ExternalLink,
+  GitBranch,
+  Code,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import CreateRepositoryModal from '@/components/group/CreateRepositoryModal';
 
-// Update interface to match the API response
 interface Repository {
   name: string;
-  description: string | null;
+  description: string;
   isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
-  groupUserName?: string;
+  lastActivity: string;
+  ownerId: string;
+  groupUserName: string;
+  group: {
+    name: string;
+    leaderId: string;
+  };
+  stats: {
+    commits: number;
+    branches: number;
+    projects: number;
+  };
+  projects?: { id: string; title: string }[];
 }
 
 interface ProjectRepositoriesProps {
@@ -48,6 +67,8 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
   const [selectedRepositories, setSelectedRepositories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [groupName, setGroupName] = useState('');
+  const [repoToRemove, setRepoToRemove] = useState<string | null>(null);
+  const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchRepositories = async () => {
@@ -227,6 +248,39 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
     }
   };
 
+  const handleRemoveRepository = async (repoName: string) => {
+    try {
+      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories/${repoName}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to remove repository: ${response.statusText}`);
+      }
+
+      // Refresh repositories list after removal
+      const refreshResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/repositories`);
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setRepositories(refreshData.repositories || []);
+      }
+
+      toast.success(`Successfully removed repository: ${repoName}`);
+      setIsRemoveDialogOpen(false);
+      setRepoToRemove(null);
+    } catch (error) {
+      console.error('Error removing repository:', error);
+      toast.error('Error removing repository', {
+        description: error instanceof Error ? error.message : 'Failed to remove repository'
+      });
+    }
+  };
+
+  const openRemoveDialog = (repoName: string) => {
+    setRepoToRemove(repoName);
+    setIsRemoveDialogOpen(true);
+  };
+
   const filteredGroupRepositories = searchQuery 
     ? groupRepositories.filter(repo => 
         repo.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -299,24 +353,90 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
           </div>
         ) : (
           <div className="space-y-4">
-            {repositories.map((repo) => (
+            {repositories.map((repo) => {
+            if (!repo || !repo.name) {
+              console.warn('Skipping invalid repository:', repo);
+              return null;
+            }
+
+              const getVisibilityColor = (isPrivate: boolean) => {
+    if (isPrivate) {
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800';
+    } else {
+      return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800';
+    }
+  };
+
+            return (
               <div
-                key={repo.name}
-                className="flex flex-col gap-2 p-4 rounded-lg border"
+                key={`${repo.groupUserName}-${repo.name}`}
+                className="rounded-lg border hover:border-primary transition-colors overflow-hidden"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{repo.name}</h3>
-                    {repo.isPrivate && <Badge variant="outline">Private</Badge>}
+                <div className="p-5">
+                  <div className="flex flex-col md:flex-row justify-between md:items-start gap-2 mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <h3 className="text-lg font-semibold">
+                          <Link href={`/${repo.groupUserName}/${repo.name}`} className="hover:text-primary transition-colors">
+                            {repo.name}
+                          </Link>
+                        </h3>
+                        <Badge
+                          className={`${getVisibilityColor(repo.isPrivate)} border`}
+                        >
+                          {repo.isPrivate ? <Lock className="h-3 w-3 mr-1" /> : <Globe className="h-3 w-3 mr-1" />}
+                          {repo.isPrivate ? 'Private' : 'Public'}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground text-sm mb-2">
+                        {repo.description}
+                      </p>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="text-sm text-muted-foreground flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {repo.lastActivity}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end mt-2 md:mt-0">
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openRemoveDialog(repo.name);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/${repo.groupUserName}/${repo.name}`}>
+                            <span className="flex items-center gap-1">
+                              View Repository <ExternalLink className="h-3 w-3 ml-1" />
+                            </span>
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mt-3 text-sm text-muted-foreground">
+                    <div className="flex space-x-4">
+                      <span className="flex items-center">
+                        <GitBranch className="h-4 w-4 mr-1" />
+                        {repo.stats.branches} branch{repo.stats.branches !== 1 ? 'es' : ''}
+                      </span>
+                      <span className="flex items-center">
+                        <Code className="h-4 w-4 mr-1" />
+                        {repo.stats.commits} commit{repo.stats.commits !== 1 ? 's' : ''}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{repo.description || "No description provided"}</p>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                  <span>Created: {format(new Date(repo.createdAt), 'MMM d, yyyy')}</span>
-                  <span>Last updated: {format(new Date(repo.updatedAt), 'MMM d, yyyy')}</span>
-                </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
       </CardContent>
@@ -381,6 +501,7 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
               )}
             </div>
             
+            
             <div className="flex justify-end gap-2 mt-4">
               <Button 
                 variant="outline" 
@@ -407,6 +528,35 @@ export function ProjectRepositories({ ownerId, projectId }: ProjectRepositoriesP
         groupName={groupName}
         onRepositoryCreated={handleRepositoryCreated}
       />
+
+      {/* Remove Repository Confirmation Dialog */}
+      <Dialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove Repository</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>Are you sure you want to remove <span className="font-medium">{repoToRemove}</span> from this project?</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              This will only unlink the repository from this project. The repository itself will not be deleted.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsRemoveDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => repoToRemove && handleRemoveRepository(repoToRemove)}
+            >
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 } 

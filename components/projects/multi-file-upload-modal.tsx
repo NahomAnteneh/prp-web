@@ -1,24 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { FileUpload } from '@/components/ui/file-upload';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Updated to match API schema
+// Updated Document interface to match our other components
 interface Document {
   id: string;
   title: string;
-  content?: string;
-  type?: string;
-  url?: string;
+  content?: string | null;
+  type?: string | null;
+  url: string;
+  size?: number | null;
+  category: string;
   createdAt: string;
-  category?: string;
-  size?: number;
+  projectId: string;
+  uploadedById?: string | null;
+  uploadedBy?: {
+    userId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
 }
 
 interface MultiFileUploadModalProps {
@@ -26,7 +34,7 @@ interface MultiFileUploadModalProps {
   onClose: () => void;
   ownerId: string;
   projectId: string;
-  onSuccess: (newDocuments: Document[]) => void;
+  onSuccess: (documents: Document[]) => void;
 }
 
 export function MultiFileUploadModal({ 
@@ -95,27 +103,8 @@ export function MultiFileUploadModal({
             throw new Error(`Failed to upload ${file.name}: ${response.status} ${response.statusText}`);
           }
 
-          const data = await response.json();
-          
-          // Handle placeholder response
-          if (data.message === 'Document creation feature coming soon') {
-            // Create a temporary document object for the UI
-            const tempDocument: Document = {
-              id: data.document?.id || `temp-${Math.random().toString(36).substr(2, 9)}`,
-              title: fileName,
-              content: '',
-              type: file.type,
-              createdAt: new Date().toISOString(),
-              category: category,
-              size: file.size,
-              url: URL.createObjectURL(file) // Create temporary URL for preview
-            };
-            uploadedDocuments.push(tempDocument);
-          } else {
-            // Use the actual document data
-            const newDocument = data.document || data;
-            uploadedDocuments.push(newDocument);
-          }
+          const document = await response.json();
+          uploadedDocuments.push(document);
         } catch (error) {
           console.error(`Error uploading ${file.name}:`, error);
           failedUploads.push(file.name);
@@ -164,11 +153,14 @@ export function MultiFileUploadModal({
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>Upload Multiple Documents</DialogTitle>
+          <DialogDescription>
+            Upload multiple files at once to your project.
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-5 pt-4">
           <div className="grid gap-4">
             <Label>Files</Label>
             <FileUpload 
@@ -195,20 +187,23 @@ export function MultiFileUploadModal({
           
           <div className="grid gap-2">
             <Label htmlFor="category">Category for all files</Label>
-            <select
-              id="category"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+            <Select 
+              value={category} 
+              onValueChange={setCategory}
               disabled={isUploading}
             >
-              <option value="general">General</option>
-              <option value="report">Report</option>
-              <option value="diagram">Diagram</option>
-              <option value="proposal">Proposal</option>
-              <option value="presentation">Presentation</option>
-              <option value="other">Other</option>
-            </select>
+              <SelectTrigger id="category">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">General</SelectItem>
+                <SelectItem value="report">Report</SelectItem>
+                <SelectItem value="diagram">Diagram</SelectItem>
+                <SelectItem value="proposal">Proposal</SelectItem>
+                <SelectItem value="presentation">Presentation</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           {isUploading && (
@@ -224,9 +219,9 @@ export function MultiFileUploadModal({
           )}
           
           {errors.length > 0 && (
-            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-md">
-              <h4 className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">Upload Errors:</h4>
-              <ul className="text-xs text-red-700 dark:text-red-400 list-disc pl-4 space-y-1">
+            <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md">
+              <h4 className="text-sm font-medium text-red-800 dark:text-red-300 mb-2">Failed uploads:</h4>
+              <ul className="text-xs text-red-700 dark:text-red-400 space-y-1">
                 {errors.map((error, index) => (
                   <li key={index}>{error}</li>
                 ))}
@@ -234,7 +229,7 @@ export function MultiFileUploadModal({
             </div>
           )}
           
-          <div className="flex justify-end gap-2">
+          <DialogFooter className="mt-6">
             <Button 
               type="button" 
               variant="outline" 
@@ -243,17 +238,20 @@ export function MultiFileUploadModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={files.length === 0 || isUploading}>
+            <Button 
+              type="submit" 
+              disabled={files.length === 0 || isUploading}
+            >
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Uploading...
                 </>
               ) : (
-                'Upload All'
+                'Upload Files'
               )}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

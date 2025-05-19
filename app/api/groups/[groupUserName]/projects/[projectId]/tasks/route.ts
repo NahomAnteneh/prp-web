@@ -19,7 +19,7 @@ export async function GET(
   { params }: { params: { groupUserName: string; projectId: string } }
 ) {
   try {
-    const { groupUserName, projectId } = params;
+    const { groupUserName, projectId } = await params;
 
     // Check if group exists
     const group = await db.group.findUnique({
@@ -95,7 +95,7 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const { groupUserName, projectId } = params;
+    const { groupUserName, projectId } = await params;
 
     // Verify the creator is a group member
     const isCreatorMember = await db.groupMember.findUnique({
@@ -176,7 +176,7 @@ export async function POST(
         projectId,
         assigneeId,
         creatorId: session.user.userId,
-      },
+      } as any,
       include: {
         assignee: {
           select: { userId: true, firstName: true, lastName: true },

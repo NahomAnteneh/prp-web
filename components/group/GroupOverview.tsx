@@ -3,6 +3,8 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { FolderGit2, GitFork, CalendarPlus, UserPlus } from 'lucide-react';
 
 // Extended group interface to include the nested properties
 interface ExtendedGroup {
@@ -31,6 +33,20 @@ interface ExtendedGroup {
       lastName?: string;
     };
   }>;
+  // In a real app, we would have activities data coming from the backend
+  // This is a mock interface for demonstration purposes
+  activities?: Array<{
+    id: string;
+    type: 'project_created' | 'repository_created' | 'member_added' | 'other';
+    timestamp: Date;
+    actor?: {
+      userId: string;
+      firstName?: string;
+      lastName?: string;
+    };
+    entityName?: string;
+    entityId?: string;
+  }>;
 }
 
 export default function GroupOverview({
@@ -48,152 +64,218 @@ export default function GroupOverview({
     day: 'numeric',
   });
 
+  // Mock activities data (in a real app, this would come from the backend)
+  const mockActivities = [
+    {
+      id: '1',
+      type: 'project_created' as const,
+      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      actor: group.members?.[0]?.user,
+      entityName: group.projects?.[0]?.title || 'New Project',
+      entityId: group.projects?.[0]?.id || '1',
+    },
+    {
+      id: '2',
+      type: 'repository_created' as const,
+      timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      actor: group.members?.[0]?.user,
+      entityName: group.repositories?.[0]?.name || 'New Repository',
+      entityId: group.repositories?.[0]?.id || '1',
+    },
+    {
+      id: '3',
+      type: 'member_added' as const, 
+      timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+      actor: { userId: group.leaderId, firstName: 'Group', lastName: 'Admin' },
+      entityName: group.members?.[1]?.user?.firstName + ' ' + group.members?.[1]?.user?.lastName || 'New Member',
+      entityId: group.members?.[1]?.userId || '2',
+    },
+  ];
+
+  // Function to render activity icon based on type
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'project_created':
+        return <CalendarPlus className="h-4 w-4 text-blue-500" />;
+      case 'repository_created':
+        return <GitFork className="h-4 w-4 text-green-500" />;
+      case 'member_added':
+        return <UserPlus className="h-4 w-4 text-purple-500" />;
+      default:
+        return <FolderGit2 className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  // Function to format activity text
+  const getActivityText = (activity: typeof mockActivities[0]) => {
+    const actorName = activity.actor?.firstName ? 
+      `${activity.actor.firstName} ${activity.actor.lastName || ''}` : 
+      'Someone';
+    
+    switch (activity.type) {
+      case 'project_created':
+        return (
+          <span>
+            <span className="font-medium">{actorName}</span> created a new project{' '}
+            <Link href={`/projects/${activity.entityId}`} className="font-medium text-blue-600 hover:underline">
+              {activity.entityName}
+            </Link>
+          </span>
+        );
+      case 'repository_created':
+        return (
+          <span>
+            <span className="font-medium">{actorName}</span> created a new repository{' '}
+            <Link href={`/groups/${group.groupUserName}/repositories/${activity.entityName}`} className="font-medium text-green-600 hover:underline">
+              {activity.entityName}
+            </Link>
+          </span>
+        );
+      case 'member_added':
+        return (
+          <span>
+            <span className="font-medium">{actorName}</span> added{' '}
+            <Link href={`/${activity.entityId}`} className="font-medium text-purple-600 hover:underline">
+              {activity.entityName}
+            </Link>{' '}
+            to the group
+          </span>
+        );
+      default:
+        return <span>Unknown activity</span>;
+    }
+  };
+
+  // Format timestamp to relative time
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInSec = Math.floor(diffInMs / 1000);
+    const diffInMin = Math.floor(diffInSec / 60);
+    const diffInHour = Math.floor(diffInMin / 60);
+    const diffInDay = Math.floor(diffInHour / 24);
+
+    if (diffInDay > 30) {
+      return date.toLocaleDateString();
+    } else if (diffInDay > 0) {
+      return `${diffInDay} day${diffInDay > 1 ? 's' : ''} ago`;
+    } else if (diffInHour > 0) {
+      return `${diffInHour} hour${diffInHour > 1 ? 's' : ''} ago`;
+    } else if (diffInMin > 0) {
+      return `${diffInMin} minute${diffInMin > 1 ? 's' : ''} ago`;
+    } else {
+      return 'Just now';
+    }
+  };
+
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {/* Left Section: Group Profile, Overview, and Repositories */}
-      <div className="col-span-3">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Left Content (Profile and Recent Activities) */}
+      <div className="lg:col-span-2 space-y-6">
         {/* Group Profile Card */}
-        <Card className="mb-4">
-          <CardContent className="flex items-start pt-6">
-            <Avatar className="h-20 w-20 mr-4 bg-blue-100">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pt-6">
+            <Avatar className="h-20 w-20 bg-blue-50">
               <AvatarFallback>
                 {group.name?.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <CardTitle className="text-2xl font-bold text-black">{group.name}</CardTitle>
+            <div className="text-center sm:text-left">
+              <CardTitle className="text-2xl font-bold">{group.name}</CardTitle>
               <p className="text-gray-500 text-sm">@{group.groupUserName}</p>
-              <p className="text-gray-500 text-sm">{group.description || "No description provided."}</p>
+              <p className="text-gray-500 text-sm mt-2">{group.description || "No description provided."}</p>
+              <div className="flex flex-wrap gap-3 mt-4">
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-blue-600 font-medium">{group.projects?.length || 0}</span>
+                  <span className="text-gray-600">Projects</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-green-600 font-medium">{group.repositories?.length || 0}</span>
+                  <span className="text-gray-600">Repositories</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-purple-600 font-medium">{group.members?.length || 0}</span>
+                  <span className="text-gray-600">Members</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-gray-600">Created:</span>
+                  <span className="text-gray-600 font-medium">{formattedCreatedAt}</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Group Overview Card */}
-        <Card className="mb-6">
-      <CardContent className="p-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold text-blue-800">Projects</p>
-              <p className="text-lg font-bold text-blue-600">
-                {group.projects?.length || 0}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold text-green-800">Repositories</p>
-              <p className="text-lg font-bold text-green-600">
-                {group.repositories?.length || 0}
-              </p>
-            </CardContent>
-          </Card>
-          {/* <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold text-purple-800">Members</p>
-              <p className="text-lg font-bold text-purple-600">
-                {group.members?.length || 0}
-              </p>
-            </CardContent>
-          </Card> */}
-          <Card className="bg-orange-50 border-orange-200">
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold text-orange-800">Created On</p>
-              <p className="text-lg font-bold text-orange-600">
-                {formattedCreatedAt}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </CardContent>
-    </Card>
-        {/* Repositories & Projects Section */}
-        <h3 className="text-base font-semibold mb-2 px-1">Repositories & Projects</h3>
-
-        {/* Conditional Rendering: Check if there's anything to display */}
-        {(!group.repositories || group.repositories.length === 0) &&
-        (!group.projects || group.projects.length === 0) ? (
-          <Card className="border-dashed mt-1 bg-muted/20">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-muted-foreground italic">
-                No repositories or projects found.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-2 gap-2.5 mt-1">
-            {/* Map over Top 3 Repositories */}
-            {group.repositories?.slice(0, 3).map((repo) => (
-              <Link
-                key={`repo-${repo.id || repo.name}`}
-                href={`/groups/${repo.groupUserName || group.groupUserName}/repositories/${repo.name}`}
-                className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <Card className="hover:border-primary/50 hover:bg-muted/40 transition-all duration-150 cursor-pointer h-full flex flex-col shadow-sm border">
-                  <CardContent className="p-3 flex-grow flex flex-col justify-center">
-                    <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
-                      {repo.name}
-                    </p>
-                    {repo.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 text-center">
-                        {repo.description}
+        {/* Recent Activities Section */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2 border-b">
+            <CardTitle className="text-base font-medium">Recent Activities</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {!mockActivities.length ? (
+              <div className="border border-dashed rounded-md bg-gray-50 p-6">
+                <p className="text-sm text-gray-500 italic text-center">
+                  No recent activities found.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {mockActivities.map((activity) => (
+                  <div key={activity.id} className="flex gap-3 p-3 rounded-md hover:bg-gray-50 transition-colors">
+                    <div className="flex-shrink-0 mt-1">
+                      {getActivityIcon(activity.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700">
+                        {getActivityText(activity)}
                       </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-
-            {/* Map over Top 3 Projects */}
-            {group.projects?.slice(0, 3).map((project) => (
-              <Link
-                key={`proj-${project.id}`}
-                href={`/projects/${project.id}`}
-                className="block outline-none rounded-lg h-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <Card className="hover:border-primary taxonomy:category cursor-pointer h-full flex flex-col shadow-sm border">
-                  <CardContent className="p-3 flex-grow flex flex-col justify-center">
-                    <p className="font-semibold text-sm text-foreground leading-snug break-words mb-1 text-center">
-                      {project.title}
-                    </p>
-                    {project.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 text-center">
-                        {project.description}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatRelativeTime(activity.timestamp)}
                       </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Right Section: Members */}
-      <div className="col-span-1">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-medium">Members</CardTitle>
+      <div className="lg:col-span-1">
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2 border-b">
+            <CardTitle className="text-base font-medium">Members</CardTitle>
           </CardHeader>
-          <CardContent className="flex gap-2 flex-wrap">
-            {group.members?.map((member) => (
-              <Link
-                key={member.userId}
-                href={`/${member.user?.userId || '#'}`}
-                className="group relative"
-              >
-                <Avatar className="h-10 w-10 cursor-pointer">
-                  <AvatarFallback>
-                    {member.user?.firstName
-                      ? member.user.firstName.charAt(0).toUpperCase()
-                      : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                  {member.user?.firstName} {member.user?.lastName}
-                </span>
-              </Link>
-            ))}
+          <CardContent className="pt-4">
+            <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+              {group.members?.map((member) => (
+                <Link
+                  key={member.userId}
+                  href={`/${member.user?.userId || '#'}`}
+                  className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  <Avatar className="h-10 w-10 bg-gray-100">
+                    <AvatarFallback>
+                      {member.user?.firstName
+                        ? member.user.firstName.charAt(0).toUpperCase()
+                        : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {member.user?.firstName} {member.user?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">@{member.userId}</p>
+                  </div>
+                  {member.userId === group.leaderId && (
+                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-xs">
+                      Leader
+                    </Badge>
+                  )}
+                </Link>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>

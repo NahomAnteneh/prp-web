@@ -250,7 +250,7 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <h3 className="text-lg font-semibold">
-                          <Link href={`/groups/${repo.groupUserName}/repositories/${repo.name}`} className="hover:text-primary transition-colors">
+                          <Link href={`/${repo.groupUserName}/${repo.name}`} className="hover:text-primary transition-colors">
                             {repo.name}
                           </Link>
                         </h3>
@@ -273,7 +273,7 @@ export default function RepositoriesList({ groupUserName, isLeader, groupName }:
                     </div>
                     <div className="flex justify-end mt-2 md:mt-0">
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/groups/${repo.groupUserName}/repositories/${repo.name}`}>
+                        <Link href={`/${repo.groupUserName}/${repo.name}`}>
                           <span className="flex items-center gap-1">
                             View Repository <ExternalLink className="h-3 w-3 ml-1" />
                           </span>

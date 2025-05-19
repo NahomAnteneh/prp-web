@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +26,8 @@ import { toast } from 'sonner';
 import { FileUpload } from '@/components/ui/file-upload';
 import { DocumentContextMenu } from './document-context-menu';
 import { MultiFileUploadModal } from './multi-file-upload-modal';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface User {
   userId: string;
@@ -34,18 +36,45 @@ interface User {
   email: string;
 }
 
-// Updated to match API schema in route.ts
+// Document interface for our component
 interface Document {
   id: string;
-  title: string; // API uses title instead of name
-  content?: string;
-  type?: string;
-  url?: string;
+  title: string;
+  content?: string | null;
+  type?: string | null;
+  url: string;
+  size?: number | null;
+  category: string;
   createdAt: string;
-  uploadedBy?: User;
-  category?: string;
-  size?: number;
+  projectId: string;
+  uploadedById?: string | null;
+  uploadedBy?: User | null;
 }
+
+// Function to safely handle nullable types for the file icon
+const getFileIcon = (type?: string | null) => {
+  const fileType = type || '';
+  if (fileType.includes('pdf')) {
+    return <FileText className="h-7 w-7 text-red-500" />;
+  } else if (fileType.includes('image')) {
+    return <FileImage className="h-7 w-7 text-blue-500" />;
+  } else if (fileType.includes('zip') || fileType.includes('rar') || fileType.includes('tar')) {
+    return <FileArchive className="h-7 w-7 text-yellow-500" />;
+  } else if (fileType.includes('text') || fileType.includes('doc') || fileType.includes('ppt') || fileType.includes('xls')) {
+    return <FileText className="h-7 w-7 text-green-500" />;
+  } else {
+    return <FileIcon className="h-7 w-7 text-gray-500" />;
+  }
+};
+
+// Function to safely format file size with null/undefined handling
+const formatFileSize = (bytes?: number | null) => {
+  if (!bytes || bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
 
 interface ProjectDocumentsProps {
   ownerId: string;
@@ -99,7 +128,9 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
             lastName: doc.uploadedBy.lastName || 'User',
             email: doc.uploadedBy.email || ''
           } : undefined,
-          category: doc.category || 'general'
+          category: doc.category || 'general',
+          projectId: doc.projectId || '',
+          uploadedById: doc.uploadedById || undefined
         })) : [];
         
         setDocuments(sanitizedDocuments);
@@ -147,6 +178,7 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
       // Add file type
       formData.append('type', file.type);
       
+      // Use the proper API endpoint with groupUserName, not ownerId
       const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/documents`, {
         method: 'POST',
         body: formData,
@@ -159,31 +191,10 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
         throw new Error(`Failed to upload document: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const document = await response.json();
       
-      // Handle placeholder response
-      if (data.message === 'Document creation feature coming soon') {
-        toast.info('Document uploaded successfully (preview mode)');
-        
-        // Create a temporary document object for the UI
-        const tempDocument: Document = {
-          id: data.document?.id || `temp-${Math.random().toString(36).substr(2, 9)}`,
-          title: documentDetails.title,
-          content: documentDetails.description,
-          type: file.type,
-          createdAt: new Date().toISOString(),
-          category: documentDetails.category,
-          size: file.size,
-          url: URL.createObjectURL(file) // Create temporary URL for preview
-        };
-        
-        setDocuments([tempDocument, ...documents]);
-        setIsUploadDialogOpen(false);
-        return;
-      }
-      
-      const newDocument = data.document || data;
-      setDocuments([newDocument, ...documents]);
+      // Add document to the list
+      setDocuments([document, ...documents]);
       
       toast.success('Document uploaded successfully');
       
@@ -199,90 +210,25 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
 
   const handleDeleteDocument = async (documentId: string) => {
     try {
-      // Check if this is a temporary or placeholder document
-      const isTemporaryDocument = documentId.startsWith('temp-') || 
-                                 documentId === 'placeholder-id' || 
-                                 documentId === 'sample-id' ||
-                                 documentId === 'unknown';
-      
-      // Also check if the document exists in our state but not on the server
-      const document = documents.find(doc => doc.id === documentId);
-      const isLocalOnlyDocument = document && 
-                                 (document.id.includes('placeholder') || 
-                                  document.id.includes('sample') || 
-                                  document.id.includes('temp-'));
-      
-      if (isTemporaryDocument || isLocalOnlyDocument) {
-        // For temporary/placeholder documents, just remove from state
-        const documentToRemove = document;
-        
-        // Revoke the blob URL if it exists to prevent memory leaks
-        if (documentToRemove?.url?.startsWith('blob:')) {
-          URL.revokeObjectURL(documentToRemove.url);
-        }
-        
-        setDocuments(documents.filter(doc => doc.id !== documentId));
-        toast.success('Document removed');
-        return;
-      }
-      
-      // For regular documents, call the API
-      try {
-        const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/documents/${documentId}`, {
-          method: 'DELETE',
-        });
+      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/documents/${documentId}`, {
+        method: 'DELETE',
+      });
 
-        if (!response.ok) {
-          // If we get a 404, the document might not exist on the server but exists in our state
-          if (response.status === 404) {
-            // Just remove it from our state
-            setDocuments(documents.filter(doc => doc.id !== documentId));
-            toast.success('Document removed');
-            return;
-          }
-          
-          const errorData = await response.json().catch(() => null);
-          const errorMessage = errorData?.message || `Failed to delete document: ${response.status} ${response.statusText}`;
-          throw new Error(errorMessage);
-        }
-
-        // Remove the document from the state
-        setDocuments(documents.filter(doc => doc.id !== documentId));
-        toast.success('Document deleted successfully');
-      } catch (apiError) {
-        console.error('API Error deleting document:', apiError);
-        toast.error(apiError instanceof Error ? apiError.message : 'Failed to delete document');
+      if (!response.ok) {
+        throw new Error(`Failed to delete document: ${response.status} ${response.statusText}`);
       }
+
+      // Remove the document from the state
+      setDocuments(documents.filter(doc => doc.id !== documentId));
+      toast.success('Document deleted successfully');
     } catch (error) {
-      console.error('Error in delete document handler:', error);
-      toast.error('An unexpected error occurred while deleting the document');
+      console.error('Error deleting document:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete document');
     }
   };
 
   const handleMultiUploadSuccess = (newDocuments: Document[]) => {
     setDocuments([...newDocuments, ...documents]);
-  };
-
-  const getFileIcon = (type: string = '') => {
-    if (type?.includes('pdf')) {
-      return <FileText className="h-7 w-7 text-red-500" />;
-    } else if (type?.includes('image')) {
-      return <FileImage className="h-7 w-7 text-blue-500" />;
-    } else if (type?.includes('zip') || type?.includes('rar') || type?.includes('tar')) {
-      return <FileArchive className="h-7 w-7 text-yellow-500" />;
-    } else if (type?.includes('text') || type?.includes('doc') || type?.includes('ppt') || type?.includes('xls')) {
-      return <FileText className="h-7 w-7 text-green-500" />;
-    } else {
-      return <FileIcon className="h-7 w-7 text-gray-500" />;
-    }
-  };
-
-  const formatFileSize = (bytes: number = 0) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const filteredDocuments = activeCategory === 'all' 
@@ -314,11 +260,14 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
                 Upload Document
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-[550px]">
               <DialogHeader>
                 <DialogTitle>Upload Document</DialogTitle>
+                <DialogDescription>
+                  Upload a document to share with your project team.
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleUpload} className="space-y-4 pt-4">
+              <form onSubmit={handleUpload} className="space-y-5 pt-4">
                 <div className="grid gap-4">
                   <Label htmlFor="file">File</Label>
                   <FileUpload 
@@ -339,42 +288,53 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
                     }}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="title">Document Title</Label>
-                  <Input
-                    id="title"
-                    placeholder="Title for this document"
-                    value={documentDetails.title}
-                    onChange={(e) => setDocumentDetails({ ...documentDetails, title: e.target.value })}
-                    required
-                  />
+                
+                <div className="grid gap-4 mt-5">
+                  <div className="grid gap-2">
+                    <Label htmlFor="title">Document Title <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="title"
+                      placeholder="Title for this document"
+                      value={documentDetails.title}
+                      onChange={(e) => setDocumentDetails({ ...documentDetails, title: e.target.value })}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="description">Description (Optional)</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Brief description of this document"
+                      value={documentDetails.description}
+                      onChange={(e) => setDocumentDetails({ ...documentDetails, description: e.target.value })}
+                      rows={3}
+                      className="resize-none"
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select 
+                      value={documentDetails.category} 
+                      onValueChange={(value) => setDocumentDetails({ ...documentDetails, category: value })}
+                    >
+                      <SelectTrigger id="category">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="report">Report</SelectItem>
+                        <SelectItem value="diagram">Diagram</SelectItem>
+                        <SelectItem value="proposal">Proposal</SelectItem>
+                        <SelectItem value="presentation">Presentation</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Description (Optional)</Label>
-                  <Input
-                    id="description"
-                    placeholder="Brief description of this document"
-                    value={documentDetails.description}
-                    onChange={(e) => setDocumentDetails({ ...documentDetails, description: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="category">Category</Label>
-                  <select
-                    id="category"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={documentDetails.category}
-                    onChange={(e) => setDocumentDetails({ ...documentDetails, category: e.target.value })}
-                  >
-                    <option value="general">General</option>
-                    <option value="report">Report</option>
-                    <option value="diagram">Diagram</option>
-                    <option value="proposal">Proposal</option>
-                    <option value="presentation">Presentation</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div className="flex justify-end gap-2">
+
+                <DialogFooter className="mt-6">
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -383,7 +343,7 @@ export function ProjectDocuments({ ownerId, projectId }: ProjectDocumentsProps) 
                     Cancel
                   </Button>
                   <Button type="submit" disabled={selectedFiles.length === 0}>Upload</Button>
-                </div>
+                </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>

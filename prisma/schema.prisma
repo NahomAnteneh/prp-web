@@ -1,8 +1,3 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,72 +6,74 @@ generator json {
   provider = "prisma-json-types-generator"
 }
 
-model User {  
-  userId                   String  @unique
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId               String               @unique
   firstName            String
   lastName             String
   /// Institutional email address
-  email                String    @unique
+  email                String               @unique
   /// Store hashed passwords only
   passwordHash         String
-  role                 Role      @default(STUDENT)
-  passwordResetToken   String?   @unique
+  role                 Role                 @default(STUDENT)
+  passwordResetToken   String?              @unique
   passwordResetExpires DateTime?
-  profileInfo          Json? 
-/// Note: Application logic must ensure a user isn't assigned as both Advisor and Evaluator *for the same project*.: string; expertise?: string[]; bio?: string }
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-
-  // --- Relations ---
-  advisorRequestsMade  AdvisorRequest[]     @relation("AdvisorRequester") // Requests targeting this user as advisor
+  profileInfo          Json?
+  /// Note: Application logic must ensure a user isn't assigned as both Advisor and Evaluator *for the same project*.: string; expertise?: string[]; bio?: string }
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  advisorRequestsMade  AdvisorRequest[]     @relation("AdvisorRequester")
   announcementsCreated Announcement[]       @relation("AnnouncementCreator")
   commitsAuthored      Commit[]             @relation("CommitAuthor")
-  evaluationsProvided  Evaluation[]         @relation("EvaluationAuthor") // Evaluations written by this user
+  documentsUploaded    Document[]
+  evaluationsProvided  Evaluation[]         @relation("EvaluationAuthor")
   feedbackProvided     Feedback[]           @relation("FeedbackAuthor")
   groupsLed            Group[]              @relation("GroupLeader")
-  groupsMemberOf       GroupMember[]
   invitesCreated       GroupInvite[]        @relation("InviteCreator")
+  groupsMemberOf       GroupMember[]
   mergeRequestsCreated MergeRequest[]       @relation("MergeRequestCreator")
   mergeRequestsReviews MergeRequestReview[] @relation("MergeRequestReviewer")
   notifications        Notification[]       @relation("NotificationRecipient")
-  advisedProjects      Project[]            @relation("ProjectAdvisor") // Projects this user advises
-  evaluatedProjects    ProjectEvaluator[]   // Projects this user is assigned to evaluate
+  advisedProjects      Project[]            @relation("ProjectAdvisor")
+  evaluatedProjects    ProjectEvaluator[]
   tasksAssigned        Task[]               @relation("TaskAssignee")
   tasksCreated         Task[]               @relation("TaskCreator")
 
-  @@index([userId]) // Index for faster username lookups
-  @@index([email])    // Index for faster email lookups
+  @@index([userId])
+  @@index([email])
 }
 
 /// Represents a project group formed by students
 model Group {
-  groupUserName  String   @id // Change to be the primary ID
-  name        String   
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  groupUserName       String              @id
+  name                String
+  description         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   /// ID of the student who is the group leader
-  leaderId        String
-  leader          User              @relation("GroupLeader", fields: [leaderId], references: [userId], onDelete: Restrict)
-  members         GroupMember[]
-  projects        Project[]         @relation("GroupProjects") // A group can have multiple projects
-  invites         GroupInvite[]
-  advisorRequests AdvisorRequest[] // Requests sent by this group to potential advisors
-  repositories    Repository[]      @relation("GroupOwnedRepository")// Repositories owned by this group
-  projectRepositories ProjectRepository[] // Join table entries linking projects/repositories for this group
+  leaderId            String
+  advisorRequests     AdvisorRequest[]
+  leader              User                @relation("GroupLeader", fields: [leaderId], references: [userId])
+  invites             GroupInvite[]
+  members             GroupMember[]
+  projects            Project[]           @relation("GroupProjects")
+  projectRepositories ProjectRepository[]
+  repositories        Repository[]        @relation("GroupOwnedRepository")
 
-  @@index([name]) // Index for faster group name lookups
+  @@index([name])
 }
 
 /// Join table for Group Members (Many-to-Many between User and Group)
 model GroupMember {
-  groupUserName  String
-  userId   String
-  joinedAt DateTime @default(now())
-
-  // --- Relations ---
-  group Group @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  groupUserName String
+  userId        String
+  joinedAt      DateTime @default(now())
+  group         Group    @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@id([groupUserName, userId])
   @@index([userId])
@@ -84,27 +81,26 @@ model GroupMember {
 
 /// Represents a final-year project
 model Project {
-  id             String        @id @default(cuid())
-  title          String
-  description    String?
+  id                String              @id @default(cuid())
+  title             String
+  description       String?
   /// Status of the project using a predefined enum
-  status         ProjectStatus @default(ACTIVE)
-  isPrivate      Boolean       @default(false)
-  submissionDate DateTime?
-  archived       Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  groupUserName  String
-  advisorId      String?
-
-  // --- Relations ---
-  group             Group              @relation("GroupProjects", fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
-  advisor           User?              @relation("ProjectAdvisor", fields: [advisorId], references: [userId], onDelete: SetNull)
+  status            ProjectStatus       @default(ACTIVE)
+  isPrivate         Boolean             @default(false)
+  submissionDate    DateTime?
+  archived          Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  groupUserName     String
+  advisorId         String?
+  documents         Document[]
   evaluations       Evaluation[]
   feedback          Feedback[]
+  advisor           User?               @relation("ProjectAdvisor", fields: [advisorId], references: [userId])
+  group             Group               @relation("GroupProjects", fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
   projectEvaluators ProjectEvaluator[]
-  tasks             Task[]
   repositories      ProjectRepository[]
+  tasks             Task[]
 
   @@index([title])
   @@index([groupUserName])
@@ -117,10 +113,8 @@ model ProjectEvaluator {
   projectId   String
   evaluatorId String
   assignedAt  DateTime @default(now())
-
-  // --- Relations ---
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  evaluator User    @relation(fields: [evaluatorId], references: [userId], onDelete: Cascade)
+  evaluator   User     @relation(fields: [evaluatorId], references: [userId], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([projectId, evaluatorId])
   @@index([evaluatorId])
@@ -128,87 +122,77 @@ model ProjectEvaluator {
 
 model ProjectRepository {
   projectId      String
-  repositoryName String   // Changed from repositoryId
-  groupUserName  String   // This was already present
-  assignedAt     DateTime @default(now())
-
-  // --- Relations ---
-  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  repository Repository @relation(fields: [repositoryName, groupUserName], references: [name, groupUserName], onDelete: Cascade)
-  group      Group      @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade) // Explicit link to the owning group
+  repositoryName String
+  groupUserName  String
+  assignedAt     DateTime   @default(now())
+  group          Group      @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
+  project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository     Repository @relation(fields: [repositoryName, groupUserName], references: [name, groupUserName], onDelete: Cascade)
 
   @@id([projectId, repositoryName, groupUserName])
   @@index([projectId])
   @@index([repositoryName])
-  @@index([groupUserName]) // Index on group for potential filtering
+  @@index([groupUserName])
 }
 
 /// Represents the Vec repository. Can be owned by a User (groupId=null) or a Group (groupId!=null).
 model Repository {
-  name        String
-  description String
+  name          String
+  description   String
   /// The User who created or primarily manages the repository
-  ownerId     String
-  isPrivate   Boolean  @default(true) // Controls public/private visibility
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  ownerId       String
+  isPrivate     Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
   /// ID of the group that owns this repository
   groupUserName String
-
-  // --- Relations ---
-  owner         Group            @relation("GroupOwnedRepository", fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
   branches      Branch[]
   commits       Commit[]
-  mergeRequests MergeRequest[]
-  remotes       Remote[]
   feedback      Feedback[]
-  projects      ProjectRepository[] // Many-to-many relation with Project via join table
+  mergeRequests MergeRequest[]
+  projects      ProjectRepository[]
+  remotes       Remote[]
+  owner         Group               @relation("GroupOwnedRepository", fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
 
-  @@id([name, groupUserName]) // Making a composite primary key from name and groupUserName
+  @@id([name, groupUserName])
   @@index([name])
-  @@index([groupUserName]) // Index on the group username
-  @@index([ownerId]) // Index on the owner
+  @@index([groupUserName])
+  @@index([ownerId])
 }
 
 /// Represents a commit in the Vec repository
 model Commit {
-  id              String     @id // Use the actual commit hash as ID
+  id              String        @id
   message         String
   timestamp       DateTime
-  createdAt       DateTime   @default(now())
-  repositoryName  String     // Changed from repositoryId
-  repositoryGroup String     // Added for composite foreign key
-  authorId        String     // User who authored the commit
-  parentCommitIDs String[]   // IDs (hashes) of parent commits
+  createdAt       DateTime      @default(now())
+  repositoryName  String
+  repositoryGroup String
+  authorId        String
+  parentCommitIDs String[]
   /// ID of the merge request that resulted in this commit (if applicable). This is the foreign key.
-  mergeRequestId  String?    @unique
-
-  // --- Relations ---
-  repository   Repository    @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
-  author       User          @relation("CommitAuthor", fields: [authorId], references: [userId], onDelete: Restrict)
-  // This side defines the relation details (fields, references, onDelete)
-  mergeRequest MergeRequest? @relation("MergeCommit", fields: [mergeRequestId], references: [id], onDelete: SetNull)
-  fileChanges  FileChange[]
-  branchesHead Branch[]      @relation("BranchHead") // Branches where this commit is the head
+  mergeRequestId  String?       @unique
+  branchesHead    Branch[]      @relation("BranchHead")
+  author          User          @relation("CommitAuthor", fields: [authorId], references: [userId])
+  mergeRequest    MergeRequest? @relation("MergeCommit", fields: [mergeRequestId], references: [id])
+  repository      Repository    @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
+  fileChanges     FileChange[]
 
   @@index([repositoryName, repositoryGroup])
   @@index([authorId])
   @@index([timestamp])
-  @@index([mergeRequestId]) // Add index for the foreign key
+  @@index([mergeRequestId])
 }
-
 
 /// Represents a file change within a Vec commit
 model FileChange {
   id                      String     @id @default(cuid())
   filePath                String
-  changeType              ChangeType // ADDED, MODIFIED, DELETED
-  fileContentHash         String?    // Hash of the content after the change (null for DELETED)
-  previousFileContentHash String?    // Hash of the content before the change (null for ADDED)
-  commitId                String     // Commit ID (hash)
-
-  // --- Relations ---
-  commit Commit @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  changeType              ChangeType
+  fileContentHash         String?
+  previousFileContentHash String?
+  commitId                String
+  commit                  Commit     @relation(fields: [commitId], references: [id], onDelete: Cascade)
 
   @@index([commitId])
   @@index([filePath])
@@ -216,47 +200,42 @@ model FileChange {
 
 /// Represents a branch in the Vec repository
 model Branch {
-  id               String   @id @default(cuid())
-  name             String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  repositoryName   String   // Changed from repositoryId
-  repositoryGroup  String   // Added for composite foreign key
-  headCommitId     String   // ID (hash) of the latest commit on this branch
-
-  // --- Relations ---
+  id                    String         @id @default(cuid())
+  name                  String
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  repositoryName        String
+  repositoryGroup       String
+  headCommitId          String
+  headCommit            Commit         @relation("BranchHead", fields: [headCommitId], references: [id])
   repository            Repository     @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
-  headCommit            Commit         @relation("BranchHead", fields: [headCommitId], references: [id], onDelete: Restrict)
-  mergeRequestsAsSource MergeRequest[] @relation("BranchMergeRequestSource") // MRs originating from this branch
-  mergeRequestsAsTarget MergeRequest[] @relation("BranchMergeRequestTarget") // MRs targeting this branch
+  mergeRequestsAsSource MergeRequest[] @relation("BranchMergeRequestSource")
+  mergeRequestsAsTarget MergeRequest[] @relation("BranchMergeRequestTarget")
 
-  @@unique([repositoryName, repositoryGroup, name]) // Branch names must be unique within a repository
+  @@unique([repositoryName, repositoryGroup, name])
   @@index([repositoryName, repositoryGroup])
 }
 
 /// Represents a merge request (like a Pull Request)
 model MergeRequest {
-  id               String             @id @default(cuid())
-  title            String
-  description      String?
-  status           MergeRequestStatus @default(OPEN)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  repositoryName   String             // Changed from repositoryId
-  repositoryGroup  String             // Added for composite foreign key
-  creatorId        String             // User who created the MR
-  sourceBranchId   String             // Branch changes are coming from
-  targetBranchId   String             // Branch changes are intended for
-
-  // --- Relations ---
-  repository   Repository           @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
-  creator      User                 @relation("MergeRequestCreator", fields: [creatorId], references: [userId], onDelete: Restrict)
-  sourceBranch Branch               @relation("BranchMergeRequestSource", fields: [sourceBranchId], references: [id], onDelete: Cascade)
-  targetBranch Branch               @relation("BranchMergeRequestTarget", fields: [targetBranchId], references: [id], onDelete: Cascade)
-  reviews      MergeRequestReview[]
-  feedback     Feedback[]
-  // This side just refers back to the relation defined on Commit.mergeRequest
-  mergeCommit  Commit?              @relation("MergeCommit")
+  id              String               @id @default(cuid())
+  title           String
+  description     String?
+  status          MergeRequestStatus   @default(OPEN)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  repositoryName  String
+  repositoryGroup String
+  creatorId       String
+  sourceBranchId  String
+  targetBranchId  String
+  mergeCommit     Commit?              @relation("MergeCommit")
+  feedback        Feedback[]
+  creator         User                 @relation("MergeRequestCreator", fields: [creatorId], references: [userId])
+  repository      Repository           @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
+  sourceBranch    Branch               @relation("BranchMergeRequestSource", fields: [sourceBranchId], references: [id], onDelete: Cascade)
+  targetBranch    Branch               @relation("BranchMergeRequestTarget", fields: [targetBranchId], references: [id], onDelete: Cascade)
+  reviews         MergeRequestReview[]
 
   @@index([repositoryName, repositoryGroup])
   @@index([creatorId])
@@ -273,10 +252,8 @@ model MergeRequestReview {
   createdAt      DateTime       @default(now())
   mergeRequestId String
   reviewerId     String
-
-  // --- Relations ---
-  mergeRequest MergeRequest @relation(fields: [mergeRequestId], references: [id], onDelete: Cascade)
-  reviewer     User         @relation("MergeRequestReviewer", fields: [reviewerId], references: [userId], onDelete: Restrict)
+  mergeRequest   MergeRequest   @relation(fields: [mergeRequestId], references: [id], onDelete: Cascade)
+  reviewer       User           @relation("MergeRequestReviewer", fields: [reviewerId], references: [userId])
 
   @@index([mergeRequestId])
   @@index([reviewerId])
@@ -284,23 +261,17 @@ model MergeRequestReview {
 
 /// Represents a remote repository link for distributed Vec operations
 model Remote {
-  id               String   @id @default(cuid())
-  name             String
-  url              String
-  createdAt        DateTime @default(now())
-  repositoryName   String   // Changed from repositoryId
-  repositoryGroup  String   // Added for composite foreign key
+  id              String     @id @default(cuid())
+  name            String
+  url             String
+  createdAt       DateTime   @default(now())
+  repositoryName  String
+  repositoryGroup String
+  repository      Repository @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
 
-  // --- Relations ---
-  repository Repository @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
-
-  @@unique([repositoryName, repositoryGroup, name]) // Remote names unique per repository
+  @@unique([repositoryName, repositoryGroup, name])
   @@index([repositoryName, repositoryGroup])
 }
-
-// -----------------------------------------------------
-// Project Management & Communication Models
-// -----------------------------------------------------
 
 /// Represents a task within a project
 model Task {
@@ -312,13 +283,12 @@ model Task {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   projectId   String
-  assigneeId  String?    // User assigned to the task
-  creatorId   String     // User who created the task
-
-  // --- Relations ---
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [userId], onDelete: SetNull)
-  creator  User    @relation("TaskCreator", fields: [creatorId], references: [userId], onDelete: Restrict)
+  assigneeId  String?
+  creatorId   String
+  priority    String     @default("MEDIUM")
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [userId])
+  creator     User       @relation("TaskCreator", fields: [creatorId], references: [userId])
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([assigneeId])
@@ -326,44 +296,60 @@ model Task {
 }
 
 model Feedback {
-  id               String         @id @default(cuid())
-  title            String?        // Optional title
-  content          String
-  status           FeedbackStatus @default(OPEN)
-  createdAt        DateTime       @default(now())
-  authorId         String         // User who gave the feedback
-  projectId        String?        // Link if feedback is on a Project
-  mergeRequestId   String?        // Link if feedback is on a Merge Request
-  repositoryName   String?        // Changed from repositoryId
-  repositoryGroup  String?        // Added for composite foreign key
-
-  // --- Relations ---
-  author       User         @relation("FeedbackAuthor", fields: [authorId], references: [userId], onDelete: Restrict)
-  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  mergeRequest MergeRequest? @relation(fields: [mergeRequestId], references: [id], onDelete: Cascade)
-  repository   Repository?  @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  title           String?
+  content         String
+  status          FeedbackStatus @default(OPEN)
+  createdAt       DateTime       @default(now())
+  authorId        String
+  projectId       String?
+  mergeRequestId  String?
+  repositoryName  String?
+  repositoryGroup String?
+  author          User           @relation("FeedbackAuthor", fields: [authorId], references: [userId])
+  mergeRequest    MergeRequest?  @relation(fields: [mergeRequestId], references: [id], onDelete: Cascade)
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository      Repository?    @relation(fields: [repositoryName, repositoryGroup], references: [name, groupUserName], onDelete: Cascade)
 
   @@index([authorId])
   @@index([projectId])
   @@index([mergeRequestId])
   @@index([repositoryName, repositoryGroup])
-  // Consider adding a CHECK constraint at the DB level if possible to enforce only one FK is non-null.
+}
+
+/// Represents a document uploaded for a project
+model Document {
+  id           String   @id @default(cuid())
+  title        String
+  content      String?
+  type         String?
+  url          String
+  size         Int?
+  category     String   @default("general")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  projectId    String
+  uploadedById String?
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [userId])
+
+  @@index([projectId])
+  @@index([uploadedById])
+  @@index([category])
 }
 
 /// Represents an evaluation submitted for a project
 model Evaluation {
   id           String   @id @default(cuid())
-  score        Float?   // Overall score (optional)
-  comments     String   @db.Text // Detailed comments
+  score        Float?
+  comments     String
   /// Store specific criteria scores/comments as JSON
   criteriaData Json?
   createdAt    DateTime @default(now())
-  authorId     String   // User (Evaluator/Advisor role) who submitted the evaluation
+  authorId     String
   projectId    String
-
-  // --- Relations ---
-  author  User    @relation("EvaluationAuthor", fields: [authorId], references: [userId], onDelete: Restrict)
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author       User     @relation("EvaluationAuthor", fields: [authorId], references: [userId])
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([authorId])
   @@index([projectId])
@@ -374,12 +360,10 @@ model Notification {
   id          String   @id @default(cuid())
   message     String
   read        Boolean  @default(false)
-  link        String?  // Optional URL link related to the notification
+  link        String?
   createdAt   DateTime @default(now())
   recipientId String
-
-  // --- Relations ---
-  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [userId], onDelete: Cascade)
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [userId], onDelete: Cascade)
 
   @@index([recipientId])
   @@index([read])
@@ -393,13 +377,11 @@ model AdvisorRequest {
   responseMessage    String?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
-  projectId          String               // The project being requested
-  groupUserName      String               // The group making the request
-  requestedAdvisorId String               // The User (potential advisor) being requested
-
-  // --- Relations ---
-  group            Group @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
-  requestedAdvisor User  @relation("AdvisorRequester", fields: [requestedAdvisorId], references: [userId], onDelete: Cascade)
+  projectId          String
+  groupUserName      String
+  requestedAdvisorId String
+  group              Group                @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
+  requestedAdvisor   User                 @relation("AdvisorRequester", fields: [requestedAdvisorId], references: [userId], onDelete: Cascade)
 
   @@index([groupUserName])
   @@index([requestedAdvisorId])
@@ -408,62 +390,48 @@ model AdvisorRequest {
 
 /// Represents an invitation to join a group
 model GroupInvite {
-  id          String    @id @default(cuid())
-  code        String    @unique // Unique code for the invite link
-  expiresAt   DateTime
-  createdAt   DateTime  @default(now())
-  usedAt      DateTime? // Timestamp when the invite was used
-  createdById String    // User who created the invite (usually group leader or member)
-  groupUserName String    // Group the invite is for
-  email       String?   // Optionally target a specific email
-
-  // --- Relations ---
-  group     Group @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
-  createdBy User  @relation("InviteCreator", fields: [createdById], references: [userId], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  code          String    @unique
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  usedAt        DateTime?
+  createdById   String
+  groupUserName String
+  email         String?
+  createdBy     User      @relation("InviteCreator", fields: [createdById], references: [userId], onDelete: Cascade)
+  group         Group     @relation(fields: [groupUserName], references: [groupUserName], onDelete: Cascade)
 
   @@index([code])
   @@index([groupUserName])
-  @@index([email]) // If targeted invites are common
+  @@index([email])
   @@index([expiresAt])
 }
-
-// -----------------------------------------------------
-// System & Configuration Models
-// -----------------------------------------------------
 
 /// Represents system-wide announcements created by administrators
 model Announcement {
   id        String   @id @default(cuid())
   title     String
-  content   String   @db.Text
+  content   String
   active    Boolean  @default(true)
-  priority  Int      @default(0) // For ordering announcements
+  priority  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  creatorId String   // Admin user who created it
-
-  // --- Relations ---
-  creator User @relation("AnnouncementCreator", fields: [creatorId], references: [userId], onDelete: Restrict)
+  creatorId String
+  creator   User     @relation("AnnouncementCreator", fields: [creatorId], references: [userId])
 
   @@index([creatorId])
-  @@index([active, createdAt(sort: Desc)]) // Index for fetching active announcements ordered by date
+  @@index([active, createdAt(sort: Desc)])
   @@index([priority])
 }
 
 /// System-wide rules and configuration settings. Assumed to be a singleton table (only one row).
 model Rule {
-  id                        Int      @id @default(1) // Fixed ID for singleton
-  maxGroupSize              Int      @default(5)
-  advisorRequestDeadline    DateTime? // Made optional
-  projectSubmissionDeadline DateTime? // Made optional
-  updatedAt                 DateTime @updatedAt
-
-  // Add other global settings as needed
+  id                        Int       @id @default(1)
+  maxGroupSize              Int       @default(5)
+  advisorRequestDeadline    DateTime?
+  projectSubmissionDeadline DateTime?
+  updatedAt                 DateTime  @updatedAt
 }
-
-// -----------------------------------------------------
-// Enums
-// -----------------------------------------------------
 
 enum Role {
   STUDENT
@@ -473,10 +441,10 @@ enum Role {
 }
 
 enum ProjectStatus {
-  ACTIVE      // Project is ongoing
-  SUBMITTED   // Project work submitted for evaluation
-  COMPLETED   // Evaluation done, project finished
-  ARCHIVED    // Project closed and archived
+  ACTIVE
+  SUBMITTED
+  COMPLETED
+  ARCHIVED
 }
 
 enum AdvisorRequestStatus {
@@ -486,18 +454,18 @@ enum AdvisorRequestStatus {
 }
 
 enum MergeRequestStatus {
-  OPEN      // Request is open for review
-  APPROVED  // Request has been approved (but not yet merged)
-  REJECTED  // Request has been rejected
-  MERGED    // Request has been successfully merged
-  CLOSED    // Request closed without merging
+  OPEN
+  APPROVED
+  REJECTED
+  MERGED
+  CLOSED
 }
 
 enum ReviewDecision {
-  APPROVED          // Reviewer approves the changes
-  REJECTED          // Reviewer rejects the changes
-  CHANGES_REQUESTED // Reviewer requests specific changes
-  COMMENTED         // Reviewer left comments without a specific decision
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  COMMENTED
 }
 
 enum ChangeType {
@@ -514,7 +482,7 @@ enum TaskStatus {
 }
 
 enum FeedbackStatus {
-  OPEN      // Feedback requires attention
-  ADDRESSED // Feedback has been acknowledged or acted upon
-  CLOSED    // Feedback resolution confirmed
+  OPEN
+  ADDRESSED
+  CLOSED
 }

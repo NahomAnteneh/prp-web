@@ -31,7 +31,7 @@ interface Task {
   title: string
   description: string
   status: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED'
-  priority: number
+  priority: string
   deadline: string | null
   deadlineFormatted: string | null
   deadlineRelative: string | null
@@ -157,22 +157,28 @@ export default function TasksList({ userId, isOwner = false }: TasksListProps) {
   }
 
   // Helper to get priority badge content
-  const getPriorityBadge = (priority: number) => {
-    if (priority >= 3) {
-      return {
-        text: "High",
-        className: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-      }
-    } else if (priority === 2) {
-      return {
-        text: "Medium",
-        className: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400"
-      }
-    } else {
-      return {
-        text: "Low",
-        className: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-      }
+  const getPriorityBadge = (priority: string) => {
+    switch(priority) {
+      case "HIGH":
+        return {
+          text: "High",
+          className: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+        }
+      case "MEDIUM":
+        return {
+          text: "Medium",
+          className: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400"
+        }
+      case "LOW":
+        return {
+          text: "Low",
+          className: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+        }
+      default:
+        return {
+          text: "Medium",
+          className: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400"
+        }
     }
   }
 

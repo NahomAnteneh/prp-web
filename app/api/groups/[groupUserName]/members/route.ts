@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { groupUserName: string } }
 ) {
   try {
-    const { groupUserName } = params;
+    const { groupUserName } = await params;
 
     // Check if the group exists
     const group = await db.group.findUnique({
@@ -72,7 +72,7 @@ export async function POST(
   { params }: { params: { groupUserName: string } }
 ) {
   try {
-    const { groupUserName } = params;
+    const { groupUserName } = await params;
 
     // Check if the group exists
     const group = await db.group.findUnique({
@@ -168,7 +168,7 @@ export async function DELETE(
   { params }: { params: { groupUserName: string } }
 ) {
   try {
-    const { groupUserName } = params;
+    const { groupUserName } = await params;
 
     // Parse the URL to get the userId to remove
     const url = new URL(req.url);

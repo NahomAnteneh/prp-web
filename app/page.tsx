@@ -8,6 +8,7 @@ import StudentDashboard from "@/components/student/dashboard/student-dashboard";
 import { Footer } from "@/components/footer";
 import { Role } from "@prisma/client";
 import AdvisorDashboard from "@/components/advisor/dashboard/AdvisorDashboard";
+import EvaluatorDashboard from "@/components/evaluator/dashboard/EvaluatorDashboard";
 
 export const metadata: Metadata = {
   title: "Project Repository Platform - BiT",
@@ -29,8 +30,7 @@ export default async function Home() {
       case Role.ADVISOR:
         return <AdvisorDashboard />;
       case Role.EVALUATOR:
-        // TODO: Create and import EvaluatorDashboard component
-        return <div className="p-8">Evaluator Dashboard - Under Development</div>;
+        return <EvaluatorDashboard />;
       default:
         // Fallback to student dashboard or show an error
         return <div className="p-8">Unknown user role: {userRole}</div>;

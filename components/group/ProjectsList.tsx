@@ -281,7 +281,7 @@ export default function ProjectsList({ groupUserName, isLeader }: ProjectsListPr
                 
                 <div className="flex justify-between items-center">
                   <Button asChild size="sm" variant="outline">
-                    <Link href={`/projects/${project.id}`}>
+                    <Link href={`/${project.group.groupUserName}/projects/${project.id}`}>
                       <ExternalLink className="h-4 w-4 mr-2" /> View Project
                     </Link>
                   </Button>
