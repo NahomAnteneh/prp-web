@@ -3,6 +3,7 @@ import { GeistSans, GeistMono } from "geist/font";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
 
+
 const geistSans = GeistSans;
 const geistMono = GeistMono;
 

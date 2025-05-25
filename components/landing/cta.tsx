@@ -169,7 +169,9 @@ export function CTA() {
                 className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white hover:text-violet-600 transition-all" 
                 asChild
               >
-                <Link href="/faculty-resources" className="flex items-center gap-1">
+                <Link href="https://r.search.yahoo.com/_ylt=Awrhbr4ddS9oJQIA0IhXNyoA;_ylu=Y29sbwNiZjEEcG9zAzEEdnRpZAMEc2VjA3Ny/RV=2/RE=1749150237/RO=10/RU=https%3a%2f%2fwww.bdu.edu.et%2f/RK=2/RS=cFVw_U1132Qp3TQLiiDldA0tuOM-"
+      className="flex items-center gap-1">
+                 
                   <span>Faculty Portal</span>
                   <ArrowUpRight className="h-3.5 w-3.5 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </Link>
