@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Menu, X, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LogoutButton } from "@/components/ui/logout-button"
@@ -16,23 +17,49 @@ import {
 } from "@/components/ui/navigation-menu"
 import { useSession } from "next-auth/react"
 import { SearchBar } from "@/components/SearchBar"
+import { cn } from "@/lib/utils"
 
 export default function Navbar() {
-  const { data: session } = useSession();
+  const { data: session } = useSession()
+  const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [displayName, setDisplayName] = useState<string>("Student")
   const [unreadCount, setUnreadCount] = useState(0)
 
-  const userName = session?.user.userId;
+  const userName = session?.user.userId
+
+  // Helper function to check if a navigation item is active
+  const isActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/"
+    }
+    return pathname.startsWith(href)
+  }
+
+  // Helper function to get navigation menu style with active state
+  const getNavMenuStyle = (href: string) => {
+    return cn(
+      "group inline-flex h-9 w-max items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
+      isActive(href) ? "bg-accent text-accent-foreground" : "bg-background",
+    )
+  }
+
+  // Helper function for mobile navigation style with active state
+  const getMobileNavStyle = (href: string) => {
+    return cn(
+      "px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
+      isActive(href) && "bg-accent text-accent-foreground font-medium",
+    )
+  }
 
   useEffect(() => {
     async function fetchNavbarData() {
       try {
         if (!userName) {
           // Skip fetching if userName is not available yet
-          return;
+          return
         }
-        
+
         const notifications = await fetch(`/api/users/${userName}/notifications`)
         if (notifications.ok) {
           const data = await notifications.json()
@@ -44,9 +71,9 @@ export default function Navbar() {
         console.error("Error fetching navbar data:", error)
       }
     }
-    
+
     setDisplayName(userName || "Student")
-    
+
     // Only call fetchNavbarData if userName exists
     if (userName) {
       fetchNavbarData()
@@ -56,9 +83,9 @@ export default function Navbar() {
   const handleMarkAllAsRead = async () => {
     try {
       if (!userName) {
-        return;
+        return
       }
-      
+
       const response = await fetch(`/api/users/${userName}/notifications`, {
         method: "POST",
         headers: {
@@ -93,42 +120,32 @@ export default function Navbar() {
           <NavigationMenu>
             <NavigationMenuList>
               <NavigationMenuItem>
-                <NavigationMenuLink 
-                  href="/group"
-                  className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-                >
+                <NavigationMenuLink href="/group" className={getNavMenuStyle("/group")}>
                   Group
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuLink 
-                  href="/projects"
-                  className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-                >
+                <NavigationMenuLink href="/projects" className={getNavMenuStyle("/projects")}>
                   Projects
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuLink 
-                  href="/tasks"
-                  className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-                >
+                <NavigationMenuLink href="/tasks" className={getNavMenuStyle("/tasks")}>
                   Tasks
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuLink 
-                  href="/explore"
-                  className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-                >
+                <NavigationMenuLink href="/explore" className={getNavMenuStyle("/explore")}>
                   Explore
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuTrigger>Resources</NavigationMenuTrigger>
+                <NavigationMenuTrigger className={cn(isActive("/resources") && "bg-accent text-accent-foreground")}>
+                  Resources
+                </NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <div className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                    <NavigationMenuLink 
+                    <NavigationMenuLink
                       href="/resources/repository-guide"
                       className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                     >
@@ -137,7 +154,7 @@ export default function Navbar() {
                         Learn how to use the Vec repository system
                       </p>
                     </NavigationMenuLink>
-                    <NavigationMenuLink 
+                    <NavigationMenuLink
                       href="/resources/project-guidelines"
                       className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                     >
@@ -148,6 +165,7 @@ export default function Navbar() {
                     </NavigationMenuLink>
                   </div>
                 </NavigationMenuContent>
+                
               </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
@@ -161,31 +179,25 @@ export default function Navbar() {
         {/* Right side menu items */}
         <div className="flex items-center space-x-4">
           {/* Notifications Dropdown */}
-          <NotificationDropdown 
-            unreadCount={unreadCount}
-            userId={userName} 
-            onMarkAllAsRead={handleMarkAllAsRead} 
-          />
+          <NotificationDropdown unreadCount={unreadCount} userId={userName} onMarkAllAsRead={handleMarkAllAsRead} />
 
           {/* User Menu */}
           <div className="hidden md:flex items-center">
-            <Link 
+            <Link
               href={userName ? `/${userName}` : "/"}
               className="flex items-center border rounded-full px-3 py-1 bg-accent/20 hover:bg-accent/30 transition-colors"
             >
               <User className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                {displayName}
-              </span>
+              <span className="text-sm font-medium">{displayName}</span>
             </Link>
             <LogoutButton className="ml-2" />
           </div>
-          
+
           {/* Mobile menu toggle */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="md:hidden" 
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -200,56 +212,42 @@ export default function Navbar() {
           <div className="mb-4">
             <SearchBar mobile={true} />
           </div>
-          
+
           <div className="flex flex-col space-y-3">
             {/* Show user info in mobile menu */}
-            <Link 
+            <Link
               href={userName ? `/${userName}` : "/"}
               className="flex items-center border rounded-full px-3 py-2 bg-accent/20 mb-2 hover:bg-accent/30 transition-colors"
             >
               <User className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                {displayName}
-              </span>
+              <span className="text-sm font-medium">{displayName}</span>
             </Link>
-            <Link 
-              href="/dashboard" 
-              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <Link href="/group" className={getMobileNavStyle("/group")} onClick={() => setIsMobileMenuOpen(false)}>
               Group
             </Link>
-            <Link 
-              href="/projects" 
-              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
+            <Link
+              href="/projects"
+              className={getMobileNavStyle("/projects")}
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Projects
             </Link>
-            <Link 
-              href="/tasks" 
-              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <Link href="/tasks" className={getMobileNavStyle("/tasks")} onClick={() => setIsMobileMenuOpen(false)}>
               Tasks
             </Link>
-            <Link 
-              href="/explore" 
-              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <Link href="/explore" className={getMobileNavStyle("/explore")} onClick={() => setIsMobileMenuOpen(false)}>
               Explore
             </Link>
-            <Link 
-              href="/resources" 
-              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
+            <Link
+              href="/resources"
+              className={getMobileNavStyle("/resources")}
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Resources
             </Link>
-            <Link 
-              href="/settings" 
-              className="px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground"
+            <Link
+              href="/settings"
+              className={getMobileNavStyle("/settings")}
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Settings

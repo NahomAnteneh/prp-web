@@ -1,7 +1,7 @@
-"use client";
+"use client"
 
-import { Button } from "@/components/ui/button";
-import { Container } from "@/components/ui/container";
+import { Button } from "@/components/ui/button"
+import { Container } from "@/components/ui/container"
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -10,87 +10,88 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { Menu, GraduationCap } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import * as React from "react";
-import { signOut, useSession } from "next-auth/react";
-import { SearchBar } from "@/components/SearchBar";
+} from "@/components/ui/navigation-menu"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { Menu, GraduationCap } from "lucide-react"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import * as React from "react"
+import { signOut, useSession } from "next-auth/react"
+import { SearchBar } from "@/components/SearchBar"
 
 const FEATURES = [
   {
     title: "Project Repository",
     href: "/features#repository",
-    description:
-      "Store all project documents, source code, and resources in a centralized system.",
+    description: "Store all project documents, source code, and resources in a centralized system.",
   },
   {
     title: "Version Control",
     href: "/features#version-control",
-    description:
-      "Track changes and maintain project history with our built-in version control system.",
+    description: "Track changes and maintain project history with our built-in version control system.",
   },
   {
     title: "Advisor Collaboration",
     href: "/features#collaboration",
-    description:
-      "Connect with advisors, get feedback, and collaborate effectively throughout your project.",
+    description: "Connect with advisors, get feedback, and collaborate effectively throughout your project.",
   },
   {
     title: "Role-Based Access",
     href: "/features#roles",
-    description:
-      "Specific access controls for Students, Advisors, Evaluators, and Administrators.",
+    description: "Specific access controls for Students, Advisors, Evaluators, and Administrators.",
   },
-];
+]
 
 interface NavLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
-  active?: boolean;
+  active?: boolean
 }
 
-const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
-  ({ className, active, children, ...props }, ref) => (
-    <a
-      ref={ref}
-      className={cn(
-        "inline-flex items-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background",
-        active ? "text-blue-600 font-semibold" : "text-foreground/70 hover:text-foreground",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </a>
-  )
-);
-NavLink.displayName = "NavLink";
+const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(({ className, active, children, ...props }, ref) => (
+  <a
+    ref={ref}
+    className={cn(
+      "inline-flex items-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background",
+      active ? "text-blue-600 font-semibold" : "text-foreground/70 hover:text-foreground",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+  </a>
+))
+NavLink.displayName = "NavLink"
 
 export function Navbar() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { data: session, status } = useSession();
+  const pathname = usePathname()
+  const router = useRouter()
+  const { data: session, status } = useSession()
 
   // Use the session data
-  const user = session?.user;
+  const user = session?.user
 
   const handleLogout = async () => {
     try {
-      await signOut({ redirect: false });
-      router.push("/");
+      await signOut({ redirect: false })
+      router.push("/")
     } catch (error) {
-      console.error('Error logging out:', error);
+      console.error("Error logging out:", error)
     }
-  };
+  }
+
+  // Helper function to check if a navigation item is active
+  const isActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/"
+    }
+    return pathname.startsWith(href)
+  }
+
+  // Helper function to get navigation menu trigger style with active state
+  const getNavMenuStyle = (href: string) => {
+    return cn(navigationMenuTriggerStyle(), isActive(href) && "bg-accent text-accent-foreground")
+  }
 
   // Show loading indicator during session fetch
   if (status === "loading") {
@@ -101,13 +102,15 @@ export function Navbar() {
             <Link href="/" className="flex items-center space-x-2">
               <GraduationCap className="h-6 w-6 text-blue-600" />
               <span className="text-xl font-bold">PRP</span>
-              <Badge variant="outline" className="ml-2 hidden sm:inline-flex">BiT</Badge>
+              <Badge variant="outline" className="ml-2 hidden sm:inline-flex">
+                BiT
+              </Badge>
             </Link>
           </div>
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
         </Container>
       </header>
-    );
+    )
   }
 
   return (
@@ -117,14 +120,18 @@ export function Navbar() {
           <Link href="/" className="flex items-center space-x-2">
             <GraduationCap className="h-6 w-6 text-blue-600" />
             <span className="text-xl font-bold">PRP</span>
-            <Badge variant="outline" className="ml-2 hidden sm:inline-flex">BiT</Badge>
+            <Badge variant="outline" className="ml-2 hidden sm:inline-flex">
+              BiT
+            </Badge>
           </Link>
 
           {/* Desktop Navigation */}
           <NavigationMenu className="hidden md:flex">
             <NavigationMenuList>
               <NavigationMenuItem>
-                <NavigationMenuTrigger>Features</NavigationMenuTrigger>
+                <NavigationMenuTrigger className={cn(isActive("/features") && "bg-accent text-accent-foreground")}>
+                  Features
+                </NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
                     {FEATURES.map((feature) => (
@@ -134,9 +141,7 @@ export function Navbar() {
                             href={feature.href}
                             className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                           >
-                            <div className="text-sm font-medium leading-none">
-                              {feature.title}
-                            </div>
+                            <div className="text-sm font-medium leading-none">{feature.title}</div>
                             <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                               {feature.description}
                             </p>
@@ -149,21 +154,21 @@ export function Navbar() {
               </NavigationMenuItem>
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
-                  <Link href="/about" className={navigationMenuTriggerStyle()}>
+                  <Link href="/about_us" className={getNavMenuStyle("/about_us")}>
                     About
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
-                  <Link href="/student-guide" className={navigationMenuTriggerStyle()}>
+                  <Link href="/student-guide" className={getNavMenuStyle("/student-guide")}>
                     Student Guide
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
-                  <Link href="/faculty-resources" className={navigationMenuTriggerStyle()}>
+                  <Link href="/faculty-resources" className={getNavMenuStyle("/faculty-resources")}>
                     Faculty
                   </Link>
                 </NavigationMenuLink>
@@ -212,7 +217,9 @@ export function Navbar() {
                 <div className="flex items-center space-x-2">
                   <GraduationCap className="h-5 w-5 text-blue-600" />
                   <span className="font-bold">PRP</span>
-                  <Badge variant="outline" className="ml-1">BiT</Badge>
+                  <Badge variant="outline" className="ml-1">
+                    BiT
+                  </Badge>
                 </div>
               </SheetTitle>
             </SheetHeader>
@@ -220,7 +227,14 @@ export function Navbar() {
               {/* Mobile Search */}
               <SearchBar mobile />
               <div>
-                <span className="flex py-2 text-base font-medium text-foreground/70">Features</span>
+                <span
+                  className={cn(
+                    "flex py-2 text-base font-medium",
+                    isActive("/features") ? "text-blue-600 font-semibold" : "text-foreground/70",
+                  )}
+                >
+                  Features
+                </span>
                 <div className="ml-4 mt-1 space-y-3">
                   {FEATURES.map((feature) => (
                     <Link
@@ -228,7 +242,7 @@ export function Navbar() {
                       href={feature.href}
                       className={cn(
                         "flex py-1 text-sm transition-colors hover:text-blue-600",
-                        pathname.includes(feature.href.split("#")[1]) && "text-blue-600"
+                        pathname.includes(feature.href.split("#")[1]) && "text-blue-600 font-semibold",
                       )}
                     >
                       {feature.title}
@@ -237,10 +251,10 @@ export function Navbar() {
                 </div>
               </div>
               <Link
-                href="/about"
+                href="/about_us"
                 className={cn(
                   "flex py-2 text-base font-medium transition-colors hover:text-blue-600",
-                  pathname.startsWith("/about") && "text-blue-600"
+                  isActive("/about_us") && "text-blue-600 font-semibold bg-accent/50 rounded-md px-2",
                 )}
               >
                 About
@@ -249,7 +263,7 @@ export function Navbar() {
                 href="/student-guide"
                 className={cn(
                   "flex py-2 text-base font-medium transition-colors hover:text-blue-600",
-                  pathname.startsWith("/student-guide") && "text-blue-600"
+                  isActive("/student-guide") && "text-blue-600 font-semibold bg-accent/50 rounded-md px-2",
                 )}
               >
                 Student Guide
@@ -258,7 +272,7 @@ export function Navbar() {
                 href="/faculty-resources"
                 className={cn(
                   "flex py-2 text-base font-medium transition-colors hover:text-blue-600",
-                  pathname.startsWith("/faculty-resources") && "text-blue-600"
+                  isActive("/faculty-resources") && "text-blue-600 font-semibold bg-accent/50 rounded-md px-2",
                 )}
               >
                 Faculty Resources
@@ -289,5 +303,5 @@ export function Navbar() {
         </Sheet>
       </Container>
     </header>
-  );
-} 
+  )
+}
