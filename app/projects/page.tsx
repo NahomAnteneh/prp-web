@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 
+
 // Mock data (replace with API/database fetch)
 const projects = [
   { id: 1, title: "AI-Based Traffic System", status: "Active", updatedAt: "2025-05-15" },
