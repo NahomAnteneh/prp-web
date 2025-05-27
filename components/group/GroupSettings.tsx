@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import {
   Card,
@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, Trash2, UserPlus, Image, Users, Settings, User } from 'lucide-react';
+import { Loader2, Trash2, UserPlus,  Users, Settings, User } from 'lucide-react';
 import { z } from 'zod';
 import { Group, GroupInvite } from '@prisma/client';
 import {
@@ -132,7 +132,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
 
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groupUserName: groupUserName.trim() }),
@@ -172,7 +172,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
       const formData = new FormData();
       formData.append('profilePicture', profilePicture);
 
-      const response = await fetch(`/api/groups/${group.id}/profile-picture`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/profile-picture`, {
         method: 'POST',
         body: formData,
       });
@@ -218,7 +218,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
 
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/invites`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim() || null }),
@@ -252,7 +252,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
   const handleRevokeInvite = async (inviteId: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/invites/${inviteId}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/invites/${inviteId}`, {
         method: 'DELETE',
       });
 
@@ -280,7 +280,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
   const handleDeleteGroup = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}`, {
         method: 'DELETE',
       });
 
@@ -313,7 +313,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
     
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/members/${memberToEdit.userId}`, {
+      const response = await fetch(`/api/groups/${group.groupUserName}/members/${memberToEdit.userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -465,7 +465,7 @@ export default function GroupSettings({ group, maxGroupSize, isLeader, onUpdate 
                 <div>
                   <h2 className="text-lg font-semibold mb-2">Group Username</h2>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Update your group's unique username.
+                    Update your groups unique username.
                   </p>
                   <div className="max-w-md space-y-2">
                     <Input

@@ -100,14 +100,14 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
             </div>
           </div>
 
-          <div className="mt-auto">
+          {/* <div className="mt-auto">
             <Link href="/projects">
               <Button variant="outline" size="sm" className="w-full">
                 View All Projects
                 <ArrowRightIcon className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-          </div>
+          </div> */}
         </CardContent>
       </Card>
 
@@ -155,14 +155,14 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
             </div>
           </div>
 
-          <div className="mt-auto">
+          {/* <div className="mt-auto">
             <Link href="/tasks">
               <Button variant="outline" size="sm" className="w-full">
                 Manage Tasks
                 <ArrowRightIcon className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-          </div>
+          </div> */}
         </CardContent>
       </Card>
 

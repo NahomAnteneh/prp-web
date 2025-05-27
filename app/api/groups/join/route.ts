@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
       await db.$transaction([
         db.groupMember.create({
           data: {
-            groupId: invite.groupId,
+             groupUserName: invite.groupUserName,
             userId: userId,
           },
         }),
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         message: 'Successfully joined the group',
         group: {
-          id: invite.groupId,
+          id: invite.groupUserName,
           name: invite.group.name,
         },
       });

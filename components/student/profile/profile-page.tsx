@@ -1,20 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { User, Users, BookOpen, Clock, Folder, ListChecks } from "lucide-react"
-import Image from "next/image"
+import { User, Users,  Folder, ListChecks } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Navbar from "../navbar";
 import { Navbar as NavBar } from "../../navbar";
 import Footer from "../footer"
 import {Footer as FooterComponent } from "../../footer"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProfileAvatar from "./profile-avatar"
 import ProfileOverview from "./profile-overview"
 import ProjectsList from "./projects-list"
-import RecentActivities from "./recent-activities"
 import TasksList from "./tasks-list"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"

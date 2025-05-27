@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { MegaphoneIcon, ChevronRight, ChevronDown } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -143,13 +142,13 @@ export default function Announcements({ announcements }: AnnouncementsProps) {
           )
         })}
         
-        <div className="flex justify-center pt-2">
+        {/* <div className="flex justify-center pt-2">
           <Link href="/announcements">
             <Button variant="outline" size="sm" className="w-full">
               View All Announcements
             </Button>
           </Link>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   )

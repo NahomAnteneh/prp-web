@@ -124,7 +124,7 @@ export default function Navbar() {
                   Group
                 </NavigationMenuLink>
               </NavigationMenuItem>
-              <NavigationMenuItem>
+              {/* <NavigationMenuItem>
                 <NavigationMenuLink href="/projects" className={getNavMenuStyle("/projects")}>
                   Projects
                 </NavigationMenuLink>
@@ -133,7 +133,7 @@ export default function Navbar() {
                 <NavigationMenuLink href="/tasks" className={getNavMenuStyle("/tasks")}>
                   Tasks
                 </NavigationMenuLink>
-              </NavigationMenuItem>
+              </NavigationMenuItem> */}
               <NavigationMenuItem>
                 <NavigationMenuLink href="/explore" className={getNavMenuStyle("/explore")}>
                   Explore
@@ -225,7 +225,7 @@ export default function Navbar() {
             <Link href="/group" className={getMobileNavStyle("/group")} onClick={() => setIsMobileMenuOpen(false)}>
               Group
             </Link>
-            <Link
+            {/* <Link
               href="/projects"
               className={getMobileNavStyle("/projects")}
               onClick={() => setIsMobileMenuOpen(false)}
@@ -234,7 +234,7 @@ export default function Navbar() {
             </Link>
             <Link href="/tasks" className={getMobileNavStyle("/tasks")} onClick={() => setIsMobileMenuOpen(false)}>
               Tasks
-            </Link>
+            </Link> */}
             <Link href="/explore" className={getMobileNavStyle("/explore")} onClick={() => setIsMobileMenuOpen(false)}>
               Explore
             </Link>
@@ -245,13 +245,13 @@ export default function Navbar() {
             >
               Resources
             </Link>
-            <Link
+            {/* <Link
               href="/settings"
               className={getMobileNavStyle("/settings")}
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Settings
-            </Link>
+            </Link> */}
             <div className="pt-2 border-t">
               <LogoutButton />
             </div>

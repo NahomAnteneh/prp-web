@@ -1,21 +1,21 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { motion } from "framer-motion";
-import { GraduationCap, Users, Compass, GitBranch } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { signIn } from "next-auth/react";
-import ProfilePhotoModal from "@/components/student/profile/profile-photo-modal";
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { motion } from "framer-motion"
+import { GraduationCap, Users, Compass, GitBranch } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Badge } from "@/components/ui/badge"
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -25,7 +25,7 @@ export default function RegisterPage() {
     batchYear: "",
     password: "",
     confirmPassword: "",
-  });
+  })
   const [formErrors, setFormErrors] = useState({
     firstName: "",
     lastName: "",
@@ -36,30 +36,30 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     general: "",
-  });
-  const [showProfilePhotoModal, setShowProfilePhotoModal] = useState(false);
+  })
+  const [showSuccess, setShowSuccess] = useState(false)
 
   useEffect(() => {
     // Check if user is already authenticated (commented out in original code)
-  }, [router]);
+  }, [router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
     if (formErrors[name as keyof typeof formErrors]) {
-      setFormErrors(prev => ({ ...prev, [name]: "" }));
+      setFormErrors((prev) => ({ ...prev, [name]: "" }))
     }
-  };
+  }
 
   const handleSelectChange = (name: string, value: string): void => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }))
     if (formErrors[name as keyof typeof formErrors]) {
-      setFormErrors(prev => ({ ...prev, [name]: "" }));
+      setFormErrors((prev) => ({ ...prev, [name]: "" }))
     }
-  };
+  }
 
   const validateForm = () => {
-    let isValid = true;
+    let isValid = true
     const errors = {
       firstName: "",
       lastName: "",
@@ -70,18 +70,18 @@ export default function RegisterPage() {
       password: "",
       confirmPassword: "",
       general: "",
-    };
+    }
 
     // First Name validation
     if (!formData.firstName) {
-      errors.firstName = "First name is required";
-      isValid = false;
+      errors.firstName = "First name is required"
+      isValid = false
     }
 
     // Last Name validation
     if (!formData.lastName) {
-      errors.lastName = "Last name is required";
-      isValid = false;
+      errors.lastName = "Last name is required"
+      isValid = false
     }
 
     // Username validation
@@ -95,70 +95,70 @@ export default function RegisterPage() {
 
     // ID Number validation
     if (!formData.userId) {
-      errors.userId = "ID number is required";
-      isValid = false;
+      errors.userId = "ID number is required"
+      isValid = false
     } else if (!formData.userId.startsWith("BDU")) {
-      errors.userId = "ID number must start with 'BDU'";
-      isValid = false;
+      errors.userId = "ID number must start with 'BDU'"
+      isValid = false
     }
 
     // Institutional Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!formData.email) {
-      errors.email = "Institutional email is required";
-      isValid = false;
+      errors.email = "Institutional email is required"
+      isValid = false
     } else if (!emailRegex.test(formData.email)) {
-      errors.email = "Please enter a valid email address";
-      isValid = false;
-    } else if (!formData.email.endsWith('bdu.edu.et')) {
-      errors.email = "Please use your BiT institutional email";
-      isValid = false;
+      errors.email = "Please enter a valid email address"
+      isValid = false
+    } else if (!formData.email.endsWith("bdu.edu.et")) {
+      errors.email = "Please use your BiT institutional email"
+      isValid = false
     }
 
     // Department validation
     if (!formData.department) {
-      errors.department = "Department is required";
-      isValid = false;
+      errors.department = "Department is required"
+      isValid = false
     }
 
     // Batch Year validation
     if (!formData.batchYear) {
-      errors.batchYear = "Batch year is required";
-      isValid = false;
+      errors.batchYear = "Batch year is required"
+      isValid = false
     }
 
     // Password validation
     if (!formData.password) {
-      errors.password = "Password is required";
-      isValid = false;
+      errors.password = "Password is required"
+      isValid = false
     } else if (formData.password.length < 8) {
-      errors.password = "Password must be at least 8 characters";
-      isValid = false;
+      errors.password = "Password must be at least 8 characters"
+      isValid = false
     }
 
     // Confirm password validation
     if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
-      isValid = false;
+      errors.confirmPassword = "Passwords do not match"
+      isValid = false
     }
 
-    setFormErrors(errors);
-    return isValid;
-  };
+    setFormErrors(errors)
+    return isValid
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+    e.preventDefault()
+
     if (!validateForm()) {
-      return;
+      return
     }
 
-    setIsLoading(true);
+    setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -166,44 +166,35 @@ export default function RegisterPage() {
           email: formData.email,
           password: formData.password,
           department: formData.department,
-          batchYear: formData.batchYear
+          batchYear: formData.batchYear,
         }),
-      });
-      
+      })
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Registration failed');
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Registration failed")
       }
-      
-      const data = await response.json();
-      console.log("Registration successful", data);
-      
-      // Sign in automatically after registration
-      console.log("Registration successful, attempting auto-login with:", { userId: formData.userId });
-      const signInRes = await signIn('credentials', {
-        redirect: false,
-        identifier: formData.userId,
-        password: formData.password
-      });
 
-      console.log("Auto-login result:", signInRes);
+      const data = await response.json()
+      console.log("Registration successful", data)
 
-      if (signInRes?.error) {
-        console.error("Auto-login failed:", signInRes.error);
-        throw new Error(signInRes.error || 'Failed to sign in after registration');
-      }
-      
-      // Show profile photo modal or redirect to home page
-      setShowProfilePhotoModal(true);
+      // Show success message
+      setShowSuccess(true)
+      setIsLoading(false)
+
+      // Redirect to login page after 3 seconds
+      setTimeout(() => {
+        router.push("/login")
+      }, 3000)
     } catch (error) {
-      console.error("Registration error:", error);
-      setFormErrors(prev => ({
+      console.error("Registration error:", error)
+      setFormErrors((prev) => ({
         ...prev,
-        general: error instanceof Error ? error.message : "Registration failed. Please try again."
-      }));
-      setIsLoading(false);
+        general: error instanceof Error ? error.message : "Registration failed. Please try again.",
+      }))
+      setIsLoading(false)
     }
-  };
+  }
 
   const departments = [
     { value: "computer-science", label: "Computer Science" },
@@ -211,10 +202,10 @@ export default function RegisterPage() {
     { value: "software-engineering", label: "Software Engineering" },
     { value: "information-systems", label: "Information Systems" },
     { value: "computer-engineering", label: "Computer Engineering" },
-  ];
+  ]
 
-  const currentYear = new Date().getFullYear();
-  const batchYears = Array.from({ length: 7 }, (_, i) => (currentYear - 5 + i).toString());
+  const currentYear = new Date().getFullYear()
+  const batchYears = Array.from({ length: 7 }, (_, i) => (currentYear - 5 + i).toString())
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -224,20 +215,20 @@ export default function RegisterPage() {
           <Link href="/" className="inline-flex items-center space-x-2">
             <GraduationCap className="h-6 w-6 text-blue-600" />
             <span className="text-xl font-bold">PRP</span>
-            <Badge variant="outline" className="ml-2 hidden sm:inline-flex">BiT</Badge>
+            <Badge variant="outline" className="ml-2 hidden sm:inline-flex">
+              BiT
+            </Badge>
           </Link>
         </div>
-        
-        <motion.div 
+
+        <motion.div
           className="max-w-md mx-auto w-full mt-16"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-              Join PRP at BiT
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Join PRP at BiT</h1>
             <p className="mt-3 text-gray-600">
               Create an account to start managing your final-year projects with our comprehensive platform.
             </p>
@@ -245,16 +236,36 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {formErrors.general && (
-              <div className="p-4 bg-red-50 rounded-lg text-red-600 text-sm shadow-sm">
-                {formErrors.general}
-              </div>
+              <div className="p-4 bg-red-50 rounded-lg text-red-600 text-sm shadow-sm">{formErrors.general}</div>
             )}
-            
+
+            {showSuccess && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-green-50 rounded-lg text-green-700 text-sm shadow-sm border border-green-200"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <svg className="h-2 w-2 text-white" fill="currentColor" viewBox="0 0 8 8">
+                      <path d="M6.564.75l-3.59 3.612-1.538-1.55L0 4.26l2.974 2.99L8 2.193z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Registration successful!</span>
+                </div>
+                <p className="mt-1 text-green-600">
+                  Your account has been created successfully. Redirecting to login page...
+                </p>
+              </motion.div>
+            )}
+
             {/* First Name and Last Name Group */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName" className="text-gray-700">First Name</Label>
-                <Input 
+                <Label htmlFor="firstName" className="text-gray-700">
+                  First Name
+                </Label>
+                <Input
                   id="firstName"
                   name="firstName"
                   value={formData.firstName}
@@ -262,13 +273,13 @@ export default function RegisterPage() {
                   placeholder="Your first name"
                   className={`border-0 bg-gray-50 shadow-sm ${formErrors.firstName ? "ring-2 ring-red-500" : ""}`}
                 />
-                {formErrors.firstName && (
-                  <p className="text-sm text-red-500">{formErrors.firstName}</p>
-                )}
+                {formErrors.firstName && <p className="text-sm text-red-500">{formErrors.firstName}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName" className="text-gray-700">Last Name</Label>
-                <Input 
+                <Label htmlFor="lastName" className="text-gray-700">
+                  Last Name
+                </Label>
+                <Input
                   id="lastName"
                   name="lastName"
                   value={formData.lastName}
@@ -276,9 +287,7 @@ export default function RegisterPage() {
                   placeholder="Your last name"
                   className={`border-0 bg-gray-50 shadow-sm ${formErrors.lastName ? "ring-2 ring-red-500" : ""}`}
                 />
-                {formErrors.lastName && (
-                  <p className="text-sm text-red-500">{formErrors.lastName}</p>
-                )}
+                {formErrors.lastName && <p className="text-sm text-red-500">{formErrors.lastName}</p>}
               </div>
             </div>
 
@@ -297,10 +306,12 @@ export default function RegisterPage() {
                 <p className="text-sm text-red-500">{formErrors.username}</p>
               )}
             </div> */}
-            
+
             <div className="space-y-2">
-              <Label htmlFor="userId" className="text-gray-700">Student ID</Label>
-              <Input 
+              <Label htmlFor="userId" className="text-gray-700">
+                Student ID
+              </Label>
+              <Input
                 id="userId"
                 name="userId"
                 value={formData.userId}
@@ -308,14 +319,14 @@ export default function RegisterPage() {
                 placeholder="Your BiT student ID number"
                 className={`border-0 bg-gray-50 shadow-sm ${formErrors.userId ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.userId && (
-                <p className="text-sm text-red-500">{formErrors.userId}</p>
-              )}
+              {formErrors.userId && <p className="text-sm text-red-500">{formErrors.userId}</p>}
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-700">Institutional Email</Label>
-              <Input 
+              <Label htmlFor="email" className="text-gray-700">
+                Institutional Email
+              </Label>
+              <Input
                 id="email"
                 name="email"
                 type="email"
@@ -324,18 +335,15 @@ export default function RegisterPage() {
                 placeholder="your.name@bdu.edu.et"
                 className={`border-0 bg-gray-50 shadow-sm ${formErrors.email ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.email && (
-                <p className="text-sm text-red-500">{formErrors.email}</p>
-              )}
+              {formErrors.email && <p className="text-sm text-red-500">{formErrors.email}</p>}
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="department" className="text-gray-700">Department</Label>
-                <Select 
-                  value={formData.department} 
-                  onValueChange={(value) => handleSelectChange("department", value)}
-                >
+                <Label htmlFor="department" className="text-gray-700">
+                  Department
+                </Label>
+                <Select value={formData.department} onValueChange={(value) => handleSelectChange("department", value)}>
                   <SelectTrigger
                     id="department"
                     className={`border-0 bg-gray-50 shadow-sm ${formErrors.department ? "ring-2 ring-red-500" : ""}`}
@@ -344,21 +352,20 @@ export default function RegisterPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {departments.map((dept) => (
-                      <SelectItem key={dept.value} value={dept.value}>{dept.label}</SelectItem>
+                      <SelectItem key={dept.value} value={dept.value}>
+                        {dept.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {formErrors.department && (
-                  <p className="text-sm text-red-500">{formErrors.department}</p>
-                )}
+                {formErrors.department && <p className="text-sm text-red-500">{formErrors.department}</p>}
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="batchYear" className="text-gray-700">Batch Year</Label>
-                <Select 
-                  value={formData.batchYear} 
-                  onValueChange={(value) => handleSelectChange("batchYear", value)}
-                >
+                <Label htmlFor="batchYear" className="text-gray-700">
+                  Batch Year
+                </Label>
+                <Select value={formData.batchYear} onValueChange={(value) => handleSelectChange("batchYear", value)}>
                   <SelectTrigger
                     id="batchYear"
                     className={`border-0 bg-gray-50 shadow-sm ${formErrors.batchYear ? "ring-2 ring-red-500" : ""}`}
@@ -367,19 +374,21 @@ export default function RegisterPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {batchYears.map((year) => (
-                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {formErrors.batchYear && (
-                  <p className="text-sm text-red-500">{formErrors.batchYear}</p>
-                )}
+                {formErrors.batchYear && <p className="text-sm text-red-500">{formErrors.batchYear}</p>}
               </div>
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-700">Password</Label>
-              <Input 
+              <Label htmlFor="password" className="text-gray-700">
+                Password
+              </Label>
+              <Input
                 id="password"
                 name="password"
                 type="password"
@@ -388,14 +397,14 @@ export default function RegisterPage() {
                 placeholder="Create a secure password"
                 className={`border-0 bg-gray-50 shadow-sm ${formErrors.password ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.password && (
-                <p className="text-sm text-red-500">{formErrors.password}</p>
-              )}
+              {formErrors.password && <p className="text-sm text-red-500">{formErrors.password}</p>}
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-gray-700">Confirm Password</Label>
-              <Input 
+              <Label htmlFor="confirmPassword" className="text-gray-700">
+                Confirm Password
+              </Label>
+              <Input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
@@ -404,37 +413,30 @@ export default function RegisterPage() {
                 placeholder="Confirm your password"
                 className={`border-0 bg-gray-50 shadow-sm ${formErrors.confirmPassword ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.confirmPassword && (
-                <p className="text-sm text-red-500">{formErrors.confirmPassword}</p>
-              )}
+              {formErrors.confirmPassword && <p className="text-sm text-red-500">{formErrors.confirmPassword}</p>}
             </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={isLoading}
-            >
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="h-4 w-4 border-2 border-white border-r-transparent rounded-full animate-spin" />
                   Creating account...
                 </span>
-              ) : "Create Account"}
+              ) : (
+                "Create Account"
+              )}
             </Button>
-            
+
             <p className="text-center text-sm text-gray-600">
               Already have an account?{" "}
-              <Link 
-                href="/login" 
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
+              <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
                 Sign in
               </Link>
             </p>
           </form>
         </motion.div>
       </div>
-      
+
       {/* Right Column - Hero/Info Section */}
       <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-500 to-sky-500 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -450,7 +452,7 @@ export default function RegisterPage() {
 
         <div className="relative h-full flex flex-col justify-center items-center p-12 z-10">
           <div className="w-full max-w-md">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
@@ -461,12 +463,13 @@ export default function RegisterPage() {
               </div>
               <h2 className="text-3xl font-bold text-white mb-4">Final-Year Project Success</h2>
               <p className="text-white/90 text-lg leading-relaxed">
-                Join our platform designed specifically for BiT students to collaborate with advisors and showcase your academic achievements.
+                Join our platform designed specifically for BiT students to collaborate with advisors and showcase your
+                academic achievements.
               </p>
             </motion.div>
 
             <div className="space-y-6">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
@@ -477,11 +480,13 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <h3 className="text-white font-medium text-lg">Project Guidance</h3>
-                  <p className="text-white/80">Follow department standards and requirements with built-in templates and guidelines.</p>
+                  <p className="text-white/80">
+                    Follow department standards and requirements with built-in templates and guidelines.
+                  </p>
                 </div>
               </motion.div>
-              
-              <motion.div 
+
+              <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
@@ -492,24 +497,15 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <h3 className="text-white font-medium text-lg">Distributed Repository</h3>
-                  <p className="text-white/80">Store project resources and track changes with integrated version control.</p>
+                  <p className="text-white/80">
+                    Store project resources and track changes with integrated version control.
+                  </p>
                 </div>
               </motion.div>
             </div>
           </div>
         </div>
       </div>
-
-      {showProfilePhotoModal && (
-        <ProfilePhotoModal
-          isOpen={showProfilePhotoModal}
-          onClose={() => setShowProfilePhotoModal(false)}
-          userId={formData.userId}
-          onSuccess={() => {
-            router.push("/");
-          }}
-        />
-      )}
     </div>
-  );
+  )
 }
