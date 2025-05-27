@@ -1,117 +1,151 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Bell, User, Settings, LogOut } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
+import { Bell, User, LogOut, Menu, X, Settings, GraduationCap, Mail } from 'lucide-react';
+// Assuming NotificationsPopover can be used or adapted. 
+// If it's advisor-specific, a new evaluator version would be needed.
+import NotificationsPopover from '@/components/advisor/dashboard/NotificationsPopover'; 
 import { Button } from '@/components/ui/button';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { signOut } from 'next-auth/react';
+import { cn } from '@/lib/utils'; // For potential cn usage if needed for active links in mobile
 
 interface EvaluatorNavbarProps {
   unreadNotifications?: number;
+  // Add username or user object if needed for display, similar to AdvisorNavbar if profile link is dynamic
+  // For now, assuming /profile and /settings are static links for evaluator
 }
 
 export default function EvaluatorNavbar({ unreadNotifications = 0 }: EvaluatorNavbarProps) {
-  const pathname = usePathname();
-  
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: session } = useSession();
+  const userId = session?.user?.userId; // Get userId for dynamic profile link
+
+  // Mobile navigation items (not part of the main tabs in EvaluatorDashboard)
+  const mobileOnlyNavigationItems = [
+    { name: 'Messages', href: '/dashboard/evaluator/messages', icon: Mail },
+    { name: 'Settings', href: '/settings', icon: Settings }, // Adjusted to a generic /settings
+  ];
+
   return (
-    <header className="bg-white shadow">
+    <header className="bg-background border-b sticky top-0 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="font-bold text-xl text-blue-600">
-                PRP
-              </Link>
-            </div>
-            <nav className="ml-10 flex items-center space-x-4">
-              <Link 
-                href="/dashboard" 
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  pathname === '/dashboard' 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                Dashboard
-              </Link>
-              <Link 
-                href="/projects" 
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  pathname.startsWith('/projects') 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                Projects
-              </Link>
-              <Link
-                href="/calendar"
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  pathname === '/calendar' 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                Calendar
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/notifications" className="relative">
-              <Button variant="ghost" size="icon">
-                <Bell className="h-5 w-5 text-gray-500" />
-                {unreadNotifications > 0 && (
-                  <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-red-500 flex items-center justify-center text-[10px] text-white">
-                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                  </span>
-                )}
-              </Button>
+        <div className="flex items-center justify-between h-16">
+          {/* Logo/Brand */}
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="h-8 w-8 rounded-full bg-cyan-100 flex items-center justify-center">
+                {/* Using GraduationCap like AdvisorNavbar for consistency */}
+                <GraduationCap className="h-4 w-4 text-cyan-600" /> 
+              </span>
+              <h1 className="text-xl font-bold">PRP</h1>
             </Link>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <User className="h-5 w-5 text-gray-500" />
+          </div>
+
+          {/* Desktop Navigation Links - Removed as main navigation is via Dashboard Tabs */}
+          {/* <nav className="ml-10 flex items-center space-x-4">
+            ...
+          </nav> */}
+
+          {/* Spacer to push User Actions to the right */}
+          <div className="flex-grow md:block hidden"></div>
+
+          {/* User Actions - Desktop */}
+          <div className="hidden md:flex items-center space-x-1.5">
+            <NotificationsPopover count={unreadNotifications} />
+
+            {/* Profile/User ID Button - Make it dynamic if userId is available */}
+            {userId ? (
+              <Link href={`/${userId}`} passHref legacyBehavior>
+                <Button variant="ghost" className="items-center">
+                  <User size={18} className="mr-1.5" />
+                  Profile
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">Evaluator Account</p>
-                  <p className="text-xs text-gray-500 truncate">evaluator@bit.edu</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
-                    <User className="h-4 w-4 mr-2" />
-                    <span>Profile</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="cursor-pointer">
-                    <Settings className="h-4 w-4 mr-2" />
-                    <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="cursor-pointer text-red-600 focus:text-red-600"
-                  onClick={() => signOut({ callbackUrl: '/' })}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </Link>
+            ) : (
+              <Button variant="ghost" className="items-center" disabled>
+                <User size={18} className="mr-1.5" />
+                Profile
+              </Button>
+            )}
+
+            {/* Direct Logout Button */}
+            <Button
+              variant="ghost"
+              onClick={() => signOut({ callbackUrl: '/' })}
+              className="items-center text-red-600 hover:text-red-700 hover:bg-red-100/50"
+            >
+              <LogOut size={18} className="mr-1.5" />
+              Logout
+            </Button>
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <NotificationsPopover count={unreadNotifications} />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Open menu"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </Button>
           </div>
         </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <nav className="md:hidden py-3 border-t">
+            <div className="space-y-1 px-2">
+              {/* Dynamic Profile Link for Mobile Menu */}
+              {userId ? (
+                <Link
+                  href={`/${userId}`}
+                  className="flex items-center px-3 py-3 text-base font-medium rounded-md text-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User size={20} className="mr-3 text-muted-foreground" />
+                  Profile
+                </Link>
+              ) : (
+                 <button
+                    className="flex items-center px-3 py-3 text-base font-medium rounded-md text-foreground hover:bg-muted hover:text-foreground w-full text-left opacity-50 cursor-not-allowed"
+                    disabled
+                  >
+                    <User size={20} className="mr-3 text-muted-foreground" />
+                    Profile
+                </button>
+              )}
+
+              {mobileOnlyNavigationItems.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="flex items-center px-3 py-3 text-base font-medium rounded-md text-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <item.icon size={20} className="mr-3 text-muted-foreground" />
+                  {item.name}
+                </Link>
+              ))}
+
+              {/* Logout Button for Mobile Menu */}
+              <div className="border-t mt-2 pt-2">
+                <button
+                  onClick={() => {
+                    signOut({ callbackUrl: '/' });
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center px-3 py-3 text-base font-medium rounded-md text-red-600 hover:bg-red-100/50 hover:text-red-700 w-full text-left"
+                >
+                  <LogOut size={20} className="mr-3 text-muted-foreground" />
+                  Log out
+                </button>
+              </div>
+            </div>
+          </nav>
+        )}
       </div>
     </header>
   );

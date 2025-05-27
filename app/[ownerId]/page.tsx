@@ -8,13 +8,17 @@ import AdvisorProfilePage from "@/components/advisor/profile/profile-page";
 import { useSession } from "next-auth/react";
 import GroupPage from "@/components/group/group-page";
 
+// Define a local type that includes the 'id' field for GroupPage consumption
+type GroupWithId = Group & { id: string };
+
 export default function UserPage() {
   // Use the useParams hook to get route parameters
   const params = useParams();
-  const ownerId = params?.ownerId as string;
+  const ownerId = params?.ownerId as string; // This ownerId is the groupUserName
   const { data: session, status } = useSession();
   const [userData, setUserData] = useState<User | null>(null);
-  const [groupData, setGroupData] = useState<Group | null>(null);
+  // Use the new GroupWithId type for groupData state
+  const [groupData, setGroupData] = useState<GroupWithId | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
 
   useEffect(() => {
@@ -34,11 +38,12 @@ export default function UserPage() {
 
     try {
       // Check if it is a group
-      const groupResponse = await fetch(`/api/groups/${id}`);
+      const groupResponse = await fetch(`/api/groups/${id}`); // Fetch using groupUserName
 
       if (groupResponse.ok) {
-        const group: Group = await groupResponse.json();
-        setGroupData(group); // Set group data on success
+        const fetchedGroup: Group = await groupResponse.json();
+        // Construct the object for GroupPage: spread fetchedGroup and add 'id' (which is groupUserName)
+        setGroupData({ ...fetchedGroup, id: fetchedGroup.groupUserName }); 
         return;
       }
 
@@ -106,19 +111,24 @@ export default function UserPage() {
       );
     }
 
+    if (userData.role === Role.EVALUATOR) {
+      return (
+        <>
+          {/* <div className="bg-blue-50 py-2 border-b mb-4">
+            <div className="container mx-auto">
+              <h1 className="text-lg text-blue-800 font-medium">Viewing Evaluator Profile</h1>
+            </div>
+          </div> */}
+          <AdvisorProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor} />
+        </>
+      );
+    }
+
     // Default profile page for other user types
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="bg-blue-50 py-2 border-b mb-4 -mx-4">
-          <div className="container mx-auto">
-            <h1 className="text-lg text-blue-800 font-medium">Viewing Profile</h1>
-          </div>
-        </div>
-        <h1 className="text-3xl font-bold">Profile Page for {userData.firstName || userData.userId}</h1>
-        <p className="mt-4 text-muted-foreground">
-          This is a {userData.role.toLowerCase()} profile. Full profile details coming soon.
-        </p>
-      </div>
+      <>
+        <AdvisorProfilePage userId={userData.userId} username={userData.userId} visitor={isVisitor}/>
+      </>
     );
   }
 

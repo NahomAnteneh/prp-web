@@ -37,18 +37,10 @@ export async function GET(req: NextRequest) {
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Check if there's a system rule for maximum projects per advisor
-    let maxProjectsPerAdvisor = 5; // Default value
-    try {
-      const rule = await db.rule.findFirst();
-      if (rule && rule.maxProjectsPerAdvisor) {
-        maxProjectsPerAdvisor = rule.maxProjectsPerAdvisor;
-      }
-    } catch (error) {
-      console.warn('Could not fetch maxProjectsPerAdvisor rule, using default value:', error);
-      // Continue with default value if we can't get the rule
-    }
-
+    // Default maximum projects per advisor
+    // Note: Currently using a hardcoded value since this is not stored in the database
+    const maxProjectsPerAdvisor = 5;
+    
     // Build the where clause
     const where: any = {
       role: 'ADVISOR',
@@ -125,10 +117,10 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    // console.error('Error fetching available advisors:', error);
+    console.error('Error fetching available advisors:', error);
     return NextResponse.json(
       { message: 'Error fetching available advisors' },
       { status: 500 }
     );
   }
-}
+} 

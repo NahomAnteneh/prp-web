@@ -1,43 +1,32 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { Role } from '@prisma/client';
 
-export async function GET() {
+// GET /api/evaluator/completed-evaluations
+export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.userId || session.user.role !== Role.EVALUATOR) {
+    return NextResponse.json(
+      { error: 'Unauthorized. Must be an evaluator to view completed evaluations.' },
+      { status: 401 }
+    );
+  }
+
+  const evaluatorId = session.user.userId;
+
   try {
-    // Get the authenticated user's session
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    // Get user ID from session
-    const userId = session.user.userId;
-    
-    // Verify the user is an evaluator
-    const user = await prisma.user.findUnique({
-      where: { userId },
-      select: { role: true },
-    });
-    
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-    
-    if (user.role !== 'EVALUATOR') {
-      return NextResponse.json({ error: 'Access denied. User is not an evaluator' }, { status: 403 });
-    }
-    
-    // Get completed evaluations
-    const completedEvaluations = await prisma.evaluation.findMany({
-      where: { authorId: userId },
+    const evaluations = await prisma.evaluation.findMany({
+      where: {
+        authorId: evaluatorId,
+      },
       include: {
         project: {
           select: {
             id: true,
             title: true,
-            status: true,
             submissionDate: true,
             group: {
               select: {
@@ -49,35 +38,20 @@ export async function GET() {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: 'desc', // Assuming createdAt of evaluation is the evaluationDate
       },
     });
-    
-    // Format the evaluations for the response
-    const formattedEvaluations = completedEvaluations.map(evaluation => {
-      const criteriaData = evaluation.criteriaData as any || {};
-      
-      return {
-        id: evaluation.id,
-        projectId: evaluation.projectId,
-        projectTitle: evaluation.project.title,
-        groupName: evaluation.project.group.name,
-        groupUserName: evaluation.project.group.groupUserName,
-        score: evaluation.score,
-        comments: evaluation.comments,
-        criteria: criteriaData.criteria || [],
-        submissionDate: evaluation.project.submissionDate,
-        evaluationDate: evaluation.createdAt,
-        projectStatus: evaluation.project.status,
-      };
-    });
-    
-    return NextResponse.json(formattedEvaluations);
-    
+
+    // The frontend CompletedTab expects fields like projectTitle, groupName, evaluationDate, score, category.
+    // The transformation is already handled in the CompletedTab.tsx component using this data structure.
+    // (e.g., evaluation.project?.title, new Date(evaluation.createdAt) for evaluationDate)
+    // So, we can return the evaluations as fetched, assuming frontend can map them.
+
+    return NextResponse.json(evaluations, { status: 200 });
   } catch (error) {
-    console.error('Error fetching completed evaluations:', error);
+    console.error(`Error fetching completed evaluations for evaluator ${evaluatorId}:`, error);
     return NextResponse.json(
-      { error: 'Failed to fetch completed evaluations' },
+      { error: 'Internal server error while fetching completed evaluations.' },
       { status: 500 }
     );
   }

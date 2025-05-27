@@ -7,7 +7,7 @@ import { Navbar } from "@/components/navbar";
 import StudentDashboard from "@/components/student/dashboard/student-dashboard";
 import { Footer } from "@/components/footer";
 import { Role } from "@prisma/client";
-import AdvisorDashboard from "@/components/advisor/dashboard/AdvisorDashboard";
+import AdvisorDashboardTabs from "@/components/advisor/dashboard/AdvisorDashboardTabs";
 import EvaluatorDashboard from "@/components/evaluator/dashboard/EvaluatorDashboard";
 
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export default async function Home() {
       case Role.STUDENT:
         return <StudentDashboard />;
       case Role.ADVISOR:
-        return <AdvisorDashboard />;
+        return <AdvisorDashboardTabs />;
       case Role.EVALUATOR:
         return <EvaluatorDashboard />;
       default:

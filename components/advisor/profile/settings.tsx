@@ -4,13 +4,10 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Settings, Save, Loader2, Lock, Mail, Building, Clock, Briefcase, BookOpen } from "lucide-react";
+import { Settings, Save, Loader2, Lock, Mail, Building, Clock, Briefcase } from "lucide-react";
 import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SettingsProps {
   userId: string;
@@ -28,19 +25,11 @@ export default function AdvisorSettings({ userId, isOwner, initialData }: Settin
     officeNumber: initialData?.profileInfo?.officeNumber || "",
     officeHours: initialData?.profileInfo?.officeHours || "",
     specialization: initialData?.profileInfo?.specialization || "",
-    bio: initialData?.profileInfo?.bio || "",
-    researchInterests: initialData?.profileInfo?.researchInterests?.join(", ") || "",
-    emailNotifications: initialData?.profileInfo?.emailNotifications !== false,
-    publicProfile: initialData?.profileInfo?.publicProfile !== false,
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSwitchChange = (name: string, checked: boolean) => {
-    setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,21 +43,13 @@ export default function AdvisorSettings({ userId, isOwner, initialData }: Settin
     try {
       setIsLoading(true);
 
-      // Format profileInfo
       const profileInfo = {
         department: formData.department,
         officeNumber: formData.officeNumber,
         officeHours: formData.officeHours,
         specialization: formData.specialization,
-        bio: formData.bio,
-        researchInterests: formData.researchInterests
-          ? formData.researchInterests.split(",").map((item: string) => item.trim())
-          : [],
-        emailNotifications: formData.emailNotifications,
-        publicProfile: formData.publicProfile,
       };
 
-      // Make API call to update user data
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",
         headers: {
@@ -96,7 +77,6 @@ export default function AdvisorSettings({ userId, isOwner, initialData }: Settin
     }
   };
 
-  // If not the owner, show a message
   if (!isOwner) {
     return (
       <Card>
@@ -227,85 +207,16 @@ export default function AdvisorSettings({ userId, isOwner, initialData }: Settin
                 />
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio" className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-muted-foreground" /> Biography
-              </Label>
-              <Textarea
-                id="bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleInputChange}
-                rows={4}
-                placeholder="Share your professional background and experience..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="researchInterests">Research Interests</Label>
-              <Textarea
-                id="researchInterests"
-                name="researchInterests"
-                value={formData.researchInterests}
-                onChange={handleInputChange}
-                rows={2}
-                placeholder="Enter research interests separated by commas"
-              />
-              <p className="text-xs text-muted-foreground">
-                Separate different research interests with commas
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Preferences Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Profile Preferences</h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="emailNotifications">Email Notifications</Label>
-                <p className="text-xs text-muted-foreground">
-                  Receive notifications about your advised projects
-                </p>
-              </div>
-              <Switch
-                id="emailNotifications"
-                checked={formData.emailNotifications}
-                onCheckedChange={(checked: boolean) => handleSwitchChange("emailNotifications", checked)}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="publicProfile">Public Profile</Label>
-                <p className="text-xs text-muted-foreground">
-                  Make your profile visible to students looking for advisors
-                </p>
-              </div>
-              <Switch
-                id="publicProfile"
-                checked={formData.publicProfile}
-                onCheckedChange={(checked: boolean) => handleSwitchChange("publicProfile", checked)}
-              />
-            </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end space-x-2 border-t px-6 py-4">
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="gap-2"
-          >
+        <CardFooter className="border-t pt-6">
+          <Button type="submit" disabled={isLoading} className="ml-auto">
             {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Saving...
-              </>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <>
-                <Save className="h-4 w-4" /> Save Changes
-              </>
+              <Save className="mr-2 h-4 w-4" />
             )}
+            Save Changes
           </Button>
         </CardFooter>
       </form>

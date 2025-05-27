@@ -1,135 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { Role, FeedbackStatus } from '@prisma/client';
 
-// Schema for validation
-const statusUpdateSchema = z.object({
-  status: z.enum(['OPEN', 'ADDRESSED', 'CLOSED']),
-});
+interface RequestBody {
+  status: FeedbackStatus;
+}
 
+// PATCH /api/evaluator/project-feedback/:feedbackId/status
 export async function PATCH(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { feedbackId: string } }
 ) {
+  const session = await getServerSession(authOptions);
+
+  // For now, only evaluators can change status. This can be broadened if other roles need to.
+  if (!session?.user?.userId || session.user.role !== Role.EVALUATOR) {
+    return NextResponse.json({ error: 'Unauthorized. Must be an evaluator to update feedback status.' }, { status: 401 });
+  }
+
+  const { feedbackId } = params;
+  const updaterId = session.user.userId; // For logging or audit if needed
+
   try {
-    const feedbackId = params.feedbackId;
-    
-    if (!feedbackId) {
-      return NextResponse.json({ error: 'Feedback ID is required' }, { status: 400 });
+    const body: RequestBody = await request.json();
+    const { status } = body;
+
+    if (!status || !Object.values(FeedbackStatus).includes(status)) {
+      return NextResponse.json({ error: 'Invalid feedback status provided.' }, { status: 400 });
     }
-    
-    // Get the authenticated user's session
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    // Get user ID from session
-    const userId = session.user.userId;
-    
-    // Verify the user is an evaluator
-    const user = await prisma.user.findUnique({
-      where: { userId },
-      select: { role: true },
+
+    // Check if feedback exists and if the user has permission to update it
+    // (e.g. is an evaluator for the project this feedback belongs to)
+    const feedbackToUpdate = await prisma.feedback.findUnique({
+      where: { id: feedbackId },
+      include: { project: { select: { projectEvaluators: { where: { evaluatorId: updaterId } } } } }
     });
-    
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    if (!feedbackToUpdate) {
+      return NextResponse.json({ error: 'Feedback thread not found.' }, { status: 404 });
     }
     
-    if (user.role !== 'EVALUATOR') {
-      return NextResponse.json({ error: 'Access denied. User is not an evaluator' }, { status: 403 });
+    // Check if the project is assigned to this evaluator, if feedback is project-specific
+    if (feedbackToUpdate.project && feedbackToUpdate.project.projectEvaluators.length === 0) {
+        return NextResponse.json({ error: 'Forbidden. You are not an evaluator for the project associated with this feedback.' }, { status: 403 });
     }
-    
-    // Verify the feedback exists and belongs to this evaluator
-    const feedback = await prisma.feedback.findFirst({
-      where: {
-        id: feedbackId,
-        authorId: userId,
-      },
-    });
-    
-    if (!feedback) {
-      return NextResponse.json(
-        { error: 'Feedback not found or you do not have permission to update it' },
-        { status: 404 }
-      );
-    }
-    
-    // Parse and validate the request
-    const body = await request.json();
-    
-    const validationResult = statusUpdateSchema.safeParse(body);
-    
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { error: 'Invalid status', details: validationResult.error.format() },
-        { status: 400 }
-      );
-    }
-    
-    const { status } = validationResult.data;
-    
-    // Update the feedback status
+    // Add similar checks if feedback is for MergeRequest or Repository, based on user permissions for those contexts.
+
     const updatedFeedback = await prisma.feedback.update({
       where: { id: feedbackId },
-      data: { status },
-      include: {
-        project: {
-          select: {
-            id: true,
-            title: true,
-            group: {
-              select: {
-                name: true,
-                groupUserName: true,
-              },
-            },
-          },
-        },
-        mergeRequest: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        repository: {
-          select: {
-            name: true,
-            groupUserName: true,
-          },
-        },
+      data: {
+        status: status,
       },
+      include: {
+        project: { select: { title: true, group: { select: { name: true }} } },
+        author: { select: { firstName: true, lastName: true, role: true } },
+        // again, responses are not directly included here from schema
+      }
     });
-    
-    // Format the response
-    const formattedFeedback = {
-      id: updatedFeedback.id,
-      title: updatedFeedback.title || 'Untitled Feedback',
-      content: updatedFeedback.content,
-      status: updatedFeedback.status,
-      createdAt: updatedFeedback.createdAt,
-      targetType: updatedFeedback.projectId 
-        ? 'PROJECT' 
-        : updatedFeedback.mergeRequestId 
-          ? 'MERGE_REQUEST' 
-          : 'REPOSITORY',
-      targetId: updatedFeedback.projectId || updatedFeedback.mergeRequestId || `${updatedFeedback.repositoryName}:${updatedFeedback.repositoryGroup}`,
-      targetName: updatedFeedback.project?.title || updatedFeedback.mergeRequest?.title || updatedFeedback.repository?.name,
-      groupName: updatedFeedback.project?.group.name || (updatedFeedback.repository ? updatedFeedback.repository.groupUserName : null),
-      responses: [], // No responses in this context
-    };
-    
-    return NextResponse.json(formattedFeedback);
-    
+
+    return NextResponse.json(updatedFeedback, { status: 200 });
   } catch (error) {
-    console.error('Error updating feedback status:', error);
-    return NextResponse.json(
-      { error: 'Failed to update feedback status' },
-      { status: 500 }
-    );
+    console.error(`Error updating status for feedback ${feedbackId} by user ${updaterId}:`, error);
+    if (error instanceof SyntaxError) {
+        return NextResponse.json({ error: 'Invalid request body: Malformed JSON.'}, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Internal server error while updating feedback status.' }, { status: 500 });
   }
 } 

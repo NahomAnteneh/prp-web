@@ -1,93 +1,97 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { Role } from '@prisma/client';
 
-export async function GET() {
+// GET /api/evaluator/project-feedback
+export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.userId || session.user.role !== Role.EVALUATOR) {
+    return NextResponse.json({ error: 'Unauthorized. Must be an evaluator to view project feedback.' }, { status: 401 });
+  }
+
+  const evaluatorId = session.user.userId;
+
   try {
-    // Get the authenticated user's session
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Find projects assigned to this evaluator
+    const assignedProjectIds = (await prisma.projectEvaluator.findMany({
+      where: { evaluatorId },
+      select: { projectId: true },
+    })).map(pe => pe.projectId);
+
+    if (assignedProjectIds.length === 0) {
+      return NextResponse.json([], { status: 200 }); // No projects assigned, so no feedback to show
     }
-    
-    // Get user ID from session
-    const userId = session.user.userId;
-    
-    // Verify the user is an evaluator
-    const user = await prisma.user.findUnique({
-      where: { userId },
-      select: { role: true },
-    });
-    
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-    
-    if (user.role !== 'EVALUATOR') {
-      return NextResponse.json({ error: 'Access denied. User is not an evaluator' }, { status: 403 });
-    }
-    
-    // Get all feedback created by this evaluator
-    const feedback = await prisma.feedback.findMany({
-      where: { authorId: userId },
+
+    // Fetch feedback for those projects
+    // Also include feedback authored by the evaluator on any project (might be useful)
+    const feedbackItems = await prisma.feedback.findMany({
+      where: {
+        // Option 1: Feedback on projects assigned to this evaluator
+        projectId: { in: assignedProjectIds },
+        // OR
+        // Option 2: Feedback authored by this evaluator (if they can also create feedback threads)
+        // authorId: evaluatorId 
+        // For now, sticking to feedback on projects they evaluate
+      },
       include: {
         project: {
           select: {
-            id: true,
             title: true,
             group: {
-              select: {
-                name: true,
-                groupUserName: true,
-              },
+              select: { name: true, groupUserName: true },
             },
           },
         },
-        mergeRequest: {
-          select: {
-            id: true,
-            title: true,
-          },
+        author: { // Author of the main feedback thread
+          select: { userId: true, firstName: true, lastName: true, role: true },
         },
-        repository: {
-          select: {
-            name: true,
-            groupUserName: true,
-          },
-        },
+        // responses: { // Prisma does not support direct fetching of responses as a nested field in Feedback
+        //   // This needs to be handled by a separate query or modeled differently if responses are part of Feedback itself.
+        //   // Assuming Feedback model does NOT have a direct `responses` array relation in Prisma schema.
+        //   // The frontend `FeedbackItem` interface expects `responses`. This will need adjustment or a separate endpoint for responses.
+        //   // For now, we will return an empty array for responses and the frontend will need to adapt or fetch them separately.
+        // }
+        // Based on schema, Feedback doesn't have a direct `responses` field.
+        // It can be linked to a MergeRequest or Project, but not directly to a list of replies within the Feedback model itself.
+        // The frontend currently expects `responses`. This points to a mismatch or a need for a different data fetching strategy for responses.
+        // For this API, we will return the main feedback. Responses might need another endpoint like /api/feedback/{feedbackId}/responses
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
-    
-    // Format the feedback for response
-    const formattedFeedback = feedback.map(item => ({
-      id: item.id,
-      title: item.title || 'Untitled Feedback',
-      content: item.content,
-      status: item.status,
-      createdAt: item.createdAt,
-      targetType: item.projectId 
-        ? 'PROJECT' 
-        : item.mergeRequestId 
-          ? 'MERGE_REQUEST' 
-          : 'REPOSITORY',
-      targetId: item.projectId || item.mergeRequestId || `${item.repositoryName}:${item.repositoryGroup}`,
-      targetName: item.project?.title || item.mergeRequest?.title || item.repository?.name,
-      groupName: item.project?.group.name || (item.repository ? item.repository.groupUserName : null),
+
+    // Transform data to match frontend FeedbackItem interface
+    const transformedFeedback = feedbackItems.map(fb => ({
+      id: fb.id,
+      projectTitle: fb.project?.title || 'N/A',
+      groupName: fb.project?.group?.name || 'N/A',
+      content: fb.content,
+      status: fb.status, // Assuming status is already 'OPEN' | 'ADDRESSED' | 'CLOSED'
+      createdAt: fb.createdAt,
+      // The `responses` field is tricky. The Prisma schema for `Feedback` doesn't show a direct relation to other `Feedback` items as responses.
+      // It can be linked to MergeRequest or Project. 
+      // If responses are themselves `Feedback` items linked in some way (e.g. via a parentFeedbackId not shown in schema), that logic is needed.
+      // For now, returning empty array as per the note above.
+      responses: [], 
+      // To populate responses correctly, we might need to model replies differently
+      // or fetch them in a separate step for each feedback item, which can be inefficient.
+      // A common pattern for threaded comments is a parentId on the comment itself.
+      // The current `FeedbackItem` on frontend expects `responses: { id, content, author, createdAt }[]`
+      // This would imply that `Feedback` can have nested `Feedback` items as responses, which isn't directly in the current Prisma schema.
+      // Let's assume the frontend `ProjectFeedback.tsx` (now `FeedbackTab.tsx`) was fetching responses in its original `fetchFeedbacks` method
+      // which might have been a custom aggregation if the API provided it.
+      // For now, the /api/evaluator/project-feedback/${feedbackId}/respond endpoint will create new Feedback entries or similar.
+      // This GET endpoint will thus return the *main* feedback threads.
     }));
-    
-    return NextResponse.json(formattedFeedback);
-    
+
+    return NextResponse.json(transformedFeedback, { status: 200 });
   } catch (error) {
-    console.error('Error fetching project feedback:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch project feedback' },
-      { status: 500 }
-    );
+    console.error(`Error fetching project feedback for evaluator ${evaluatorId}:`, error);
+    return NextResponse.json({ error: 'Internal server error while fetching project feedback.' }, { status: 500 });
   }
 }
 
