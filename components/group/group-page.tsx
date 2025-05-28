@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 
 // Define the expected type for groupData, including relations
 interface GroupWithRelations extends Group {
+  id: string;
   members: { 
     userId: string;
     user?: {
@@ -43,7 +44,7 @@ interface GroupWithRelations extends Group {
 
 // Add props interface for the component
 interface GroupPageProps {
-  groupData?: Group;
+  groupData?: Group & { id: string };
   isVisitor?: boolean;
 }
 
@@ -68,6 +69,7 @@ export default function GroupPage({ groupData: propGroupData, isVisitor }: Group
     if (propGroupData) {
       setGroupData({
         ...propGroupData,
+        id: propGroupData.id || '', // Ensure id is set
         members: [],  // Initialize with empty arrays since we might not have full data
         invites: [],
       });
@@ -102,6 +104,8 @@ export default function GroupPage({ groupData: propGroupData, isVisitor }: Group
       if (response.ok) {
         setGroupData({
           ...data,
+          // Ensure id is properly set
+          id: data.id,
           members: Array.isArray(data.members) ? data.members : [],
           invites: Array.isArray(data.invites) ? data.invites : [],
         });
@@ -250,19 +254,31 @@ export default function GroupPage({ groupData: propGroupData, isVisitor }: Group
 
             <TabsContent value="projects" className="mt-6">
               <h2 className="text-xl font-bold mb-4">Group Projects</h2>
-              <ProjectsList
-                groupUserName={groupData.groupUserName}
-                isLeader={!isVisitor && userId === groupData.leaderId}
-              />
+              {groupData.groupUserName ? (
+                <ProjectsList
+                  groupUserName={groupData.groupUserName}
+                  isLeader={!isVisitor && userId === groupData.leaderId}
+                />
+              ) : (
+                <div className="p-4 border rounded bg-muted/30">
+                  <p>Unable to load projects. Group username is missing.</p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="repositories" className="mt-6">
               <h2 className="text-xl font-bold mb-4">Group Repositories</h2>
-              <RepositoriesList
-                groupUserName={groupData.groupUserName}
-                isLeader={!isVisitor && userId === groupData.leaderId}
-                groupName={groupData.name}
-              />
+              {groupData.groupUserName ? (
+                <RepositoriesList
+                  groupUserName={groupData.groupUserName}
+                  isLeader={!isVisitor && userId === groupData.leaderId}
+                  groupName={groupData.name}
+                />
+              ) : (
+                <div className="p-4 border rounded bg-muted/30">
+                  <p>Unable to load repositories. Group username is missing.</p>
+                </div>
+              )}
             </TabsContent>
 
             {!isVisitor && (

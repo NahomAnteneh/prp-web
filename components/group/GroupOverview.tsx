@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -33,20 +34,20 @@ interface ExtendedGroup {
       lastName?: string;
     };
   }>;
-  // In a real app, we would have activities data coming from the backend
-  // This is a mock interface for demonstration purposes
-  activities?: Array<{
-    id: string;
-    type: 'project_created' | 'repository_created' | 'member_added' | 'other';
-    timestamp: Date;
-    actor?: {
-      userId: string;
-      firstName?: string;
-      lastName?: string;
-    };
-    entityName?: string;
-    entityId?: string;
-  }>;
+}
+
+// Activity interface
+interface Activity {
+  id: string;
+  type: 'project_created' | 'repository_created' | 'member_added' | 'other';
+  timestamp: Date;
+  actor?: {
+    userId: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  entityName?: string;
+  entityId?: string;
 }
 
 export default function GroupOverview({
@@ -57,6 +58,10 @@ export default function GroupOverview({
   isLeader?: boolean;
   onUpdate?: () => void;
 }) {
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Format the creation date
   const formattedCreatedAt = new Date(group.createdAt).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -64,33 +69,36 @@ export default function GroupOverview({
     day: 'numeric',
   });
 
-  // Mock activities data (in a real app, this would come from the backend)
-  const mockActivities = [
-    {
-      id: '1',
-      type: 'project_created' as const,
-      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-      actor: group.members?.[0]?.user,
-      entityName: group.projects?.[0]?.title || 'New Project',
-      entityId: group.projects?.[0]?.id || '1',
-    },
-    {
-      id: '2',
-      type: 'repository_created' as const,
-      timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-      actor: group.members?.[0]?.user,
-      entityName: group.repositories?.[0]?.name || 'New Repository',
-      entityId: group.repositories?.[0]?.id || '1',
-    },
-    {
-      id: '3',
-      type: 'member_added' as const, 
-      timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      actor: { userId: group.leaderId, firstName: 'Group', lastName: 'Admin' },
-      entityName: group.members?.[1]?.user?.firstName + ' ' + group.members?.[1]?.user?.lastName || 'New Member',
-      entityId: group.members?.[1]?.userId || '2',
-    },
-  ];
+  // Fetch activities from API
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/groups/${group.groupUserName}/activities`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch activities: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        // Convert string timestamps to Date objects
+        const formattedData = data.map((activity: any) => ({
+          ...activity,
+          timestamp: new Date(activity.timestamp)
+        }));
+        
+        setActivities(formattedData);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching activities:", err);
+        setError("Failed to load activities");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActivities();
+  }, [group.groupUserName]);
 
   // Function to render activity icon based on type
   const getActivityIcon = (type: string) => {
@@ -107,7 +115,7 @@ export default function GroupOverview({
   };
 
   // Function to format activity text
-  const getActivityText = (activity: typeof mockActivities[0]) => {
+  const getActivityText = (activity: Activity) => {
     const actorName = activity.actor?.firstName ? 
       `${activity.actor.firstName} ${activity.actor.lastName || ''}` : 
       'Someone';
@@ -212,7 +220,19 @@ export default function GroupOverview({
             <CardTitle className="text-base font-medium">Recent Activities</CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            {!mockActivities.length ? (
+            {loading ? (
+              <div className="border border-dashed rounded-md bg-gray-50 p-6">
+                <p className="text-sm text-gray-500 italic text-center">
+                  Loading activities...
+                </p>
+              </div>
+            ) : error ? (
+              <div className="border border-dashed rounded-md bg-gray-50 p-6">
+                <p className="text-sm text-gray-500 italic text-center">
+                  {error}
+                </p>
+              </div>
+            ) : !activities.length ? (
               <div className="border border-dashed rounded-md bg-gray-50 p-6">
                 <p className="text-sm text-gray-500 italic text-center">
                   No recent activities found.
@@ -220,7 +240,7 @@ export default function GroupOverview({
               </div>
             ) : (
               <div className="space-y-4">
-                {mockActivities.map((activity) => (
+                {activities.map((activity) => (
                   <div key={activity.id} className="flex gap-3 p-3 rounded-md hover:bg-gray-50 transition-colors">
                     <div className="flex-shrink-0 mt-1">
                       {getActivityIcon(activity.type)}

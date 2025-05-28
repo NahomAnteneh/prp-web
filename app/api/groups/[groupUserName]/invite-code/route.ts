@@ -9,7 +9,7 @@ const INVITE_EXPIRATION_HOURS = 24;
 
 export async function POST(
   request: Request,
-  { params }: { params: { groupId: string } }
+  { params }: { params: { groupUserName: string } }
 ) {
   try {
     // Check authentication
@@ -18,11 +18,11 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupId = params.groupId;
+    const groupUserName = params.groupUserName;
 
     // Check if the group exists
     const group = await db.group.findUnique({
-      where: { groupUserName: groupId },
+      where: { groupUserName },
       include: {
         members: {
           select: {
@@ -77,13 +77,14 @@ export async function POST(
       data: {
         code: inviteCode,
         expiresAt,
-       groupUserName: group.groupUserName,
+        groupUserName,
         createdById: session.user.userId,
         email: email || null,
       },
     });
     
     return NextResponse.json({ 
+      id: invitation.id,
       inviteCode: invitation.code,
       expiresAt: invitation.expiresAt,
       message: `Invitation created successfully. Valid for ${INVITE_EXPIRATION_HOURS} hours.`
@@ -100,7 +101,7 @@ export async function POST(
 // Get information about an invite code
 export async function GET(
   request: Request,
-  { params }: { params: { groupId: string } }
+  { params }: { params: { groupUserName: string } }
 ) {
   try {
     // Check authentication
@@ -109,7 +110,7 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupId = params.groupId;
+    const groupUserName = params.groupUserName;
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
 
@@ -132,7 +133,7 @@ export async function GET(
         },
       });
 
-      if (!invitation || invitation.groupUserName !== groupId) {
+      if (!invitation || invitation.groupUserName !== groupUserName) {
         return NextResponse.json(
           { message: 'Invitation not found' },
           { status: 404 }
@@ -160,7 +161,7 @@ export async function GET(
           code: invitation.code,
           expiresAt: invitation.expiresAt,
           group: {
-            id: groupId,
+            groupUserName,
             name: invitation.group.name,
             description: invitation.group.description,
             memberCount: invitation.group.members.length,
@@ -172,7 +173,7 @@ export async function GET(
     // Otherwise, list all active invitations for the group
     // Authorization: Only group leader or admin can see all invitations
     const group = await db.group.findUnique({
-      where: { groupUserName: groupId },
+      where: { groupUserName },
     });
 
     if (!group) {
@@ -194,13 +195,23 @@ export async function GET(
 
     const invitations = await db.groupInvite.findMany({
       where: {
-        groupUserName: "some-group-username",
+        groupUserName,
         expiresAt: { gt: new Date() }, // Only active invitations
         usedAt: null, // Only unused invitations
       },
       orderBy: {
         createdAt: 'desc',
       },
+      select: {
+        id: true,
+        code: true,
+        email: true,
+        expiresAt: true,
+        createdAt: true,
+        groupUserName: true,
+        usedAt: true,
+        createdById: true
+      }
     });
 
     return NextResponse.json({ invitations });

@@ -59,7 +59,7 @@ export function AdvisorRequestModal({ ownerId, projectId, onRequestComplete }: A
   const fetchAdvisors = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/advisor/avilable');
+      const response = await fetch('/api/advisor/available');
       
       if (!response.ok) {
         throw new Error('Failed to fetch advisors');

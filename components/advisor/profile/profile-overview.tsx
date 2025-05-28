@@ -1,18 +1,37 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, GraduationCap, Award, UserCheck, BookOpen } from 'lucide-react';
+import { Users, GraduationCap, Award, UserCheck, BookOpen, MessageSquare, BarChart2, ExternalLink, Activity as ActivityIcon, Info, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AdvisorStats {
   currentAdvisees: number;
   completedProjects: number;
-  yearsExperience: number;
   avgRating: number;
+  evaluatedProjects: number;
+}
+
+interface Activity {
+  type: 'feedback' | 'task' | 'submission' | 'comment' | 'evaluation';
+  id: string;
+  createdAt: string;
+  content?: string;
+  title?: string;
+  status?: string;
+  link?: string;
+  project?: {
+    id: string;
+    title: string;
+  };
+  student?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface ProfileOverviewProps {
@@ -22,97 +41,107 @@ interface ProfileOverviewProps {
 
 export default function ProfileOverview({ userId, isOwner = false }: ProfileOverviewProps) {
   const [isLoading, setIsLoading] = useState(true);
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(true);
   const [advisorInfo, setAdvisorInfo] = useState<any | null>(null);
   const [stats, setStats] = useState<AdvisorStats>({
     currentAdvisees: 0,
     completedProjects: 0,
-    yearsExperience: 0,
-    avgRating: 0
+    avgRating: 0,
+    evaluatedProjects: 0
   });
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       try {
         setIsLoading(true);
-
-        // Fetch advisor details
         const advisorResponse = await fetch(`/api/users/${userId}/details`);
         const advisorData = await advisorResponse.json();
-        
-        if (!advisorResponse.ok) {
-          throw new Error(advisorData.message || 'Failed to fetch advisor details');
-        }
-        
+        if (!advisorResponse.ok) throw new Error(advisorData.message || 'Failed to fetch advisor details');
         setAdvisorInfo(advisorData);
 
-        // Fetch stats
         const statsResponse = await fetch(`/api/users/${userId}/stats`);
         const statsData = await statsResponse.json();
-        
-        if (!statsResponse.ok) {
-          throw new Error(statsData.message || 'Failed to fetch stats');
-        }
-        
+        if (!statsResponse.ok) throw new Error(statsData.message || 'Failed to fetch stats');
         setStats({
           currentAdvisees: statsData.currentAdvisees || 0,
           completedProjects: statsData.completedProjects || 0,
-          yearsExperience: statsData.yearsExperience || 0,
-          avgRating: statsData.avgRating || 0
+          avgRating: statsData.avgRating || 0,
+          evaluatedProjects: statsData.evaluatedProjects || 0
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-        toast.error('Error fetching advisor data', {
-          description: errorMessage,
-        });
+        toast.error('Error fetching advisor details', { description: errorMessage });
         setAdvisorInfo(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
+    const fetchActivities = async () => {
+      try {
+        setIsActivitiesLoading(true);
+        const activitiesResponse = await fetch(`/api/users/${userId}/activities?limit=5`);
+        const activitiesData = await activitiesResponse.json();
+        if (!activitiesResponse.ok) throw new Error(activitiesData.message || 'Failed to fetch recent activities');
+        setRecentActivities(activitiesData.activities || []);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
+        toast.error('Error fetching recent activities', { description: errorMessage });
+        setRecentActivities([]);
+      } finally {
+        setIsActivitiesLoading(false);
+      }
+    };
+
+    fetchInitialData();
+    fetchActivities();
   }, [userId]);
+
+  const getActivityIcon = (type: Activity['type']) => {
+    switch (type) {
+      case 'feedback': return <MessageSquare className="h-5 w-5 text-blue-500" />;
+      case 'task': return <BarChart2 className="h-5 w-5 text-green-500" />;
+      case 'submission': return <BookOpen className="h-5 w-5 text-purple-500" />;
+      case 'comment': return <MessageSquare className="h-5 w-5 text-yellow-500" />;
+      case 'evaluation': return <UserCheck className="h-5 w-5 text-red-500" />;
+      default: return <Info className="h-5 w-5 text-gray-500" />;
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-2 bg-muted rounded-full h-9 w-9"></div>
+                  <div className="h-7 bg-muted rounded w-1/2"></div>
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
         <Card className="animate-pulse">
           <CardHeader>
-            <div className="h-7 bg-muted rounded w-1/3"></div>
-            <div className="h-4 bg-muted rounded w-1/2"></div>
+            <div className="h-6 bg-muted rounded w-1/4"></div>
           </CardHeader>
-          <CardContent>
-            <div className="h-20 bg-muted rounded"></div>
+          <CardContent className="space-y-3">
+            <div className="h-16 bg-muted rounded"></div>
+            <div className="h-16 bg-muted rounded"></div>
+            <div className="h-16 bg-muted rounded"></div>
           </CardContent>
         </Card>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="animate-pulse">
-            <CardHeader>
-              <div className="h-7 bg-muted rounded w-1/3"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-32 bg-muted rounded"></div>
-            </CardContent>
-          </Card>
-          
-          <Card className="animate-pulse">
-            <CardHeader>
-              <div className="h-7 bg-muted rounded w-1/3"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-32 bg-muted rounded"></div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Stats Overview */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-100 dark:border-blue-900">
           <CardContent className="p-4">
             <div className="flex flex-col items-center text-center space-y-2">
@@ -137,14 +166,14 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-100 dark:border-emerald-900">
+        <Card className="bg-gradient-to-br from-green-50 to-lime-50 dark:from-green-950/20 dark:to-lime-950/20 border-green-100 dark:border-green-900">
           <CardContent className="p-4">
             <div className="flex flex-col items-center text-center space-y-2">
-              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-full">
-                <GraduationCap className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-full">
+                <ListChecks className="h-5 w-5 text-green-700 dark:text-green-400" />
               </div>
-              <div className="text-2xl font-bold">{stats.yearsExperience}</div>
-              <div className="text-sm text-muted-foreground">Years Experience</div>
+              <div className="text-2xl font-bold">{stats.evaluatedProjects}</div>
+              <div className="text-sm text-muted-foreground">Evaluated Projects</div>
             </div>
           </CardContent>
         </Card>
@@ -162,60 +191,59 @@ export default function ProfileOverview({ userId, isOwner = false }: ProfileOver
         </Card>
       </div>
       
-      {/* Bio/About Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">About</CardTitle>
-        </CardHeader>
-        <CardContent className="prose dark:prose-invert max-w-none">
-          <p>{advisorInfo?.bio || "No biography information available."}</p>
-        </CardContent>
-      </Card>
-      
-      {/* Research Interests */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Research Interests</CardTitle>
+          <CardTitle className="text-lg">Recent Activities</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {advisorInfo?.researchInterests && advisorInfo.researchInterests.length > 0 ? (
-              advisorInfo.researchInterests.map((interest: string, index: number) => (
-                <Badge key={index} variant="secondary" className="px-2 py-1 text-sm">
-                  {interest}
-                </Badge>
-              ))
-            ) : (
-              <p className="text-muted-foreground">No research interests specified.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Publications/Achievements */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Recent Publications</CardTitle>
-          {advisorInfo?.publications && advisorInfo.publications.length > 3 && (
-            <Button variant="link" className="text-sm" asChild>
-              <Link href={`/publications/${userId}`}>View All</Link>
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {advisorInfo?.publications && advisorInfo.publications.length > 0 ? (
+          {isActivitiesLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full rounded" />
+              <Skeleton className="h-12 w-full rounded" />
+              <Skeleton className="h-12 w-full rounded" />
+            </div>
+          ) : recentActivities.length > 0 ? (
             <ul className="space-y-3">
-              {advisorInfo.publications.slice(0, 3).map((publication: any, index: number) => (
-                <li key={index} className="border-b pb-3 last:border-b-0 last:pb-0">
-                  <h4 className="font-medium">{publication.title}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{publication.journal}, {publication.year}</p>
+              {recentActivities.map((activity) => (
+                <li key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-shrink-0 mt-1">
+                    {getActivityIcon(activity.type)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {activity.title || activity.content || `${activity.type.charAt(0).toUpperCase() + activity.type.slice(1)} Update`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(activity.createdAt).toLocaleDateString()} {new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {activity.project && (
+                        <> • <Link href={`/projects/${activity.project.id}`} className="hover:underline text-primary/80">{activity.project.title}</Link></>
+                      )}
+                      {activity.student && (
+                         <> • <Link href={`/${activity.student.id}`} className="hover:underline text-primary/80">{activity.student.name}</Link></>
+                      )}
+                    </p>
+                  </div>
+                  {activity.link && (
+                    <Button variant="ghost" size="icon" asChild className="ml-auto self-center">
+                        <Link href={activity.link} target="_blank" rel="noopener noreferrer" aria-label="View details">
+                            <ExternalLink className="h-4 w-4 text-muted-foreground"/>
+                        </Link>
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-muted-foreground">No publications available.</p>
+            <p className="text-muted-foreground text-center py-4">No recent activities to display.</p>
           )}
         </CardContent>
+        {recentActivities.length > 0 && (
+           <CardFooter className="border-t pt-3">
+            <Button variant="link" size="sm" asChild className="mx-auto">
+                <Link href={`/users/${userId}/activities`}>View All Activities</Link>
+            </Button>
+           </CardFooter>
+        )}
       </Card>
     </div>
   );
