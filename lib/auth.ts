@@ -67,16 +67,16 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        username: { label: 'Username', type: 'text' },
+        userId: { label: 'Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.username || !credentials?.password) {
+        if (!credentials?.userId || !credentials?.password) {
           return null;
         }
 
         const user = await db.user.findUnique({
-          where: { username: credentials.username },
+          where: { userId: credentials.userId },
         });
 
         if (!user) {
@@ -90,9 +90,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         return {
-          id: user.id,
-          name: user.name || '',
-          username: user.username,
+          userId: user.userId,
+          name: user.firstName + ' ' + user.lastName || '',
           role: user.role,
         };
       },
@@ -101,17 +100,15 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id as string;
+        session.user.userId = token.userId as string;
         session.user.name = token.name as string;
-        session.user.username = token.username as string;
         session.user.role = token.role as string;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.username = user.username;
+        token.userId = user.userId;
         token.role = user.role as Role;
       }
       return token;
@@ -122,17 +119,15 @@ export const authOptions: NextAuthOptions = {
 declare module 'next-auth' {
   interface Session {
     user: {
-      id: string;
+      userId: string;
       name: string;
-      username: string;
       role: string;
     };
   }
   
   interface User {
-    id: string;
+    userId: string;
     name: string;
-    username: string;
     role: string;
   }
 } 

@@ -1,421 +1,284 @@
 'use client';
 
-import { useState } from 'react';
-import { Users, Edit, X, Mail, Copy, UserPlus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { FolderGit2, GitFork, CalendarPlus, UserPlus } from 'lucide-react';
 
-interface GroupMember {
-  user: {
-    id: string;
+// Extended group interface to include the nested properties
+interface ExtendedGroup {
+  name: string;
+  groupUserName: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  leaderId: string;
+  repositories?: Array<{
+    id?: string;
     name: string;
-    username: string;
-  };
-  userId: string;
-  joinedAt: string;
+    description?: string;
+    groupUserName?: string;
+  }>;
+  projects?: Array<{
+    id: string;
+    title: string;
+    description?: string;
+  }>;
+  members?: Array<{
+    userId: string;
+    user?: {
+      userId: string;
+      firstName?: string;
+      lastName?: string;
+    };
+  }>;
+  // In a real app, we would have activities data coming from the backend
+  // This is a mock interface for demonstration purposes
+  activities?: Array<{
+    id: string;
+    type: 'project_created' | 'repository_created' | 'member_added' | 'other';
+    timestamp: Date;
+    actor?: {
+      userId: string;
+      firstName?: string;
+      lastName?: string;
+    };
+    entityName?: string;
+    entityId?: string;
+  }>;
 }
 
-interface GroupOverviewProps {
-  group: {
-    id: string;
-    name: string;
-    description: string;
-    leaderId: string;
-    createdAt: string;
-    members: GroupMember[];
-  };
-  maxGroupSize: number;
-  isLeader: boolean;
-  onUpdate: () => void;
-}
+export default function GroupOverview({
+  group,
+}: {
+  group: ExtendedGroup;
+  maxGroupSize?: number;
+  isLeader?: boolean;
+  onUpdate?: () => void;
+}) {
+  // Format the creation date
+  const formattedCreatedAt = new Date(group.createdAt).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
-export default function GroupOverview({ group, maxGroupSize, isLeader, onUpdate }: GroupOverviewProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState(group.name);
-  const [editedDescription, setEditedDescription] = useState(group.description || '');
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [emailInviteStatus, setEmailInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [emailInviteError, setEmailInviteError] = useState('');
+  // Mock activities data (in a real app, this would come from the backend)
+  const mockActivities = [
+    {
+      id: '1',
+      type: 'project_created' as const,
+      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      actor: group.members?.[0]?.user,
+      entityName: group.projects?.[0]?.title || 'New Project',
+      entityId: group.projects?.[0]?.id || '1',
+    },
+    {
+      id: '2',
+      type: 'repository_created' as const,
+      timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      actor: group.members?.[0]?.user,
+      entityName: group.repositories?.[0]?.name || 'New Repository',
+      entityId: group.repositories?.[0]?.id || '1',
+    },
+    {
+      id: '3',
+      type: 'member_added' as const, 
+      timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+      actor: { userId: group.leaderId, firstName: 'Group', lastName: 'Admin' },
+      entityName: group.members?.[1]?.user?.firstName + ' ' + group.members?.[1]?.user?.lastName || 'New Member',
+      entityId: group.members?.[1]?.userId || '2',
+    },
+  ];
 
-  const handleSaveChanges = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editedName,
-          description: editedDescription,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update group');
-      }
-
-      toast.success('Group updated', {
-        description: 'Group details have been successfully updated.',
-      });
-      
-      setIsEditing(false);
-      onUpdate();
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast.error('Error updating group', {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
+  // Function to render activity icon based on type
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'project_created':
+        return <CalendarPlus className="h-4 w-4 text-blue-500" />;
+      case 'repository_created':
+        return <GitFork className="h-4 w-4 text-green-500" />;
+      case 'member_added':
+        return <UserPlus className="h-4 w-4 text-purple-500" />;
+      default:
+        return <FolderGit2 className="h-4 w-4 text-gray-500" />;
     }
   };
 
-  const generateInviteCode = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/invite-code`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to generate invite code');
-      }
-
-      const data = await response.json();
-      setInviteCode(data.inviteCode);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast.error('Error generating invite code', {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const sendEmailInvitation = async () => {
-    // Validate email
-    if (!inviteEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
-      setEmailInviteError('Please enter a valid email address');
-      return;
-    }
+  // Function to format activity text
+  const getActivityText = (activity: typeof mockActivities[0]) => {
+    const actorName = activity.actor?.firstName ? 
+      `${activity.actor.firstName} ${activity.actor.lastName || ''}` : 
+      'Someone';
     
-    setEmailInviteStatus('loading');
-    setEmailInviteError('');
-    
-    try {
-      // Generate invite code if it doesn't exist
-      if (!inviteCode) {
-        await generateInviteCode();
-      }
-      
-      // Send invitation email
-      const response = await fetch(`/api/groups/${group.id}/invite-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: inviteEmail,
-          inviteCode: inviteCode,
-          groupName: group.name
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to send invitation');
-      }
-
-      setEmailInviteStatus('success');
-      toast.success('Invitation sent', {
-        description: `Invitation email has been sent to ${inviteEmail}`,
-      });
-      setInviteEmail('');
-    } catch (error: unknown) {
-      setEmailInviteStatus('error');
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      setEmailInviteError(errorMessage);
-      toast.error('Error sending invitation', {
-        description: errorMessage,
-      });
-    } finally {
-      setEmailInviteStatus('idle');
+    switch (activity.type) {
+      case 'project_created':
+        return (
+          <span>
+            <span className="font-medium">{actorName}</span> created a new project{' '}
+            <Link href={`/projects/${activity.entityId}`} className="font-medium text-blue-600 hover:underline">
+              {activity.entityName}
+            </Link>
+          </span>
+        );
+      case 'repository_created':
+        return (
+          <span>
+            <span className="font-medium">{actorName}</span> created a new repository{' '}
+            <Link href={`/groups/${group.groupUserName}/repositories/${activity.entityName}`} className="font-medium text-green-600 hover:underline">
+              {activity.entityName}
+            </Link>
+          </span>
+        );
+      case 'member_added':
+        return (
+          <span>
+            <span className="font-medium">{actorName}</span> added{' '}
+            <Link href={`/${activity.entityId}`} className="font-medium text-purple-600 hover:underline">
+              {activity.entityName}
+            </Link>{' '}
+            to the group
+          </span>
+        );
+      default:
+        return <span>Unknown activity</span>;
     }
   };
 
-  const removeMember = async (userId: string) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/groups/${group.id}/members/${userId}`, {
-        method: 'DELETE',
-      });
+  // Format timestamp to relative time
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInSec = Math.floor(diffInMs / 1000);
+    const diffInMin = Math.floor(diffInSec / 60);
+    const diffInHour = Math.floor(diffInMin / 60);
+    const diffInDay = Math.floor(diffInHour / 24);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to remove member');
-      }
-
-      toast.success('Member removed', {
-        description: 'The member has been removed from the group.',
-      });
-      
-      onUpdate();
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast.error('Error removing member', {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
+    if (diffInDay > 30) {
+      return date.toLocaleDateString();
+    } else if (diffInDay > 0) {
+      return `${diffInDay} day${diffInDay > 1 ? 's' : ''} ago`;
+    } else if (diffInHour > 0) {
+      return `${diffInHour} hour${diffInHour > 1 ? 's' : ''} ago`;
+    } else if (diffInMin > 0) {
+      return `${diffInMin} minute${diffInMin > 1 ? 's' : ''} ago`;
+    } else {
+      return 'Just now';
     }
-  };
-
-  const copyInviteCode = () => {
-    navigator.clipboard.writeText(inviteCode);
-    toast.success('Copied to clipboard', {
-      description: 'Invite code copied to clipboard.',
-    });
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-start justify-between pb-2">
-        <div>
-          {isEditing ? (
-            <div className="space-y-2">
-              <Label htmlFor="groupName">Group Name</Label>
-              <Input
-                id="groupName"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                className="max-w-md"
-              />
-            </div>
-          ) : (
-            <CardTitle className="text-2xl flex items-center">
-              <Users className="mr-2 h-6 w-6" />
-              {group.name}
-            </CardTitle>
-          )}
-          
-          {isEditing ? (
-            <div className="mt-4 space-y-2">
-              <Label htmlFor="groupDescription">Description</Label>
-              <Textarea
-                id="groupDescription"
-                value={editedDescription}
-                onChange={(e) => setEditedDescription(e.target.value)}
-                className="max-w-md"
-                rows={3}
-              />
-            </div>
-          ) : (
-            <CardDescription className="mt-1">
-              {group.description || "No description provided."}
-            </CardDescription>
-          )}
-
-          {isEditing && (
-            <div className="mt-4 flex gap-2">
-              <Button onClick={handleSaveChanges} disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Changes"}
-              </Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                Cancel
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        {isLeader && !isEditing && (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-1"
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit className="h-4 w-4" />
-              Edit Group
-            </Button>
-
-            <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  size="sm" 
-                  className="flex items-center gap-1"
-                  disabled={group.members.length >= maxGroupSize}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Invite Member
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-xl">Invite New Members</DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                  <div className="space-y-6">
-                    {/* Email Invitation Section */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-2">Invite by Email</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Send an invitation email directly to a student
-                      </p>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="inviteEmail">Student Email</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="inviteEmail"
-                              value={inviteEmail}
-                              onChange={(e) => setInviteEmail(e.target.value)}
-                              placeholder="student@university.edu"
-                              type="email"
-                            />
-                            <Button 
-                              onClick={sendEmailInvitation}
-                              disabled={emailInviteStatus === 'loading' || !inviteEmail || group.members.length >= maxGroupSize}
-                              size="sm"
-                            >
-                              <Mail className="h-4 w-4 mr-1" />
-                              Send
-                            </Button>
-                          </div>
-                          {emailInviteError && (
-                            <p className="text-sm text-destructive">{emailInviteError}</p>
-                          )}
-                          {emailInviteStatus === 'success' && (
-                            <p className="text-sm text-green-600">Invitation sent successfully!</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">Or</span>
-                      </div>
-                    </div>
-
-                    {/* Invite Code Section */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-2">Share Invite Code</h3>
-                      {inviteCode ? (
-                        <div className="space-y-4">
-                          <p className="text-sm text-muted-foreground">
-                            Share this code with students you want to invite to your group:
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={inviteCode}
-                              readOnly
-                              className="font-mono text-center"
-                            />
-                            <Button onClick={copyInviteCode} size="icon" variant="outline">
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            This code will expire in 24 hours.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <p className="text-sm text-muted-foreground">
-                            Generate an invitation code to let others join your group.
-                          </p>
-                          <Button 
-                            onClick={generateInviteCode} 
-                            disabled={isLoading || group.members.length >= maxGroupSize}
-                            variant="outline"
-                            className="w-full"
-                          >
-                            {isLoading ? "Generating..." : "Generate Invite Code"}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Left Content (Profile and Recent Activities) */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* Group Profile Card */}
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pt-6">
+            <Avatar className="h-20 w-20 bg-blue-50">
+              <AvatarFallback>
+                {group.name?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="text-center sm:text-left">
+              <CardTitle className="text-2xl font-bold">{group.name}</CardTitle>
+              <p className="text-gray-500 text-sm">@{group.groupUserName}</p>
+              <p className="text-gray-500 text-sm mt-2">{group.description || "No description provided."}</p>
+              <div className="flex flex-wrap gap-3 mt-4">
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-blue-600 font-medium">{group.projects?.length || 0}</span>
+                  <span className="text-gray-600">Projects</span>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
-      </CardHeader>
-
-      <CardContent>
-        <div className="mt-2">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-medium">Members ({group.members.length}/{maxGroupSize})</h3>
-            <Badge variant={group.members.length >= maxGroupSize ? "destructive" : "outline"}>
-              {group.members.length >= maxGroupSize ? "Full" : `${maxGroupSize - group.members.length} spots available`}
-            </Badge>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {group.members.map((member) => (
-              <div 
-                key={member.userId} 
-                className="flex items-center justify-between p-3 border rounded-md bg-muted/20 hover:bg-muted/40 transition-colors"
-              >
-                <Link 
-                  href={`/${member.user.username}`} 
-                  className="flex items-center gap-2 flex-1"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>
-                      {member.user.name ? member.user.name.charAt(0).toUpperCase() : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{member.user.name}</p>
-                    <p className="text-xs text-muted-foreground">@{member.user.username}</p>
-                  </div>
-                </Link>
-                
-                <div className="flex items-center gap-2">
-                  {member.userId === group.leaderId && (
-                    <Badge variant="secondary" className="ml-2">Leader</Badge>
-                  )}
-                  
-                  {isLeader && member.userId !== group.leaderId && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => removeMember(member.userId)}
-                      disabled={isLoading}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-green-600 font-medium">{group.repositories?.length || 0}</span>
+                  <span className="text-gray-600">Repositories</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-purple-600 font-medium">{group.members?.length || 0}</span>
+                  <span className="text-gray-600">Members</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-gray-600">Created:</span>
+                  <span className="text-gray-600 font-medium">{formattedCreatedAt}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activities Section */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2 border-b">
+            <CardTitle className="text-base font-medium">Recent Activities</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {!mockActivities.length ? (
+              <div className="border border-dashed rounded-md bg-gray-50 p-6">
+                <p className="text-sm text-gray-500 italic text-center">
+                  No recent activities found.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {mockActivities.map((activity) => (
+                  <div key={activity.id} className="flex gap-3 p-3 rounded-md hover:bg-gray-50 transition-colors">
+                    <div className="flex-shrink-0 mt-1">
+                      {getActivityIcon(activity.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700">
+                        {getActivityText(activity)}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatRelativeTime(activity.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Right Section: Members */}
+      <div className="lg:col-span-1">
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2 border-b">
+            <CardTitle className="text-base font-medium">Members</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+              {group.members?.map((member) => (
+                <Link
+                  key={member.userId}
+                  href={`/${member.user?.userId || '#'}`}
+                  className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  <Avatar className="h-10 w-10 bg-gray-100">
+                    <AvatarFallback>
+                      {member.user?.firstName
+                        ? member.user.firstName.charAt(0).toUpperCase()
+                        : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {member.user?.firstName} {member.user?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">@{member.userId}</p>
+                  </div>
+                  {member.userId === group.leaderId && (
+                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-xs">
+                      Leader
+                    </Badge>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
-} 
+}

@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
-import { mockRules } from '@/app/api/mock-data';
 import { db } from '@/lib/db';
+
+// Define mock rules as fallback
+const mockRules = {
+  maxGroupSize: 5,
+  advisorRequestDeadline: new Date().toISOString(),
+  projectSubmissionDeadline: new Date().toISOString()
+};
 
 export async function GET() {
   try {

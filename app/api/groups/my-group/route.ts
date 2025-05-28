@@ -16,7 +16,7 @@ export async function GET() {
 
     // Find the user's group membership
     const membership = await db.groupMember.findFirst({
-      where: { userId: session.user.id },
+      where: { userId : session.user.userId },
       include: {
         group: {
           include: {
@@ -24,23 +24,23 @@ export async function GET() {
               include: {
                 user: {
                   select: {
-                    id: true,
-                    name: true,
-                    username: true,
+                    userId: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
             },
-            project: {
+            projects: {
               select: {
                 id: true,
                 title: true,
                 advisorId: true,
                 advisor: {
                   select: {
-                    id: true,
-                    name: true, 
-                    username: true,
+                    userId: true,
+                    firstName: true,
+                    lastName: true, 
                     profileInfo: true,
                   },
                 },
@@ -55,11 +55,22 @@ export async function GET() {
                 requestMessage: true,
                 requestedAdvisor: {
                   select: {
-                    id: true,
-                    name: true,
-                    username: true,
+                    userId: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
+              },
+            },
+            repositories: {
+              select: {
+                name: true,
+                description: true,
+                createdAt: true,
+                updatedAt: true,
+                ownerId: true,
+                isPrivate: true,
+                groupUserName: true,
               },
             },
           },
@@ -82,4 +93,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-} 
+}

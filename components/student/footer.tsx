@@ -1,8 +1,8 @@
-import Link from "next/link"
+import Link from "next/link";
 
 export default function Footer() {
-  const currentYear = new Date().getFullYear()
-  
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="w-full border-t bg-background py-6 mt-8">
       <div className="mx-auto max-w-7xl flex flex-col md:flex-row justify-between items-center px-4 md:px-8">
@@ -11,7 +11,7 @@ export default function Footer() {
             © {currentYear} Project Repository Platform. All rights reserved.
           </span>
         </div>
-        
+
         <div className="flex items-center space-x-6">
           <Link 
             href="/terms" 
@@ -40,5 +40,5 @@ export default function Footer() {
         </div>
       </div>
     </footer>
-  )
-} 
+  );
+}

@@ -26,14 +26,19 @@ export function useAuth() {
     try {
       setAuthError(null);
       
-      // Use NextAuth's signIn directly - this is the simplest and most reliable approach
+      console.log("Attempting login with:", { identifier });
+      
+      // Use NextAuth's signIn directly
       const result = await signIn('credentials', {
         identifier,
         password,
         redirect: false,
       });
       
+      console.log("Sign in result:", result);
+      
       if (result?.error) {
+        console.error("Login error:", result.error);
         setAuthError(result.error);
         return { success: false, error: result.error };
       }
@@ -46,6 +51,7 @@ export function useAuth() {
         return { success: false, error: 'Invalid response from server' };
       }
     } catch (error) {
+      console.error("Login exception:", error);
       const errorMsg = error instanceof Error ? error.message : "Something went wrong";
       setAuthError(errorMsg);
       return { 

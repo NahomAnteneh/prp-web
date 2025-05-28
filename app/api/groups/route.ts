@@ -1,12 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
 
+// GET: Retrieve all groups (with filtering capabilities)
+export async function GET(req: NextRequest) {
+  try {
+    // URL query parameters for filtering
+    const url = new URL(req.url);
+    const nameFilter = url.searchParams.get('name');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const skip = (page - 1) * limit;
+
+    // Build filter condition
+    const whereCondition: Record<string, unknown> = {};
+    if (nameFilter) {
+      whereCondition.name = {
+        contains: nameFilter,
+        mode: 'insensitive', // Case-insensitive search
+      };
+    }
+
+    // Get total count for pagination
+    const totalGroups = await db.group.count({
+      where: whereCondition,
+    });
+
+    // Query groups with filtering, pagination, and data relations
+    const groups = await db.group.findMany({
+      where: whereCondition,
+      include: {
+        leader: {
+          select: {
+            userId: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                userId: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            projects: true,
+            repositories: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+      skip: skip,
+    });
+
+    return NextResponse.json({
+      groups,
+      pagination: {
+        total: totalGroups,
+        pages: Math.ceil(totalGroups / limit),
+        currentPage: page,
+        limit
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching groups:', error);
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: Create a new group
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    // Parse request data
+    const rawData = await req.json();
+    const { name, groupUserName, description } = rawData;
 
+    const session = await getServerSession(authOptions);
     if (!session || !session.user) {
       return NextResponse.json(
         { message: 'Unauthorized' },
@@ -14,49 +96,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Only students can create groups
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true, role: true },
-    });
-
-    if (!user || user.role !== 'STUDENT') {
-      return NextResponse.json(
-        { message: 'Only students can create groups' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is already in a group
-    const existingMembership = await db.groupMember.findFirst({
-      where: { userId: user.id },
-    });
-
-    if (existingMembership) {
-      return NextResponse.json(
-        { message: 'You are already a member of a group' },
-        { status: 400 }
-      );
-    }
-
-    const data = await req.json();
-    const { name, description } = data;
-
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return NextResponse.json(
-        { message: 'Group name is required' },
-        { status: 400 }
-      );
-    }
-
     // Check if the group name is already taken
     const existingGroup = await db.group.findUnique({
-      where: { name },
+      where: { groupUserName },
     });
 
     if (existingGroup) {
       return NextResponse.json(
-        { message: 'A group with this name already exists' },
+        { message: 'A group with this group username already exists' },
         { status: 400 }
       );
     }
@@ -73,15 +120,20 @@ export async function POST(req: NextRequest) {
       // Continue with default maxGroupSize
     }
 
-    // Create the group and add the user as both leader and member
+    // Create the group
     const group = await db.group.create({
       data: {
         name,
+        groupUserName,
         description,
-        leaderId: user.id,
+        leader: {
+          connect: {
+            userId: session.user.userId,
+          },
+        },
         members: {
           create: {
-            userId: user.id,
+            userId: session.user.userId,
           },
         },
       },
@@ -90,9 +142,9 @@ export async function POST(req: NextRequest) {
           include: {
             user: {
               select: {
-                id: true,
-                name: true,
-                username: true,
+                userId: true,
+                firstName: true,
+                lastName: true,
               },
             },
           },
@@ -104,7 +156,7 @@ export async function POST(req: NextRequest) {
       message: 'Group created successfully',
       group,
       maxGroupSize,
-    });
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating group:', error);
     return NextResponse.json(
@@ -112,4 +164,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

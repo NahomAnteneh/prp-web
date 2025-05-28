@@ -1,44 +1,35 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Plus, 
-  Edit, 
-  CheckCircle, 
-  Clock, 
-  Calendar,
-  FileCode,
-  MoreHorizontal
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Folder, ExternalLink, Calendar, User } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { z } from "zod";
+import CreateProjectModal from "./CreateProjectModal";
+
+// Validation schema matching server-side createProjectSchema
+const createProjectSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Project title is required")
+    .max(255, "Project title is too long"),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Description is too long")
+    .optional(),
+  advisorId: z.string().min(1, "Advisor ID is required").optional(),
+});
 
 interface Project {
   id: string;
@@ -46,647 +37,319 @@ interface Project {
   description: string | null;
   status: string;
   submissionDate: string | null;
+  archived: boolean;
   createdAt: string;
   updatedAt: string;
-  milestones?: {
+  group: {
+    groupUserName: string;
+    name: string;
+  };
+  advisor: {
+    id: string;
+    name: string;
+  } | null;
+  stats: {
+    tasks: number;
+    repositories: number;
+    evaluations: number;
+    feedback: number;
+  };
+  evaluations: {
+    id: string;
+    score: number;
+    createdAt: string;
+  }[];
+  feedback: {
+    id: string;
     title: string;
-    description?: string;
-    deadline: string;
-    completed: boolean;
+    createdAt: string;
+    authorId: string;
+    status: string;
   }[];
 }
 
+interface ProjectResponse {
+  projects: Project[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
 interface ProjectsListProps {
-  groupId: string;
+  groupUserName: string;
   isLeader: boolean;
 }
 
-export default function ProjectsList({ groupId, isLeader }: ProjectsListProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function ProjectsList({ groupUserName, isLeader }: ProjectsListProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [projectData, setProjectData] = useState<ProjectResponse>({
+    projects: [],
+    pagination: { total: 0, limit: 5, offset: 0, hasMore: false },
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  
-  // New project form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [titleError, setTitleError] = useState('');
-  
-  // New milestone form state
-  const [milestoneTitle, setMilestoneTitle] = useState('');
-  const [milestoneDescription, setMilestoneDescription] = useState('');
-  const [milestoneDeadline, setMilestoneDeadline] = useState('');
-  const [milestoneTitleError, setMilestoneTitleError] = useState('');
-  const [milestoneDeadlineError, setMilestoneDeadlineError] = useState('');
+
+  const fetchProjects = async (offset: number, limit: number, append: boolean = false) => {
+    try {
+      setIsLoadingMore(true);
+      const url = `/api/groups/${groupUserName}/projects?offset=${offset}&limit=${limit}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch projects");
+      }
+
+      // Ensure data has the expected structure
+      const normalizedData: ProjectResponse = {
+        projects: Array.isArray(data.projects)
+          ? data.projects.slice(0, limit)
+          : Array.isArray(data)
+            ? data.slice(0, limit)
+            : [],
+        pagination: data.pagination || {
+          total: Array.isArray(data.projects)
+            ? data.projects.length
+            : Array.isArray(data)
+              ? data.length
+              : 0,
+          limit,
+          offset,
+          hasMore:
+            (Array.isArray(data.projects)
+              ? data.projects.length
+              : Array.isArray(data)
+                ? data.length
+                : 0) > offset + limit,
+        },
+      };
+
+      if (append) {
+        setProjectData({
+          projects: [...projectData.projects, ...normalizedData.projects],
+          pagination: normalizedData.pagination,
+        });
+      } else {
+        setProjectData(normalizedData);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong";
+      toast.error("Error fetching projects", {
+        description: errorMessage,
+      });
+      setProjectData({
+        projects: [],
+        pagination: { total: 0, limit, offset, hasMore: false },
+      });
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
-    fetchProjects();
-  }, [groupId]);
+    fetchProjects(0, 5); // Fetch only 5 projects initially
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupUserName]);
 
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/groups/${groupId}/projects`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch projects');
-      }
-
-      setProjects(data.projects || []);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error fetching projects', {
-        description: errorMessage,
-      });
-    } finally {
-      setLoading(false);
+  const handleLoadMore = () => {
+    if (projectData.pagination.hasMore) {
+      const newOffset = projectData.pagination.offset + projectData.pagination.limit;
+      fetchProjects(newOffset, projectData.pagination.limit, true);
     }
-  };
-
-  const handleCreateProject = async () => {
-    // Validation
-    if (!title.trim()) {
-      setTitleError('Project title is required');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupId,
-          title: title.trim(),
-          description: description.trim() || null,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create project');
-      }
-
-      toast.success('Project created', {
-        description: 'Your project has been created successfully.',
-      });
-      
-      setShowCreateModal(false);
-      resetForm();
-      fetchProjects();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error creating project', {
-        description: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateProject = async () => {
-    if (!currentProject) return;
-    
-    // Validation
-    if (!title.trim()) {
-      setTitleError('Project title is required');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/projects/${currentProject.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update project');
-      }
-
-      toast.success('Project updated', {
-        description: 'Your project has been updated successfully.',
-      });
-      
-      setShowEditModal(false);
-      resetForm();
-      fetchProjects();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error updating project', {
-        description: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddMilestone = async () => {
-    if (!currentProject) return;
-    
-    // Validation
-    let hasError = false;
-    
-    if (!milestoneTitle.trim()) {
-      setMilestoneTitleError('Milestone title is required');
-      hasError = true;
-    }
-    
-    if (!milestoneDeadline) {
-      setMilestoneDeadlineError('Deadline is required');
-      hasError = true;
-    }
-    
-    if (hasError) return;
-
-    try {
-      setLoading(true);
-      
-      // Get current milestones or initialize empty array
-      const currentMilestones = currentProject.milestones || [];
-      
-      // Add new milestone
-      const newMilestone = {
-        title: milestoneTitle.trim(),
-        description: milestoneDescription.trim() || undefined,
-        deadline: milestoneDeadline,
-        completed: false,
-      };
-      
-      const updatedMilestones = [...currentMilestones, newMilestone];
-      
-      const response = await fetch(`/api/projects/${currentProject.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          milestones: updatedMilestones,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to add milestone');
-      }
-
-      toast.success('Milestone added', {
-        description: 'Project milestone has been added successfully.',
-      });
-      
-      setShowMilestoneModal(false);
-      resetMilestoneForm();
-      fetchProjects();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error adding milestone', {
-        description: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleMilestoneCompletion = async (projectId: string, milestoneIndex: number, completed: boolean) => {
-    const project = projects.find(p => p.id === projectId);
-    if (!project || !project.milestones) return;
-    
-    try {
-      setLoading(true);
-      
-      // Create a copy of milestones and update the specific one
-      const updatedMilestones = [...project.milestones];
-      updatedMilestones[milestoneIndex] = {
-        ...updatedMilestones[milestoneIndex],
-        completed,
-      };
-      
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          milestones: updatedMilestones,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update milestone');
-      }
-
-      // Update projects locally for immediate feedback
-      setProjects(projects.map(p => 
-        p.id === projectId 
-          ? { ...p, milestones: updatedMilestones } 
-          : p
-      ));
-      
-      toast.success('Milestone updated', {
-        description: `Milestone marked as ${completed ? 'completed' : 'incomplete'}.`,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error('Error updating milestone', {
-        description: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setTitleError('');
-  };
-
-  const resetMilestoneForm = () => {
-    setMilestoneTitle('');
-    setMilestoneDescription('');
-    setMilestoneDeadline('');
-    setMilestoneTitleError('');
-    setMilestoneDeadlineError('');
-  };
-
-  const openEditModal = (project: Project) => {
-    setCurrentProject(project);
-    setTitle(project.title);
-    setDescription(project.description || '');
-    setShowEditModal(true);
-  };
-
-  const openAddMilestoneModal = (project: Project) => {
-    setCurrentProject(project);
-    setShowMilestoneModal(true);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
-  
-  const getProjectStatusBadge = (status: string) => {
+
+  // Calculate project summary
+  const totalProjects = projectData.projects.length;
+  const activeProjects = projectData.projects.filter(
+    (p) => p.status.toUpperCase() === "ACTIVE",
+  ).length;
+  const completedProjects = projectData.projects.filter(
+    (p) => p.status.toUpperCase() === "COMPLETED",
+  ).length;
+
+  // Helper function to get appropriate color for status badge
+  const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
-      case 'ACTIVE':
-        return <Badge className="bg-green-500">Active</Badge>;
-      case 'SUBMITTED':
-        return <Badge className="bg-blue-500">Submitted</Badge>;
-      case 'COMPLETED':
-        return <Badge className="bg-purple-500">Completed</Badge>;
-      case 'ARCHIVED':
-        return <Badge variant="outline">Archived</Badge>;
+      case "ACTIVE":
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800";
+      case "COMPLETED":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800";
+      case "SUBMITTED":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800";
+      case "ARCHIVED":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800";
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200 dark:border-gray-800";
     }
   };
-  
-  const getMilestoneStatusColor = (deadline: string, completed: boolean) => {
-    if (completed) return 'text-green-500';
-    
-    const now = new Date();
-    const deadlineDate = new Date(deadline);
-    
-    // If deadline is in the past and not completed
-    if (deadlineDate < now) return 'text-red-500';
-    
-    // If deadline is within the next 7 days
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(now.getDate() + 7);
-    
-    if (deadlineDate <= sevenDaysFromNow) return 'text-amber-500';
-    
-    return 'text-blue-500';
-  };
 
-  if (loading && projects.length === 0) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-40">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-        <span className="ml-2">Loading projects...</span>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Folder className="h-5 w-5" /> Projects
+          </CardTitle>
+          <CardDescription>Loading projects...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading projects...</span>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
-  
+
   return (
-    <div className="space-y-6">
-      {isLeader && (
-        <div className="flex justify-end">
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Create Project
-          </Button>
+    <div className="space-y-8">
+      {/* Project Summary */}
+      <section>
+        <h2 className="text-2xl font-semibold text-foreground mb-3">Project Summary</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="p-4 bg-background border border-blue-500 rounded">
+            <h3 className="font-medium">Total Projects</h3>
+            <p className="text-2xl">{totalProjects}</p>
+          </div>
+          <div className="p-4 bg-background border border-blue-500 rounded">
+            <h3 className="font-medium">Active Projects</h3>
+            <p className="text-2xl">{activeProjects}</p>
+          </div>
+          <div className="p-4 bg-background border border-blue-500 rounded">
+            <h3 className="font-medium">Completed Projects</h3>
+            <p className="text-2xl">{completedProjects}</p>
+          </div>
         </div>
-      )}
-      
-      {projects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10">
-            <FileCode className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No Projects Yet</h3>
-            <p className="text-sm text-muted-foreground text-center max-w-md mt-1">
-              Your group doesn&apos;t have any projects yet. 
-              {isLeader ? ' Start by creating your first project above.' : ' The group leader can create a project.'}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-1">
-          {projects.map((project) => (
-            <Card key={project.id}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{project.title}</CardTitle>
-                    <CardDescription className="mt-1">
-                      Created on {formatDate(project.createdAt)}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getProjectStatusBadge(project.status)}
-                    
-                    {isLeader && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => openEditModal(project)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Project
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openAddMilestoneModal(project)}>
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Add Milestone
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pb-2">
-                {project.description ? (
-                  <p className="text-sm">{project.description}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">No description provided</p>
-                )}
-                
-                {project.milestones && project.milestones.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold mb-2 flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Milestones
-                    </h4>
-                    <div className="space-y-2">
-                      {project.milestones.map((milestone, index) => (
-                        <div key={index} className="bg-muted/30 rounded p-3">
-                          <div className="flex justify-between items-start">
-                            <div className={getMilestoneStatusColor(milestone.deadline, milestone.completed)}>
-                              <div className="flex items-center">
-                                {milestone.completed ? (
-                                  <CheckCircle className="h-4 w-4 mr-1.5" />
-                                ) : (
-                                  <Clock className="h-4 w-4 mr-1.5" />
-                                )}
-                                <h5 className="text-sm font-medium">{milestone.title}</h5>
-                              </div>
-                              <p className="text-xs ml-5.5 mt-0.5">
-                                Due: {formatDate(milestone.deadline)}
-                              </p>
-                            </div>
-                            
-                            {isLeader && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={milestone.completed ? "text-muted-foreground" : "text-green-600"}
-                                onClick={() => toggleMilestoneCompletion(project.id, index, !milestone.completed)}
-                              >
-                                {milestone.completed ? "Mark Incomplete" : "Mark Complete"}
-                              </Button>
-                            )}
-                          </div>
-                          {milestone.description && (
-                            <p className="text-xs text-muted-foreground mt-1 ml-5.5">
-                              {milestone.description}
-                            </p>
-                          )}
+      </section>
+
+      {/* Project List */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Folder className="h-5 w-5 text-primary" /> Projects
+              </CardTitle>
+              <CardDescription>
+                {isLeader ? "Your group's current and past projects" : "Current and past projects"}
+              </CardDescription>
+            </div>
+            {isLeader && (
+              <Button size="sm" onClick={() => setShowCreateModal(true)}>
+                New Project
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {projectData.projects.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="mb-4 text-muted-foreground">
+                {isLeader
+                  ? "Your group hasn't started any projects yet."
+                  : "This group hasn't started any projects yet."}
+              </p>
+              {isLeader && (
+                <Button onClick={() => setShowCreateModal(true)}>
+                  Create New Project
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {projectData.projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="rounded-lg border hover:border-primary transition-colors overflow-hidden"
+                >
+                  <div className="p-5">
+                    <div className="flex flex-col md:flex-row justify-between md:items-start gap-2 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <h3 className="text-lg font-semibold">
+                            <Link
+                              href={`/groups/${project.group.groupUserName}/projects/${project.id}`}
+                              className="hover:text-primary transition-colors"
+                            >
+                              {project.title}
+                            </Link>
+                          </h3>
+                          <Badge className={`${getStatusColor(project.status)} border`}>
+                            {project.status}
+                          </Badge>
                         </div>
-                      ))}
+                        <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                          {project.description || "No description provided"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground mb-4">
+                      <div className="flex items-center gap-1">
+                        <User className="h-3.5 w-3.5" />
+                        <span>Group: {project.group.groupUserName}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <User className="h-3.5 w-3.5" />
+                        <span>Advisor: {project.advisor ? project.advisor.name : "None"}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>Last updated: {formatDate(project.updatedAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>
+                          Stats: {project.stats.tasks} tasks, {project.stats.evaluations} evaluations
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/${project.group.groupUserName}/projects/${project.id}`}>
+                          <ExternalLink className="h-4 w-4 mr-2" /> View Project
+                        </Link>
+                      </Button>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-      
-      {/* Create Project Modal */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Add a new project for your group to work on.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                Project Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setTitleError('');
-                }}
-                placeholder="Enter project title"
-                className={titleError ? 'border-red-500' : ''}
-              />
-              {titleError && <p className="text-sm text-red-500">{titleError}</p>}
+                </div>
+              ))}
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the project goals and scope"
-                rows={3}
-              />
+          )}
+          {projectData.pagination.hasMore && (
+            <div className="text-center mt-6">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? "Loading..." : "Load More"}
+              </Button>
             </div>
-          </div>
-          
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => {
-              setShowCreateModal(false);
-              resetForm();
-            }}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleCreateProject} disabled={loading}>
-              {loading ? 'Creating...' : 'Create Project'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Project Modal */}
-      <Dialog open={showEditModal} onOpenChange={(open) => {
-        setShowEditModal(open);
-        if (!open) resetForm();
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-            <DialogDescription>
-              Update the details of your project.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">
-                Project Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-title"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setTitleError('');
-                }}
-                placeholder="Enter project title"
-                className={titleError ? 'border-red-500' : ''}
-              />
-              {titleError && <p className="text-sm text-red-500">{titleError}</p>}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the project goals and scope"
-                rows={3}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => {
-              setShowEditModal(false);
-              resetForm();
-            }}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleUpdateProject} disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Add Milestone Modal */}
-      <Dialog open={showMilestoneModal} onOpenChange={(open) => {
-        setShowMilestoneModal(open);
-        if (!open) resetMilestoneForm();
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Project Milestone</DialogTitle>
-            <DialogDescription>
-              Add a milestone or deadline to track project progress.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="milestone-title">
-                Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="milestone-title"
-                value={milestoneTitle}
-                onChange={(e) => {
-                  setMilestoneTitle(e.target.value);
-                  setMilestoneTitleError('');
-                }}
-                placeholder="e.g., 'Complete initial design', 'Submit draft report'"
-                className={milestoneTitleError ? 'border-red-500' : ''}
-              />
-              {milestoneTitleError && (
-                <p className="text-sm text-red-500">{milestoneTitleError}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="milestone-description">Description</Label>
-              <Textarea
-                id="milestone-description"
-                value={milestoneDescription}
-                onChange={(e) => setMilestoneDescription(e.target.value)}
-                placeholder="Add any additional details about this milestone"
-                rows={2}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="milestone-deadline">
-                Deadline <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="milestone-deadline"
-                type="date"
-                value={milestoneDeadline}
-                onChange={(e) => {
-                  setMilestoneDeadline(e.target.value);
-                  setMilestoneDeadlineError('');
-                }}
-                className={milestoneDeadlineError ? 'border-red-500' : ''}
-              />
-              {milestoneDeadlineError && (
-                <p className="text-sm text-red-500">{milestoneDeadlineError}</p>
-              )}
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => {
-              setShowMilestoneModal(false);
-              resetMilestoneForm();
-            }}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleAddMilestone} disabled={loading}>
-              {loading ? 'Adding...' : 'Add Milestone'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </CardContent>
+
+        <CreateProjectModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          groupUserName={groupUserName}
+          onProjectCreated={() => fetchProjects(0, 5)}
+        />
+      </Card>
     </div>
   );
-} 
+}

@@ -1,13 +1,20 @@
 "use client";
 
-import type { FileType } from "@/server/api/routers/github";
 import ShikiHighlighter from "react-shiki";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
+// Define a custom FileType based on the Prisma schema
+interface FileType {
+  name: string; // e.g., filePath from FileChange
+  content?: string; // Text content for text files (optional)
+  url?: string; // URL to file content (for binary or hosted files)
+  isBinary: boolean; // Determine if file is binary based on extension or metadata
+}
+
 interface ContentProp {
-  file: NonNullable<FileType>; // the parent component will ensure that the file is not null
-  url: string;
+  file: FileType; // Non-null file object
+  url: string; // URL to file content (used for binary files or as fallback)
 }
 
 const BinaryViewer: React.FC<ContentProp> = ({ file, url }) => {
@@ -37,7 +44,7 @@ const BinaryViewer: React.FC<ContentProp> = ({ file, url }) => {
     );
   }
 
-  // Default fallback for unsupported binary files
+  // Fallback for unsupported binary files
   return (
     <div className="p-4 font-mono text-xs">
       Binary file not supported for preview: {file.name}
@@ -70,6 +77,9 @@ const TextViewer: React.FC<ContentProp> = ({ file, url }) => {
     return <img src={url} alt={file.name} />;
   }
 
+  // Use file.content if available (for text files), otherwise fetch content (not implemented here)
+  const content = file.content || "";
+
   return (
     <ShikiHighlighter
       language={fileExtension}
@@ -81,17 +91,19 @@ const TextViewer: React.FC<ContentProp> = ({ file, url }) => {
             : "github-light"
           : theme ?? "github-light"
       }
+      defaultColor="#000000"
+      cssVariablePrefix="shiki"
     >
-      {file.text || ""}
+      {content}
     </ShikiHighlighter>
   );
 };
 
 const ContentViewer: React.FC<ContentProp> = ({ file, url }) => {
-  return file.isBinary === false ? (
-    <TextViewer file={file} url={url} />
-  ) : (
+  return file.isBinary ? (
     <BinaryViewer file={file} url={url} />
+  ) : (
+    <TextViewer file={file} url={url} />
   );
 };
 

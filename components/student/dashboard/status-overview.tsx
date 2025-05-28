@@ -1,13 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { 
-  BarChart3Icon, 
-  ClockIcon, 
-  CheckCircle2Icon, 
-  AlertCircleIcon, 
-  ArrowRightIcon 
-} from "lucide-react"
+import { BarChart3Icon, ClockIcon, CheckCircle2Icon, AlertCircleIcon, ArrowRightIcon } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
@@ -41,7 +35,7 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
   const safeProjectSummary = {
     totalProjects: projectSummary?.totalProjects || 0,
     activeProjects: projectSummary?.activeProjects || 0,
-    completedProjects: projectSummary?.completedProjects || 0
+    completedProjects: projectSummary?.completedProjects || 0,
   }
 
   // Set default values for taskSummary if undefined or missing properties
@@ -51,20 +45,20 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
     inProgressTasks: taskSummary?.inProgressTasks || 0,
     todoTasks: taskSummary?.todoTasks || 0,
     blockedTasks: taskSummary?.blockedTasks || 0,
-    upcomingDeadlines: taskSummary?.upcomingDeadlines || []
+    upcomingDeadlines: taskSummary?.upcomingDeadlines || [],
   }
 
   const formatDateRelative = (date: Date) => {
     const now = new Date()
     const diff = Math.round((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    
+
     if (diff === 0) return "Today"
     if (diff === 1) return "Tomorrow"
     if (diff > 1 && diff < 7) return `In ${diff} days`
-    
-    return new Intl.DateTimeFormat('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
+
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
     }).format(date)
   }
 
@@ -102,9 +96,13 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
 
           <div className="mt-auto">
             <Link href="/projects">
-              <Button variant="outline" size="sm" className="w-full">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full group hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95"
+              >
                 View All Projects
-                <ArrowRightIcon className="ml-2 h-4 w-4" />
+                <ArrowRightIcon className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
               </Button>
             </Link>
           </div>
@@ -118,9 +116,7 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
             <CheckCircle2Icon className="mr-2 h-5 w-5" />
             Task Progress
           </CardTitle>
-          <CardDescription>
-            {getTaskCompletionPercentage()}% of tasks completed
-          </CardDescription>
+          <CardDescription>{getTaskCompletionPercentage()}% of tasks completed</CardDescription>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col">
           <div className="mb-5">
@@ -129,8 +125,8 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
               <span>{safeTaskSummary.totalTasks} total</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2.5">
-              <div 
-                className="bg-primary h-2.5 rounded-full" 
+              <div
+                className="bg-primary h-2.5 rounded-full"
                 style={{ width: `${getTaskCompletionPercentage()}%` }}
               ></div>
             </div>
@@ -157,9 +153,13 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
 
           <div className="mt-auto">
             <Link href="/tasks">
-              <Button variant="outline" size="sm" className="w-full">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full group hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95"
+              >
                 Manage Tasks
-                <ArrowRightIcon className="ml-2 h-4 w-4" />
+                <ArrowRightIcon className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
               </Button>
             </Link>
           </div>
@@ -179,7 +179,7 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
           <CardContent>
             <div className="space-y-3">
               {safeTaskSummary.upcomingDeadlines.map((task) => (
-                <div 
+                <div
                   key={task.id}
                   className="flex justify-between items-center p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow"
                 >
@@ -194,13 +194,13 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
                     <span className="font-medium text-sm line-clamp-1">{task.title}</span>
                   </div>
                   <div className="flex items-center ml-4">
-                    <span 
+                    <span
                       className={`text-sm whitespace-nowrap ${
-                        task.daysRemaining <= 1 
-                          ? 'text-destructive font-medium' 
-                          : task.daysRemaining <= 3 
-                            ? 'text-orange-500 font-medium' 
-                            : 'text-muted-foreground'
+                        task.daysRemaining <= 1
+                          ? "text-destructive font-medium"
+                          : task.daysRemaining <= 3
+                            ? "text-orange-500 font-medium"
+                            : "text-muted-foreground"
                       }`}
                     >
                       Due {formatDateRelative(task.deadline)}
@@ -219,4 +219,4 @@ export default function StatusOverview({ projectSummary, taskSummary }: StatusOv
       )}
     </div>
   )
-} 
+}

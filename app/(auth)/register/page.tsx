@@ -10,52 +10,42 @@ import { GraduationCap, Users, Compass, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { signIn } from "next-auth/react";
+import ProfilePhotoModal from "@/components/student/profile/profile-photo-modal";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    username: "",
-    idNumber: "",
-    institutionalEmail: "",
+    firstName: "",
+    lastName: "",
+    userId: "",
+    email: "",
     department: "",
     batchYear: "",
     password: "",
     confirmPassword: "",
   });
   const [formErrors, setFormErrors] = useState({
-    username: "",
-    idNumber: "",
-    institutionalEmail: "",
+    firstName: "",
+    lastName: "",
+    userId: "",
+    email: "",
     department: "",
     batchYear: "",
     password: "",
     confirmPassword: "",
     general: "",
   });
+  const [showProfilePhotoModal, setShowProfilePhotoModal] = useState(false);
 
   useEffect(() => {
-    // // Check if user is already authenticated
-    // const checkAuth = async () => {
-    //   try {
-    //     const response = await fetch('/api/auth/me');
-    //     if (response.ok) {
-    //       // User is already logged in, redirect to dashboard or onboarding
-    //       router.push("/group-onboarding");
-    //     }
-    //   } catch (error) {
-    //     console.error('Error checking authentication:', error);
-    //   }
-    // };
-
-    // checkAuth();
+    // Check if user is already authenticated (commented out in original code)
   }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing again
     if (formErrors[name as keyof typeof formErrors]) {
       setFormErrors(prev => ({ ...prev, [name]: "" }));
     }
@@ -63,8 +53,6 @@ export default function RegisterPage() {
 
   const handleSelectChange = (name: string, value: string): void => {
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user selects an option
     if (formErrors[name as keyof typeof formErrors]) {
       setFormErrors(prev => ({ ...prev, [name]: "" }));
     }
@@ -73,9 +61,10 @@ export default function RegisterPage() {
   const validateForm = () => {
     let isValid = true;
     const errors = {
-      username: "",
-      idNumber: "",
-      institutionalEmail: "",
+      firstName: "",
+      lastName: "",
+      userId: "",
+      email: "",
       department: "",
       batchYear: "",
       password: "",
@@ -83,31 +72,46 @@ export default function RegisterPage() {
       general: "",
     };
 
-    // Username validation
-    if (!formData.username) {
-      errors.username = "Username is required";
-      isValid = false;
-    } else if (formData.username.length < 3) {
-      errors.username = "Username must be at least 3 characters";
+    // First Name validation
+    if (!formData.firstName) {
+      errors.firstName = "First name is required";
       isValid = false;
     }
 
+    // Last Name validation
+    if (!formData.lastName) {
+      errors.lastName = "Last name is required";
+      isValid = false;
+    }
+
+    // Username validation
+    // if (!formData.username) {
+    //   errors.username = "Username is required";
+    //   isValid = false;
+    // } else if (formData.username.length < 3) {
+    //   errors.username = "Username must be at least 3 characters";
+    //   isValid = false;
+    // }
+
     // ID Number validation
-    if (!formData.idNumber) {
-      errors.idNumber = "ID number is required";
+    if (!formData.userId) {
+      errors.userId = "ID number is required";
+      isValid = false;
+    } else if (!formData.userId.startsWith("BDU")) {
+      errors.userId = "ID number must start with 'BDU'";
       isValid = false;
     }
 
     // Institutional Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.institutionalEmail) {
-      errors.institutionalEmail = "Institutional email is required";
+    if (!formData.email) {
+      errors.email = "Institutional email is required";
       isValid = false;
-    } else if (!emailRegex.test(formData.institutionalEmail)) {
-      errors.institutionalEmail = "Please enter a valid email address";
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = "Please enter a valid email address";
       isValid = false;
-    } else if (!formData.institutionalEmail.endsWith('bdu.edu.et')) {
-      errors.institutionalEmail = "Please use your BiT institutional email";
+    } else if (!formData.email.endsWith('bdu.edu.et')) {
+      errors.email = "Please use your BiT institutional email";
       isValid = false;
     }
 
@@ -156,9 +160,10 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: formData.username,
-          idNumber: formData.idNumber,
-          email: formData.institutionalEmail,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          userId: formData.userId,
+          email: formData.email,
           password: formData.password,
           department: formData.department,
           batchYear: formData.batchYear
@@ -173,20 +178,33 @@ export default function RegisterPage() {
       const data = await response.json();
       console.log("Registration successful", data);
       
-      // After successful registration, redirect to login page with success message
-      router.push("/login?registered=true");
+      // Sign in automatically after registration
+      console.log("Registration successful, attempting auto-login with:", { userId: formData.userId });
+      const signInRes = await signIn('credentials', {
+        redirect: false,
+        identifier: formData.userId,
+        password: formData.password
+      });
+
+      console.log("Auto-login result:", signInRes);
+
+      if (signInRes?.error) {
+        console.error("Auto-login failed:", signInRes.error);
+        throw new Error(signInRes.error || 'Failed to sign in after registration');
+      }
+      
+      // Show profile photo modal or redirect to home page
+      setShowProfilePhotoModal(true);
     } catch (error) {
       console.error("Registration error:", error);
       setFormErrors(prev => ({
         ...prev,
         general: error instanceof Error ? error.message : "Registration failed. Please try again."
       }));
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // Computing departments at BiT
   const departments = [
     { value: "computer-science", label: "Computer Science" },
     { value: "information-technology", label: "Information Technology" },
@@ -195,7 +213,6 @@ export default function RegisterPage() {
     { value: "computer-engineering", label: "Computer Engineering" },
   ];
 
-  // Generate batch years (current year - 5 to current year + 1)
   const currentYear = new Date().getFullYear();
   const batchYears = Array.from({ length: 7 }, (_, i) => (currentYear - 5 + i).toString());
 
@@ -233,7 +250,40 @@ export default function RegisterPage() {
               </div>
             )}
             
-            <div className="space-y-2">
+            {/* First Name and Last Name Group */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-gray-700">First Name</Label>
+                <Input 
+                  id="firstName"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="Your first name"
+                  className={`border-0 bg-gray-50 shadow-sm ${formErrors.firstName ? "ring-2 ring-red-500" : ""}`}
+                />
+                {formErrors.firstName && (
+                  <p className="text-sm text-red-500">{formErrors.firstName}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-gray-700">Last Name</Label>
+                <Input 
+                  id="lastName"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Your last name"
+                  className={`border-0 bg-gray-50 shadow-sm ${formErrors.lastName ? "ring-2 ring-red-500" : ""}`}
+                />
+                {formErrors.lastName && (
+                  <p className="text-sm text-red-500">{formErrors.lastName}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Existing Fields */}
+            {/* <div className="space-y-2">
               <Label htmlFor="username" className="text-gray-700">Username</Label>
               <Input 
                 id="username"
@@ -246,36 +296,36 @@ export default function RegisterPage() {
               {formErrors.username && (
                 <p className="text-sm text-red-500">{formErrors.username}</p>
               )}
-            </div>
+            </div> */}
             
             <div className="space-y-2">
-              <Label htmlFor="idNumber" className="text-gray-700">Student ID</Label>
+              <Label htmlFor="userId" className="text-gray-700">Student ID</Label>
               <Input 
-                id="idNumber"
-                name="idNumber"
-                value={formData.idNumber}
+                id="userId"
+                name="userId"
+                value={formData.userId}
                 onChange={handleChange}
                 placeholder="Your BiT student ID number"
-                className={`border-0 bg-gray-50 shadow-sm ${formErrors.idNumber ? "ring-2 ring-red-500" : ""}`}
+                className={`border-0 bg-gray-50 shadow-sm ${formErrors.userId ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.idNumber && (
-                <p className="text-sm text-red-500">{formErrors.idNumber}</p>
+              {formErrors.userId && (
+                <p className="text-sm text-red-500">{formErrors.userId}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="institutionalEmail" className="text-gray-700">Institutional Email</Label>
+              <Label htmlFor="email" className="text-gray-700">Institutional Email</Label>
               <Input 
-                id="institutionalEmail"
-                name="institutionalEmail"
+                id="email"
+                name="email"
                 type="email"
-                value={formData.institutionalEmail}
+                value={formData.email}
                 onChange={handleChange}
                 placeholder="your.name@bdu.edu.et"
-                className={`border-0 bg-gray-50 shadow-sm ${formErrors.institutionalEmail ? "ring-2 ring-red-500" : ""}`}
+                className={`border-0 bg-gray-50 shadow-sm ${formErrors.email ? "ring-2 ring-red-500" : ""}`}
               />
-              {formErrors.institutionalEmail && (
-                <p className="text-sm text-red-500">{formErrors.institutionalEmail}</p>
+              {formErrors.email && (
+                <p className="text-sm text-red-500">{formErrors.email}</p>
               )}
             </div>
             
@@ -387,7 +437,6 @@ export default function RegisterPage() {
       
       {/* Right Column - Hero/Info Section */}
       <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-500 to-sky-500 relative overflow-hidden">
-        {/* Decorative elements */}
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -450,6 +499,17 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {showProfilePhotoModal && (
+        <ProfilePhotoModal
+          isOpen={showProfilePhotoModal}
+          onClose={() => setShowProfilePhotoModal(false)}
+          userId={formData.userId}
+          onSuccess={() => {
+            router.push("/");
+          }}
+        />
+      )}
     </div>
   );
-} 
+}

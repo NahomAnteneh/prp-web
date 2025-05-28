@@ -24,11 +24,13 @@ interface ApiResponse {
 
 interface NotificationDropdownProps {
   unreadCount: number
+  userId?: string
   onMarkAllAsRead: () => void
 }
 
 export default function NotificationDropdown({ 
   unreadCount, 
+  userId,
   onMarkAllAsRead 
 }: NotificationDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -39,11 +41,17 @@ export default function NotificationDropdown({
 
   // Fetch notifications from API
   const fetchNotifications = async () => {
+    if (!userId) {
+      setError("User ID not available");
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true)
     setError(null)
     
     try {
-      const response = await fetch('/api/notifications/recent')
+      const response = await fetch(`/api/${userId}/notifications`)
       
       if (!response.ok) {
         throw new Error(`Failed to fetch notifications: ${response.statusText}`)
@@ -118,10 +126,14 @@ export default function NotificationDropdown({
   }
 
   const handleMarkAllAsRead = async () => {
+    if (!userId) {
+      return;
+    }
+    
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api/notifications/mark-read', {
+      const response = await fetch(`/api/${userId}/notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -146,8 +158,12 @@ export default function NotificationDropdown({
   }
 
   const handleMarkAsRead = async (notificationId: string) => {
+    if (!userId) {
+      return;
+    }
+    
     try {
-      const response = await fetch('/api/notifications/mark-read', {
+      const response = await fetch(`/api/${userId}/notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

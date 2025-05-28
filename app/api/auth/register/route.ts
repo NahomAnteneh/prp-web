@@ -33,10 +33,10 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username, idNumber, email, password, department, batchYear } = body;
+    const { firstName, lastName, userId, email, password, department, batchYear } = body;
 
     // Basic validation
-    if (!username || !email || !password || !department || !batchYear) {
+    if (!firstName || !lastName || !userId || !email || !password || !department || !batchYear) {
       const response = NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -46,12 +46,12 @@ export async function POST(req: NextRequest) {
 
     // Check if username already exists
     const existingUser = await prisma.user.findUnique({
-      where: { username }
+      where: { userId }
     });
 
     if (existingUser) {
       const response = NextResponse.json(
-        { error: 'Username already taken' },
+        { error: 'User already exists' },
         { status: 409 }
       );
       return addCorsHeaders(response);
@@ -81,15 +81,16 @@ export async function POST(req: NextRequest) {
     // Create user
     const user = await prisma.user.create({
       data: {
-        username,
+        firstName,
+        lastName,
+        userId,
+        email,
         passwordHash,
         role: Role.STUDENT,
         profileInfo: {
-          idNumber,
-          email,
           department,
           batchYear,
-        }
+        },
       },
     });
 
@@ -98,8 +99,7 @@ export async function POST(req: NextRequest) {
       { 
         message: 'User registered successfully', 
         user: {
-          id: user.id,
-          username: user.username,
+          id: user.userId,
           role: user.role,
         }
       },
@@ -114,4 +114,4 @@ export async function POST(req: NextRequest) {
     );
     return addCorsHeaders(response);
   }
-} 
+}

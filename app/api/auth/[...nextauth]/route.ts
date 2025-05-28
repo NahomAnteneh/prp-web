@@ -11,7 +11,7 @@ export const authOptions: AuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        identifier: { label: 'Username or Email', type: 'text' },
+        identifier: { label: 'ID or Email', type: 'text' },
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
@@ -19,15 +19,19 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // Find user by username (identifier can be username)
-        const user = await prisma.user.findUnique({
-          where: { username: credentials.identifier }
+        // Try to find user by userId first
+        let user = await prisma.user.findUnique({
+          where: { userId: credentials.identifier }
         });
 
+        // If not found by userId, try by email
         if (!user) {
-          // If user not found by username, could be using email in the profileInfo JSON
-          // NOTE: This is just a fallback in case the user is using email instead of username
-          // In a proper implementation, you might want to add an email field to the User model
+          user = await prisma.user.findUnique({
+            where: { email: credentials.identifier }
+          });
+        }
+
+        if (!user) {
           return null;
         }
 
@@ -43,9 +47,9 @@ export const authOptions: AuthOptions = {
 
         // Return user object without password
         return {
-          id: user.id,
-          name: user.name || user.username,
-          username: user.username,
+          id: user.userId,
+          userId: user.userId,
+          name: `${user.firstName} ${user.lastName}`,
           role: user.role,
         };
       }
@@ -57,18 +61,16 @@ export const authOptions: AuthOptions = {
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.userId = user.userId;
         token.name = user.name;
-        token.username = user.username;
-        token.role = user.role;
+        token.role = user.role as Role;
       }
       return token;
     },
     session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id as string;
+        session.user.userId = token.userId as string;
         session.user.name = token.name as string;
-        session.user.username = token.username as string;
         session.user.role = token.role as Role;
       }
       return session;
@@ -86,4 +88,4 @@ const handler = NextAuth(authOptions);
 
 // Export handler functions for App Router
 // These functions receive the req object and route params
-export { handler as GET, handler as POST }; 
+export { handler as GET, handler as POST };

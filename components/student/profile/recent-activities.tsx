@@ -5,9 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, GitCommit, GitPullRequest, MessageSquare, CheckCircle, Circle } from "lucide-react"
+// import Link from "next/link"
 
 interface RecentActivitiesProps {
   userId: string
+  isOwner?: boolean
 }
 
 interface Activity {
@@ -20,72 +22,28 @@ interface Activity {
   relatedTo?: string
 }
 
-export default function RecentActivities({ userId }: RecentActivitiesProps) {
+export default function RecentActivities({ userId, isOwner = false }: RecentActivitiesProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [activities, setActivities] = useState<Activity[]>([])
 
   useEffect(() => {
-    // In a real implementation, fetch activities data from an API
     const fetchActivities = async () => {
       try {
-        // Simulating API call with a timeout
-        setTimeout(() => {
-          setActivities([
-            {
-              id: "activity-1",
-              type: "commit",
-              title: "Added profile components",
-              description: "Created student profile components with responsive design",
-              timestamp: "2 hours ago",
-              project: "Project Repository Platform",
-              relatedTo: "feature/student-profile"
-            },
-            {
-              id: "activity-2",
-              type: "pull_request",
-              title: "Merge: Group Dashboard UI",
-              description: "Implemented UI components for group dashboard view",
-              timestamp: "Yesterday",
-              project: "Project Repository Platform",
-              relatedTo: "PR #42"
-            },
-            {
-              id: "activity-3",
-              type: "comment",
-              title: "Comment on Task",
-              description: "Added implementation details for the authentication system",
-              timestamp: "3 days ago",
-              project: "Project Repository Platform",
-              relatedTo: "Task #15"
-            },
-            {
-              id: "activity-4",
-              type: "task",
-              title: "Completed Task",
-              description: "Finalized database schema for user profiles",
-              timestamp: "1 week ago",
-              project: "Project Repository Platform",
-              relatedTo: "Task #8"
-            },
-            {
-              id: "activity-5",
-              type: "milestone",
-              title: "Milestone Reached",
-              description: "Completed Phase 1: Project Setup and Architecture",
-              timestamp: "2 weeks ago",
-              project: "Project Repository Platform"
-            }
-          ])
-          setIsLoading(false)
-        }, 1000)
+        const response = await fetch(`/api/users/${userId}/activities`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch activities");
+        }
+        const data = await response.json();
+        setActivities(data);
       } catch (error) {
-        console.error("Error fetching activities:", error)
-        setIsLoading(false)
+        console.error("Error fetching activities:", error);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchActivities()
-  }, [])
+    fetchActivities();
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -147,17 +105,17 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
   const getActivityColor = (type: Activity["type"]) => {
     switch (type) {
       case "commit":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
       case "pull_request":
-        return "bg-purple-100 text-purple-800"
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400"
       case "comment":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
       case "task":
-        return "bg-amber-100 text-amber-800"
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400"
       case "milestone":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400"
     }
   }
 
@@ -169,9 +127,11 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" /> Recent Activities
             </CardTitle>
-            <CardDescription>Your recent activities across projects</CardDescription>
+            <CardDescription>
+              {isOwner ? "Your recent activities across projects" : "Recent activities across projects"}
+            </CardDescription>
           </div>
-          <Button size="sm" variant="outline">View All</Button>
+          {isOwner && <Button size="sm" variant="outline">View All</Button>}
         </div>
       </CardHeader>
       <CardContent>
@@ -215,4 +175,4 @@ export default function RecentActivities({ userId }: RecentActivitiesProps) {
       </CardContent>
     </Card>
   )
-} 
+}
