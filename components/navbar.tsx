@@ -67,6 +67,8 @@ export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const { data: session, status } = useSession()
+  const [hoveredFeature, setHoveredFeature] = React.useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   // Use the session data
   const user = session?.user
@@ -93,7 +95,7 @@ export function Navbar() {
     return cn(navigationMenuTriggerStyle(), isActive(href) && "bg-accent text-accent-foreground")
   }
 
-  if (isLoading) {
+  if (status === "loading") {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center justify-between">
@@ -280,9 +282,9 @@ export function Navbar() {
                       style={{ animationDelay: `${index * 100}ms` }}
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      <span className="text-base transition-transform duration-300 hover:scale-125">
+                      {/* <span className="text-base transition-transform duration-300 hover:scale-125">
                         {feature.icon}
-                      </span>
+                      </span> */}
                       {feature.title}
                     </Link>
                   ))}

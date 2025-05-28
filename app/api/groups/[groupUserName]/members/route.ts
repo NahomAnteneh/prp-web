@@ -162,6 +162,83 @@ export async function POST(
   }
 }
 
+// PATCH: Update a member's role in the group
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { groupUserName: string } }
+) {
+  try {
+    const { groupUserName } = params;
+    const body = await req.json();
+    const { memberUserId, role, permissions } = body; // permissions might be used later
+
+    if (!memberUserId || !role) {
+      return NextResponse.json(
+        { message: 'memberUserId and role are required in the request body' },
+        { status: 400 }
+      );
+    }
+
+    // Check if the group exists
+    const group = await db.group.findUnique({
+      where: { groupUserName },
+    });
+
+    if (!group) {
+      return NextResponse.json(
+        { message: 'Group not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if the member exists in the group
+    const existingMembership = await db.groupMember.findUnique({
+      where: {
+        groupUserName_userId: {
+          groupUserName: groupUserName,
+          userId: memberUserId,
+        },
+      },
+    });
+
+    if (!existingMembership) {
+      return NextResponse.json(
+        { message: 'Member not found in this group' },
+        { status: 404 }
+      );
+    }
+
+    // Update the member's role
+    // For now, we only update the role string. 
+    // If `role` is 'custom', the frontend handles displaying permission toggles.
+    // Storing granular custom permissions would require schema changes (e.g., a JSON field on GroupMember).
+    const updatedMembership = await db.groupMember.update({
+      where: {
+        groupUserName_userId: {
+          groupUserName: groupUserName,
+          userId: memberUserId,
+        },
+      },
+      data: {
+        role: role, // The role field on GroupMember model needs to exist and be a string
+        // customPermissions: role === 'custom' ? permissions : undefined, // Example if storing JSON permissions
+      },
+    });
+
+    return NextResponse.json({
+      message: 'Member role updated successfully',
+      member: updatedMembership,
+    });
+
+  } catch (error) {
+    console.error('Error updating group member role:', error);
+    return NextResponse.json(
+      { message: 'Internal server error while updating role' },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE: Remove a member from the group
 export async function DELETE(
   req: NextRequest,

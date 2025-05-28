@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { EmptyRepositoryWelcome } from "./empty-repository-welcome";
+import { getRepositoryEndpoints } from "@/config/api";
 
 interface TreeNode {
   path: string;
@@ -50,8 +51,9 @@ export function CodeTab({ ownerId, repoId, defaultBranchName }: CodeTabProps) {
       setIsFileTreeLoading(true);
       
       try {
+        // Use the new endpoint mapping
         const treeResponse = await fetch(
-          `/api/groups/${ownerId}/repositories/${repoId}/tree/${defaultBranchName}`
+          getRepositoryEndpoints.tree(ownerId, repoId, defaultBranchName)
         );
         
         if (treeResponse.ok) {
@@ -62,7 +64,7 @@ export function CodeTab({ ownerId, repoId, defaultBranchName }: CodeTabProps) {
         // Fetch README
         try {
           const readmeResponse = await fetch(
-            `/api/groups/${ownerId}/repositories/${repoId}/readme/${defaultBranchName}`
+            getRepositoryEndpoints.readme(ownerId, repoId, defaultBranchName)
           );
           
           if (readmeResponse.ok) {
@@ -78,7 +80,7 @@ export function CodeTab({ ownerId, repoId, defaultBranchName }: CodeTabProps) {
         // Fetch last commit
         try {
           const commitsResponse = await fetch(
-            `/api/groups/${ownerId}/repositories/${repoId}/commits/${defaultBranchName}?limit=1`
+            `${getRepositoryEndpoints.commits(ownerId, repoId)}?limit=1`
           );
           if (commitsResponse.ok) {
             const commits: Commit[] = await commitsResponse.json();

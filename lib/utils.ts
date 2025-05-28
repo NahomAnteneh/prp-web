@@ -1,5 +1,9 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { API_URL } from "@/config/api"
+
+// API base URL - configure this to point to your repository server
+export const API_BASE_URL = API_URL;
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

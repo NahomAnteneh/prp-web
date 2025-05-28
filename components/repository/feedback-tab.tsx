@@ -17,6 +17,7 @@ import {
   Clock,
   MessageSquare
 } from "lucide-react";
+import { getRepositoryEndpoints } from "@/config/api";
 
 // Define session user type to match NextAuth.js structure in this project
 interface SessionUser {
@@ -75,8 +76,8 @@ export function FeedbackTab({ ownerId, repoId }: FeedbackTabProps) {
       setError(null);
       
       try {
-        // Use the real API endpoint
-        const response = await fetch(`/api/repositories/${ownerId}/${repoId}/feedback`);
+        // Use the mapped endpoints
+        const response = await fetch(getRepositoryEndpoints.feedback.list(ownerId, repoId));
         
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);
@@ -116,8 +117,8 @@ export function FeedbackTab({ ownerId, repoId }: FeedbackTabProps) {
     setIsSubmittingFeedback(true);
     
     try {
-      // Use the real API endpoint
-      const response = await fetch(`/api/repositories/${ownerId}/${repoId}/feedback`, {
+      // Use the mapped endpoints
+      const response = await fetch(getRepositoryEndpoints.feedback.create(ownerId, repoId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +156,7 @@ export function FeedbackTab({ ownerId, repoId }: FeedbackTabProps) {
   // New function to update feedback status
   const handleUpdateFeedbackStatus = async (feedbackId: string, newStatus: "OPEN" | "ADDRESSED" | "CLOSED") => {
     try {
-      const response = await fetch(`/api/repositories/${ownerId}/${repoId}/feedback/${feedbackId}`, {
+      const response = await fetch(getRepositoryEndpoints.feedback.update(ownerId, repoId, feedbackId), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -101,7 +101,7 @@ export async function POST(
 // Get information about an invite code
 export async function GET(
   request: Request,
-  { params }: { params: { groupUserName: string } }
+  { params }: { params: { groupUserName: string } | Promise<{ groupUserName: string }> }
 ) {
   try {
     // Check authentication
@@ -110,7 +110,8 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupUserName = params.groupUserName;
+    const resolvedParams = await Promise.resolve(params); // Ensure params is resolved
+    const groupUserName = resolvedParams.groupUserName;
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
 

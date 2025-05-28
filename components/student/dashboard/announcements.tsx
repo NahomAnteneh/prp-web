@@ -5,19 +5,20 @@ import { MegaphoneIcon, ChevronRight, ChevronDown } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Announcement } from "@prisma/client"
+// import { Announcement } from "@prisma/client" // No longer using full Prisma type
 import { cn } from "@/lib/utils"
 
-// export interface Announcement {
-//   id: string
-//   title: string
-//   content: string
-//   createdAt: Date
-//   priority: number
-// }
+// Define a more precise type for the announcements this component receives
+interface AnnouncementItem {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Date; // Expecting Date object after transformation
+  priority: number;
+}
 
 interface AnnouncementsProps {
-  announcements: Announcement[]
+  announcements: AnnouncementItem[]; // Use the more precise type
 }
 
 export default function Announcements({ announcements }: AnnouncementsProps) {

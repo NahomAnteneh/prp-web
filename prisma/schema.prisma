@@ -42,8 +42,8 @@ model User {
   evaluatedProjects    ProjectEvaluator[]
   tasksAssigned        Task[]               @relation("TaskAssignee")
   tasksCreated         Task[]               @relation("TaskCreator")
-  repositoriesOwned    Repository[]         @relation("RepositoryOwner")
-  /// Each repository belongs to one user
+  adviceRequested      AdviceRequest[]      @relation("AdviceRequester")
+  adviceResponses      AdviceResponse[]     @relation("AdviceResponder")
 
   @@index([userId])
   @@index([email])
@@ -103,6 +103,7 @@ model Project {
   projectEvaluators ProjectEvaluator[]
   repositories      ProjectRepository[]
   tasks             Task[]
+  adviceRequests    AdviceRequest[]
 
   @@index([title])
   @@index([groupUserName])
@@ -371,6 +372,37 @@ model Notification {
   @@index([read])
 }
 
+/// Represents a request for advice from an advisor on a specific project topic
+model AdviceRequest {
+  id          String          @id @default(cuid())
+  topic       String
+  description String
+  status      String          @default("PENDING")
+  createdAt   DateTime        @default(now())
+  projectId   String
+  requesterId String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requester   User            @relation("AdviceRequester", fields: [requesterId], references: [userId])
+  response    AdviceResponse?
+
+  @@index([projectId])
+  @@index([requesterId])
+  @@index([status])
+}
+
+/// Represents an advisor's response to an advice request
+model AdviceResponse {
+  id              String        @id @default(cuid())
+  content         String
+  createdAt       DateTime      @default(now())
+  adviceRequestId String        @unique
+  authorId        String
+  adviceRequest   AdviceRequest @relation(fields: [adviceRequestId], references: [id], onDelete: Cascade)
+  author          User          @relation("AdviceResponder", fields: [authorId], references: [userId])
+
+  @@index([authorId])
+}
+
 /// Represents a student group's request for an advisor
 model AdvisorRequest {
   id                 String               @id @default(cuid())
@@ -433,6 +465,8 @@ model Rule {
   advisorRequestDeadline    DateTime?
   projectSubmissionDeadline DateTime?
   updatedAt                 DateTime  @updatedAt
+  maxEvaluatorsPerProject   Int       @default(3)
+  maxProjectsPerAdvisor     Int       @default(5)
 }
 
 enum Role {
@@ -486,11 +520,5 @@ enum TaskStatus {
 enum FeedbackStatus {
   OPEN
   ADDRESSED
-  CLOSED
-}
-
-/// Represents the status of feedback
-enum FeedbackStatus {
-  OPEN
   CLOSED
 }

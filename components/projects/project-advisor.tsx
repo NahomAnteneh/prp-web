@@ -7,11 +7,22 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Phone, Send, Clock, Loader2, UserPlus, Star } from 'lucide-react';
+import { Mail, Phone, Send, Clock, Loader2, UserPlus, Star, HelpCircle } from 'lucide-react';
 import { AdvisorRequestModal } from './advisor-request-modal';
 import { AdvisorRating } from './advisor-rating';
 import { AdvisorFeedback } from './advisor-feedback';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
 
 interface User {
   userId: string;
@@ -26,22 +37,30 @@ interface User {
   expertise?: string[];
 }
 
-interface Message {
-  id: string;
-  content: string;
-  createdAt: string;
-  sender: User;
-  isRead: boolean;
-}
-
 interface AdvisorRequest {
   id: string;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
-  requestMessage?: string;
-  responseMessage?: string;
+  status: string;
+  requestMessage: string | null;
   createdAt: string;
-  updatedAt: string;
-  requestedAdvisor: User;
+  requestedAdvisorId: string;
+  requestedAdvisor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  };
+}
+
+interface AdviceRequest {
+  id: string;
+  topic: string;
+  description: string;
+  status: 'PENDING' | 'ANSWERED';
+  createdAt: string;
+  response?: {
+    content: string;
+    createdAt: string;
+  };
 }
 
 interface ProjectAdvisorProps {
@@ -52,10 +71,16 @@ interface ProjectAdvisorProps {
 export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
   const [advisor, setAdvisor] = useState<User | null>(null);
   const [advisorRequest, setAdvisorRequest] = useState<AdvisorRequest | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [adviceRequests, setAdviceRequests] = useState<AdviceRequest[]>([]);
+  const [newAdviceTopic, setNewAdviceTopic] = useState('');
+  const [newAdviceDescription, setNewAdviceDescription] = useState('');
+  const [adviceResponse, setAdviceResponse] = useState('');
+  const [selectedAdviceRequest, setSelectedAdviceRequest] = useState<AdviceRequest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSending, setIsSending] = useState(false);
+  const [isSubmittingAdvice, setIsSubmittingAdvice] = useState(false);
+  const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
+  const [isAdviceDialogOpen, setIsAdviceDialogOpen] = useState(false);
+  const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
   const [error, setError] = useState('');
 
   const fetchAdvisorData = async () => {
@@ -70,14 +95,14 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
         const advisorData = await advisorResponse.json();
         setAdvisor(advisorData.advisor);
         
-        // Fetch advisor messages if advisor exists
-        const messagesResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor/messages`);
+        // Fetch advice requests
+        const adviceResponse = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor/advice`);
         
-        if (messagesResponse.ok) {
-          const messagesData = await messagesResponse.json();
-          setMessages(messagesData);
+        if (adviceResponse.ok) {
+          const adviceData = await adviceResponse.json();
+          setAdviceRequests(adviceData);
         } else {
-          console.error('Failed to fetch messages:', messagesResponse.statusText);
+          console.error('Failed to fetch advice requests:', adviceResponse.statusText);
         }
       } else if (advisorResponse.status === 404) {
         // No advisor assigned, check for pending requests
@@ -101,78 +126,106 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
   useEffect(() => {
     fetchAdvisorData();
   }, [ownerId, projectId]);
-
-  const handleSendMessage = async (e: React.FormEvent) => {
+  
+  const handleSubmitAdviceRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim()) return;
+    if (!newAdviceTopic.trim() || !newAdviceDescription.trim()) {
+      toast.error('Please provide both a topic and description');
+      return;
+    }
     
     try {
-      setIsSending(true);
-      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor/messages`, {
+      setIsSubmittingAdvice(true);
+      
+      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor/advice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: newMessage,
+          topic: newAdviceTopic.trim(),
+          description: newAdviceDescription.trim(),
         }),
       });
-
+      
       if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit advice request');
       }
-
-      const sentMessage = await response.json();
-      setMessages([...messages, sentMessage]);
-      setNewMessage('');
+      
+      toast.success('Advice request submitted');
+      setNewAdviceTopic('');
+      setNewAdviceDescription('');
+      setIsAdviceDialogOpen(false);
+      
+      // Refresh the advice requests list
+      fetchAdvisorData();
     } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message', {
+      console.error('Error submitting advice request:', error);
+      toast.error('Failed to submit request', { 
         description: error instanceof Error ? error.message : 'Please try again later'
       });
     } finally {
-      setIsSending(false);
+      setIsSubmittingAdvice(false);
     }
   };
-
-  const handleCancelRequest = async () => {
-    if (!advisorRequest) return;
+  
+  const handleSubmitAdviceResponse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!adviceResponse.trim() || !selectedAdviceRequest) {
+      toast.error('Please provide a response');
+      return;
+    }
     
     try {
-      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor-request/${advisorRequest.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to cancel request: ${response.statusText}`);
-      }
-
-      toast.success('Request cancelled', {
-        description: 'Your advisor request has been cancelled.'
+      setIsSubmittingResponse(true);
+      
+      const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor/advice/${selectedAdviceRequest.id}/respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: adviceResponse.trim(),
+        }),
       });
       
-      setAdvisorRequest(null);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit response');
+      }
+      
+      toast.success('Response submitted');
+      setAdviceResponse('');
+      setIsResponseDialogOpen(false);
+      setSelectedAdviceRequest(null);
+      
+      // Refresh the advice requests list
+      fetchAdvisorData();
     } catch (error) {
-      console.error('Error cancelling request:', error);
-      toast.error('Failed to cancel request', {
+      console.error('Error submitting advice response:', error);
+      toast.error('Failed to submit response', { 
         description: error instanceof Error ? error.message : 'Please try again later'
       });
+    } finally {
+      setIsSubmittingResponse(false);
     }
   };
-
+  
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
+    return new Intl.DateTimeFormat('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
       day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
+      hour: '2-digit',
+      minute: '2-digit'
     }).format(date);
   };
 
@@ -197,7 +250,56 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
               Please try again later or contact support if the problem persists.
             </p>
           </div>
-        ) : advisor ? (
+        ) : advisorRequest ? (
+          <div className="flex flex-col items-center justify-center py-10">
+            <Clock className="h-12 w-12 text-amber-500/80 mb-4" />
+            <h3 className="text-lg font-medium text-center mb-2">Advisor Request Pending</h3>
+            <p className="text-sm text-center text-muted-foreground mb-4">
+              Request sent to {advisorRequest.requestedAdvisor.firstName} {advisorRequest.requestedAdvisor.lastName}
+              <br />on {formatDate(advisorRequest.createdAt)}
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="mt-2"
+              onClick={async () => {
+                if (confirm('Are you sure you want to cancel this advisor request?')) {
+                  try {
+                    const response = await fetch(`/api/groups/${ownerId}/projects/${projectId}/advisor-request/${advisorRequest.id}`, {
+                      method: 'DELETE',
+                    });
+                    
+                    if (!response.ok) {
+                      throw new Error('Failed to cancel request');
+                    }
+                    
+                    toast.success('Advisor request cancelled');
+                    setAdvisorRequest(null);
+                  } catch (error) {
+                    toast.error('Failed to cancel request');
+                    console.error(error);
+                  }
+                }
+              }}
+            >
+              Cancel Request
+            </Button>
+          </div>
+        ) : !advisor ? (
+          <div className="flex flex-col items-center justify-center py-10">
+            <UserPlus className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Advisor Assigned</h3>
+            <p className="text-sm text-center text-muted-foreground mb-6">
+              Request an advisor to get expert guidance for your project
+            </p>
+            
+            <AdvisorRequestModal 
+              ownerId={ownerId}
+              projectId={projectId} 
+              onRequestComplete={fetchAdvisorData}
+            />
+          </div>
+        ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
               <div className="flex flex-col items-center">
@@ -221,8 +323,8 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
               </div>
               
               <div className="mt-6 space-y-4">
-                <div className="flex items-center">
-                  <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
                   <a 
                     href={`mailto:${advisor.email}`} 
                     className="text-sm text-blue-600 hover:underline"
@@ -232,8 +334,8 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
                 </div>
                 
                 {advisor.phoneNumber && (
-                  <div className="flex items-center">
-                    <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
                     <a 
                       href={`tel:${advisor.phoneNumber}`} 
                       className="text-sm text-blue-600 hover:underline"
@@ -244,11 +346,11 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
                 )}
                 
                 {advisor.expertise && advisor.expertise.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium mb-2">Expertise</h4>
+                  <div className="pt-4">
+                    <h4 className="text-sm font-medium mb-2">Areas of Expertise</h4>
                     <div className="flex flex-wrap gap-2">
-                      {advisor.expertise.map((skill, index) => (
-                        <Badge key={index} variant="outline">{skill}</Badge>
+                      {advisor.expertise.map((area) => (
+                        <Badge key={area} variant="secondary">{area}</Badge>
                       ))}
                     </div>
                   </div>
@@ -273,118 +375,154 @@ export function ProjectAdvisor({ ownerId, projectId }: ProjectAdvisorProps) {
             </div>
             
             <div className="lg:col-span-2">
-              <div className="border rounded-lg p-4 h-[400px] flex flex-col">
-                <h3 className="text-sm font-medium mb-3">Advisor Messages</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">Advice Requests</h3>
                 
-                <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-                  {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center">
-                      <Clock className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">No messages yet.</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Send a message to your advisor to get started.
-                      </p>
-                    </div>
-                  ) : (
-                    messages.map((message) => (
-                      <div 
-                        key={message.id} 
-                        className={`flex gap-2 max-w-[80%] ${
-                          message.sender.role === 'ADVISOR' 
-                            ? 'mr-auto' 
-                            : 'ml-auto flex-row-reverse'
-                        }`}
-                      >
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          {message.sender.profileImageUrl ? (
-                            <AvatarImage 
-                              src={message.sender.profileImageUrl} 
-                              alt={`${message.sender.firstName} ${message.sender.lastName}`} 
-                            />
-                          ) : (
-                            <AvatarFallback>
-                              {getInitials(message.sender.firstName, message.sender.lastName)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div>
-                          <div className={`rounded-lg p-3 ${
-                            message.sender.role === 'ADVISOR' 
-                              ? 'bg-muted' 
-                              : 'bg-primary text-primary-foreground'
-                          }`}>
-                            <p className="text-sm">{message.content}</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatDate(message.createdAt)}
-                          </p>
+                <Dialog open={isAdviceDialogOpen} onOpenChange={setIsAdviceDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      Request Advice
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Request Advice</DialogTitle>
+                      <DialogDescription>
+                        Ask your advisor for specific guidance on your project.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmitAdviceRequest}>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <label htmlFor="topic" className="text-sm font-medium">Topic</label>
+                          <Input
+                            id="topic"
+                            placeholder="E.g., Project Architecture, Database Design"
+                            value={newAdviceTopic}
+                            onChange={(e) => setNewAdviceTopic(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <label htmlFor="description" className="text-sm font-medium">Description</label>
+                          <Textarea
+                            id="description"
+                            placeholder="Describe what you need help with in detail..."
+                            value={newAdviceDescription}
+                            onChange={(e) => setNewAdviceDescription(e.target.value)}
+                            className="resize-none min-h-[150px]"
+                            required
+                          />
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline" type="button">Cancel</Button>
+                        </DialogClose>
+                        <Button 
+                          type="submit" 
+                          disabled={isSubmittingAdvice || !newAdviceTopic.trim() || !newAdviceDescription.trim()}
+                        >
+                          {isSubmittingAdvice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Submit Request
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
                 
-                <form onSubmit={handleSendMessage} className="flex gap-2 mt-auto">
-                  <Textarea 
-                    placeholder="Type a message..." 
-                    className="min-h-[40px] resize-none"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={isSending}
-                  />
-                  <Button 
-                    type="submit" 
-                    size="icon" 
-                    disabled={!newMessage.trim() || isSending}
-                  >
-                    {isSending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
+                <Dialog open={isResponseDialogOpen} onOpenChange={setIsResponseDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Respond to Advice Request</DialogTitle>
+                      <DialogDescription>
+                        Provide your guidance to the student's request.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {selectedAdviceRequest && (
+                      <form onSubmit={handleSubmitAdviceResponse}>
+                        <div className="grid gap-4 py-4">
+                          <div>
+                            <h4 className="text-sm font-medium mb-1">Topic</h4>
+                            <p className="text-sm">{selectedAdviceRequest.topic}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium mb-1">Description</h4>
+                            <p className="text-sm bg-muted p-3 rounded-md">
+                              {selectedAdviceRequest.description}
+                            </p>
+                          </div>
+                          <div className="grid gap-2">
+                            <label htmlFor="response" className="text-sm font-medium">Your Response</label>
+                            <Textarea
+                              id="response"
+                              placeholder="Provide your guidance here..."
+                              className="min-h-[150px]"
+                              value={adviceResponse}
+                              onChange={(e) => setAdviceResponse(e.target.value)}
+                              required
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline" type="button">Cancel</Button>
+                          </DialogClose>
+                          <Button 
+                            type="submit" 
+                            disabled={isSubmittingResponse || !adviceResponse.trim()}
+                          >
+                            {isSubmittingResponse && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Submit Response
+                          </Button>
+                        </DialogFooter>
+                      </form>
                     )}
-                  </Button>
-                </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              
+              <div className="border rounded-lg p-4 h-[400px] overflow-y-auto">
+                {adviceRequests.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                    <HelpCircle className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No advice requests yet.</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Click the "Request Advice" button to ask for specific guidance.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {adviceRequests.map((request) => (
+                      <div key={request.id} className="border rounded-md p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium">{request.topic}</h4>
+                          <Badge variant={request.status === 'PENDING' ? 'outline' : 'default'}>
+                            {request.status === 'PENDING' ? 'Pending' : 'Answered'}
+                          </Badge>
+                        </div>
+                        
+                        <p className="text-sm mb-3">{request.description}</p>
+                        <p className="text-xs text-muted-foreground mb-4">
+                          Requested on {formatDate(request.createdAt)}
+                        </p>
+                        
+                        {request.response && (
+                          <div className="bg-muted p-3 rounded-md mt-3">
+                            <h5 className="text-sm font-medium mb-1">Advisor Response</h5>
+                            <p className="text-sm">{request.response.content}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Responded on {formatDate(request.response.createdAt)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ) : advisorRequest ? (
-          <div className="flex flex-col items-center justify-center py-10">
-            <div className="bg-muted/30 rounded-lg p-6 max-w-md w-full text-center">
-              <Clock className="h-10 w-10 mx-auto text-amber-500 mb-4" />
-              <h3 className="text-lg font-medium mb-2">Advisor Request Pending</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                You've requested <strong>{advisorRequest.requestedAdvisor.firstName} {advisorRequest.requestedAdvisor.lastName}</strong> to be your advisor on {formatDate(advisorRequest.createdAt)}.
-              </p>
-              
-              {advisorRequest.requestMessage && (
-                <div className="bg-muted p-3 rounded-md text-left mb-4">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Your request message:</p>
-                  <p className="text-sm italic">"{advisorRequest.requestMessage}"</p>
-                </div>
-              )}
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                onClick={handleCancelRequest}
-              >
-                Cancel Request
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-10">
-            <UserPlus className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Advisor Assigned</h3>
-            <p className="text-sm text-muted-foreground mb-6 max-w-md text-center">
-              Your project doesn't have an advisor yet. Request an advisor to get guidance and feedback on your project.
-            </p>
-            <AdvisorRequestModal 
-              ownerId={ownerId}
-              projectId={projectId}
-              onRequestComplete={fetchAdvisorData}
-            />
           </div>
         )}
       </CardContent>

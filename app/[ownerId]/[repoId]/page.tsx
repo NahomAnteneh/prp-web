@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RepositoryHeader } from "@/components/repository/repository-header";
 import { CodeTab } from "@/components/repository/code-tab";
+import { getRepositoryEndpoints } from "@/config/api";
 
 // Type definitions
 interface Repository {
@@ -63,8 +64,8 @@ export default function MainRepoPage() {
       setError(null);
       
       try {
-        // Fetch repository overview
-        const repoResponse = await fetch(`/api/groups/${ownerId}/repositories/${repoId}/overview`);
+        // Fetch repository overview using mapped endpoints
+        const repoResponse = await fetch(getRepositoryEndpoints.overview(ownerId, repoId));
         
         if (!repoResponse.ok) {
           throw new Error(`Failed to fetch repository data: ${repoResponse.status}`);

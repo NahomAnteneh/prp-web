@@ -18,6 +18,7 @@ import {
 import { useSession } from "next-auth/react"
 import { SearchBar } from "@/components/SearchBar"
 import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
 
 export default function Navbar() {
   const { data: session } = useSession()
@@ -283,6 +284,6 @@ export default function Navbar() {
           </div>
         </div>
       )}
-    </nav>
+    </motion.nav>
   )
 }

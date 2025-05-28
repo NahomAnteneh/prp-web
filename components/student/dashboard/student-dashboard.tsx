@@ -8,42 +8,44 @@ import StatusOverview, { ProjectSummary, TaskSummary } from "./status-overview";
 import RecentActivities, { Activity } from "./recent-activities";
 import Footer from "../footer";
 
-// Define interface for API data objects
-interface AnnouncementData {
-  id: string;
-  title: string;
-  content: string;
-  active: boolean;
-  priority: number;
-  createdAt: string;
-  updatedAt: string;
-  creatorId: string;
-}
-
-interface TaskDeadlineData {
-  id: string;
-  title: string;
-  deadline: string;
-  daysRemaining: number;
-}
-
-interface ActivityData extends Omit<Activity, "timestamp"> {
-  timestamp: string;
-}
-
-interface DashboardData {
+// Define interface for API data objects from /api/dashboard/student
+interface StudentDashboardApiResponse {
   user: {
-    userId: string;
+    id: string; 
+    name: string; 
     unreadNotifications: number;
     hasGroup: boolean;
     groupName: string | null;
   };
-  announcements: AnnouncementData[];
+  announcements: {
+    id: string;
+    title: string;
+    content: string;
+    priority: number;
+    createdAt: string; // API sends string, will be converted to Date
+  }[];
   projectSummary: ProjectSummary;
   taskSummary: TaskSummary & {
-    upcomingDeadlines: TaskDeadlineData[];
+    upcomingDeadlines: {
+      id: string;
+      title: string;
+      deadline: string; // API sends string, will be converted to Date
+      daysRemaining: number;
+    }[];
   };
-  recentActivities: ActivityData[];
+  // recentActivities is removed here, will be fetched from a different endpoint
+}
+
+// Interface for individual activity item from /api/users/[userId]/activities
+interface UserActivityApiResponseItem {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  timestamp: string; // Formatted string e.g., "X seconds ago"
+  timestamp_raw: string; // ISO Date string
+  link?: string;
+  // other fields like project, projectId etc. can be added if RecentActivities component uses them
 }
 
 export default function StudentDashboard() {
@@ -56,10 +58,12 @@ export default function StudentDashboard() {
       hasGroup: boolean;
       groupName: string | null;
     };
-    announcements: AnnouncementData[];
+    announcements: (Omit<StudentDashboardApiResponse['announcements'][0], 'createdAt'> & { createdAt: Date })[];
     projectSummary: ProjectSummary;
-    taskSummary: TaskSummary;
-    recentActivities: Activity[];
+    taskSummary: Omit<TaskSummary, 'upcomingDeadlines'> & {
+      upcomingDeadlines: (Omit<StudentDashboardApiResponse['taskSummary']['upcomingDeadlines'][0], 'deadline'> & { deadline: Date })[];
+    };
+    recentActivities: Activity[]; // This will be populated from the new activities API
   } | null>(null);
 
   useEffect(() => {
@@ -68,99 +72,91 @@ export default function StudentDashboard() {
         setIsLoading(true);
         setError(null);
 
-        // Mock data for testing
-        const mockData: DashboardData = {
-          user: {
-            userId: "student123",
-            unreadNotifications: 5,
-            hasGroup: true,
-            groupName: "Group A",
-          },
-          announcements: [
-            {
-              id: "ann1",
-              title: "Welcome to the Dashboard",
-              content: "New semester updates.",
-              active: true,
-              priority: 1,
-              createdAt: "2025-05-20T10:00:00Z",
-              updatedAt: "2025-05-20T10:00:00Z",
-              creatorId: "admin123",
-            },
-          ],
-          projectSummary: {
-            totalProjects: 10,
-            activeProjects: 5,
-            completedProjects: 3,
-          },
-          taskSummary: {
-            totalTasks: 20,
-            completedTasks: 8,
-            inProgressTasks: 7,
-            todoTasks: 4,
-            blockedTasks: 1,
-            upcomingDeadlines: [
-              {
-                id: "task1",
-                title: "Complete project proposal",
-                deadline: "2025-05-26T23:59:59Z",
-                daysRemaining: 2,
-              },
-              {
-                id: "task2",
-                title: "Review design mockups",
-                deadline: "2025-05-28T23:59:59Z",
-                daysRemaining: 4,
-              },
-            ],
-          },
-          recentActivities: [
-            {
-              id: "act1",
-              title: "Submitted assignment",
-              description: "Submitted project proposal for review.",
-              timestamp: "2025-05-24T08:00:00Z",
-              type: "submission",
-            },
-          ],
-        };
+        // Step 1: Fetch main dashboard data
+        const dashboardResponse = await fetch("/api/dashboard/student");
+        if (!dashboardResponse.ok) {
+          const errorData = await dashboardResponse.json().catch(() => ({ message: "Failed to fetch main dashboard data"}));
+          throw new Error(errorData.message || `HTTP error! status: ${dashboardResponse.status}`);
+        }
+        const mainApiData: StudentDashboardApiResponse = await dashboardResponse.json();
 
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Step 2: Fetch recent activities using userId from main dashboard data
+        let recentActivitiesData: Activity[] = [];
+        if (mainApiData.user?.id) {
+          const activitiesResponse = await fetch(`/api/users/${mainApiData.user.id}/activities`);
+          if (activitiesResponse.ok) {
+            const userActivitiesApiResult: UserActivityApiResponseItem[] = await activitiesResponse.json();
+            recentActivitiesData = Array.isArray(userActivitiesApiResult)
+              ? userActivitiesApiResult.map(activity => {
+                  // Map API activity type to the frontend ActivityType
+                  let mappedType: Activity['type'];
+                  switch (activity.type.toLowerCase()) {
+                    case 'commit':
+                      mappedType = 'commit';
+                      break;
+                    case 'pull_request': // API uses pull_request
+                      mappedType = 'merge_request'; // Frontend uses merge_request
+                      break;
+                    case 'comment': // API uses comment for feedback
+                      mappedType = 'feedback';
+                      break;
+                    case 'task': // API uses task
+                      mappedType = 'task_update'; // Frontend uses task_update
+                      break;
+                    // Add other cases as needed, e.g., for 'evaluation', 'repository' if API provides them
+                    default:
+                      // Handle unknown types: either assign a default, filter out, or try to cast
+                      // For now, let's try a direct cast, which might still cause issues if not in ActivityType
+                      // A safer approach would be to filter or assign a specific default like 'repository'
+                      mappedType = activity.type as Activity['type']; 
+                  }
 
-        // Transform the data with null checks
+                  return {
+                    id: activity.id,
+                    title: activity.title,
+                    description: activity.description,
+                    timestamp: new Date(activity.timestamp_raw), 
+                    type: mappedType,
+                    link: activity.link,
+                  };
+                })
+              // Optional: Filter out activities where mappedType couldn't be confidently assigned to an ActivityType
+              // .filter(activity => Object.values(ActivityType).includes(activity.type as ActivityType)) 
+              : [];
+          } else {
+            console.warn(`Failed to fetch recent activities: ${activitiesResponse.status}`);
+            // Continue without activities if this fetch fails, or handle error more strictly
+          }
+        }
+
+        // Step 3: Transform and combine data
         const transformedData = {
           user: {
-            userId: mockData.user.userId,
-            unreadNotifications: mockData.user.unreadNotifications || 0,
-            hasGroup: mockData.user.hasGroup || false,
-            groupName: mockData.user.groupName || null,
+            userId: mainApiData.user.id,
+            unreadNotifications: mainApiData.user.unreadNotifications || 0,
+            hasGroup: mainApiData.user.hasGroup || false,
+            groupName: mainApiData.user.groupName || null,
           },
-          announcements: Array.isArray(mockData.announcements)
-            ? mockData.announcements.map((announcement) => ({
+          announcements: Array.isArray(mainApiData.announcements)
+            ? mainApiData.announcements.map((announcement) => ({
                 ...announcement,
                 createdAt: new Date(announcement.createdAt),
               }))
             : [],
-          projectSummary: mockData.projectSummary,
+          projectSummary: mainApiData.projectSummary || { totalProjects: 0, activeProjects: 0, completedProjects: 0 },
           taskSummary: {
-            ...mockData.taskSummary,
-            upcomingDeadlines: Array.isArray(mockData.taskSummary.upcomingDeadlines)
-              ? mockData.taskSummary.upcomingDeadlines.map((task) => ({
+            ...(mainApiData.taskSummary || { totalTasks: 0, completedTasks: 0, inProgressTasks: 0, todoTasks: 0, blockedTasks: 0 }),
+            upcomingDeadlines: Array.isArray(mainApiData.taskSummary?.upcomingDeadlines)
+              ? mainApiData.taskSummary.upcomingDeadlines.map((task) => ({
                   ...task,
                   deadline: new Date(task.deadline),
                 }))
               : [],
           },
-          recentActivities: Array.isArray(mockData.recentActivities)
-            ? mockData.recentActivities.map((activity) => ({
-                ...activity,
-                timestamp: new Date(activity.timestamp),
-              }))
-            : [],
+          recentActivities: recentActivitiesData, // Use data from the new activities API
         };
 
-        console.log("Transformed data:", transformedData);
+        console.log("Fetched and combined data:", transformedData);
         setDashboardData(transformedData);
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
@@ -245,7 +241,6 @@ export default function StudentDashboard() {
                 dashboardData.announcements.map((announcement) => ({
                   ...announcement,
                   createdAt: new Date(announcement.createdAt),
-                  updatedAt: new Date(announcement.updatedAt),
                 })) || []
               }
             />

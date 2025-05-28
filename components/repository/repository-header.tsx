@@ -9,6 +9,7 @@ import type { Session } from "next-auth";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "../student/navbar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getRepositoryEndpoints } from "@/config/api";
 
 interface RepositoryHeaderProps {
   owner: string;
@@ -55,7 +56,7 @@ export function RepositoryHeader({
     const fetchRepositoryData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/groups/${owner}/repositories/${repository}/overview`);
+        const response = await fetch(getRepositoryEndpoints.overview(owner, repository));
         
         if (!response.ok) {
           throw new Error("Failed to fetch repository data");
