@@ -154,7 +154,7 @@ export function Features() {
               className="group"
               asChild
             >
-              <Link href="/about" className="flex items-center gap-2">
+              <Link href="/about_us" className="flex items-center gap-2">
                 About the Platform
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>

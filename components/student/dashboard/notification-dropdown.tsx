@@ -28,47 +28,58 @@ interface NotificationDropdownProps {
   onMarkAllAsRead: () => void
 }
 
-export default function NotificationDropdown({ 
-  unreadCount, 
-  userId,
-  onMarkAllAsRead 
-}: NotificationDropdownProps) {
+export default function NotificationDropdown({ unreadCount, userId, onMarkAllAsRead }: NotificationDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Fix hydration issue
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Fetch notifications from API
   const fetchNotifications = async () => {
     if (!userId) {
-      setError("User ID not available");
-      setIsLoading(false);
-      return;
+      setError("User ID not available")
+      setIsLoading(false)
+      return
     }
-    
+
     setIsLoading(true)
     setError(null)
-    
+
     try {
-      const response = await fetch(`/api/${userId}/notifications`)
-      
+      console.log(`Fetching notifications from: /api/users/${userId}/notifications`)
+      console.log(`User ID:`, userId)
+      console.log(`Full URL:`, `${window.location.origin}/api/users/${userId}/notifications`)
+      const response = await fetch(`/api/users/${userId}/notifications`)
+
+      console.log("Response status:", response.status)
+      console.log("Response ok:", response.ok)
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch notifications: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error("API Error Response:", errorText)
+        throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`)
       }
-      
-      const data = await response.json() as ApiResponse
-      
+
+      const data = (await response.json()) as ApiResponse
+      console.log("Fetched notifications:", data)
+
       // Transform dates from strings to Date objects
       const transformedNotifications = data.notifications.map((notification) => ({
         ...notification,
-        createdAt: new Date(notification.createdAt)
+        createdAt: new Date(notification.createdAt),
       }))
-      
+
       setNotifications(transformedNotifications)
     } catch (err) {
       console.error("Error fetching notifications:", err)
-      setError("Failed to load notifications")
+      setError(err instanceof Error ? err.message : "Failed to load notifications")
       setNotifications([])
     } finally {
       setIsLoading(false)
@@ -77,10 +88,10 @@ export default function NotificationDropdown({
 
   // Fetch notifications when dropdown is opened
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isMounted) {
       fetchNotifications()
     }
-  }, [isOpen])
+  }, [isOpen, userId, isMounted])
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -90,66 +101,79 @@ export default function NotificationDropdown({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside)
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
 
   const formatTimeAgo = (date: Date) => {
+    if (!isMounted) return "" // Prevent hydration mismatch
+
     const now = new Date()
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-    
+
     if (diffInSeconds < 60) {
       return `${diffInSeconds} seconds ago`
     }
-    
+
     const diffInMinutes = Math.floor(diffInSeconds / 60)
     if (diffInMinutes < 60) {
-      return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`
+      return `${diffInMinutes} minute${diffInMinutes !== 1 ? "s" : ""} ago`
     }
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60)
     if (diffInHours < 24) {
-      return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`
+      return `${diffInHours} hour${diffInHours !== 1 ? "s" : ""} ago`
     }
-    
+
     const diffInDays = Math.floor(diffInHours / 24)
     if (diffInDays < 30) {
-      return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`
+      return `${diffInDays} day${diffInDays !== 1 ? "s" : ""} ago`
     }
-    
-    return new Intl.DateTimeFormat('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
+
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
     }).format(date)
   }
 
+  // Mark all notifications as read
   const handleMarkAllAsRead = async () => {
     if (!userId) {
-      return;
+      return
     }
-    
+
+    const unreadNotifications = notifications.filter((n) => !n.read)
+    if (unreadNotifications.length === 0) {
+      return
+    }
+
     setIsLoading(true)
-    
+
     try {
-      const response = await fetch(`/api/${userId}/notifications`, {
-        method: 'POST',
+      console.log("Marking all as read for user:", userId)
+      const response = await fetch(`/api/users/${userId}/notifications`, {
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ markAll: true })
+        body: JSON.stringify({
+          notificationIds: unreadNotifications.map((n) => n.id),
+        }),
       })
-      
+
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Mark all as read error:", errorText)
         throw new Error(`Failed to mark notifications as read: ${response.statusText}`)
       }
-      
+
       // Call the parent component's handler to update the UI
       onMarkAllAsRead()
-      
+
       // Update local state to show all as read
-      setNotifications(notifications.map(n => ({ ...n, read: true })))
+      setNotifications(notifications.map((n) => ({ ...n, read: true })))
     } catch (err) {
       console.error("Error marking notifications as read:", err)
     } finally {
@@ -157,32 +181,35 @@ export default function NotificationDropdown({
     }
   }
 
+  // Mark individual notification as read
   const handleMarkAsRead = async (notificationId: string) => {
     if (!userId) {
-      return;
+      return
     }
-    
+
     try {
-      const response = await fetch(`/api/${userId}/notifications`, {
-        method: 'POST',
+      console.log("Marking notification as read:", notificationId)
+      const response = await fetch(`/api/users/${userId}/notifications`, {
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ notificationId })
+        body: JSON.stringify({
+          notificationIds: [notificationId],
+        }),
       })
-      
+
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Mark as read error:", errorText)
         throw new Error(`Failed to mark notification as read: ${response.statusText}`)
       }
-      
+
       // Update local state
-      setNotifications(notifications.map(n => 
-        n.id === notificationId ? { ...n, read: true } : n
-      ))
-      
+      setNotifications(notifications.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
+
       // Update unread count in UI
-      if (notifications.find(n => n.id === notificationId && !n.read)) {
-        // Only decrement if it was unread before
+      if (notifications.find((n) => n.id === notificationId && !n.read)) {
         onMarkAllAsRead()
       }
     } catch (err) {
@@ -191,18 +218,32 @@ export default function NotificationDropdown({
   }
 
   const getNotificationTitle = (notification: Notification) => {
-    // Default to message if no title is provided from API
-    return notification.type 
+    return notification.type
       ? `${notification.type.charAt(0).toUpperCase() + notification.type.slice(1)}`
-      : notification.message.split(' ').slice(0, 3).join(' ') + '...'
+      : notification.message.split(" ").slice(0, 3).join(" ") + "..."
+  }
+
+  if (!isMounted) {
+    return (
+      <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1">
+            <Badge variant="destructive" className="flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
+              {unreadCount}
+            </Badge>
+          </span>
+        )}
+      </Button>
+    )
   }
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Notification bell button */}
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className="relative"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notifications"
@@ -210,10 +251,7 @@ export default function NotificationDropdown({
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <span className="absolute -right-1 -top-1">
-            <Badge 
-              variant="destructive" 
-              className="flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs"
-            >
+            <Badge variant="destructive" className="flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
               {unreadCount}
             </Badge>
           </span>
@@ -226,9 +264,9 @@ export default function NotificationDropdown({
           {/* Header */}
           <div className="p-3 border-b flex justify-between items-center">
             <h3 className="text-sm font-semibold">Notifications</h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-xs h-8"
               onClick={handleMarkAllAsRead}
               disabled={isLoading || unreadCount === 0}
@@ -246,10 +284,10 @@ export default function NotificationDropdown({
               </div>
             ) : error ? (
               <div className="p-4 text-center text-sm text-destructive">
-                {error}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <p>{error}</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="mt-2 text-xs h-8 mx-auto block"
                   onClick={fetchNotifications}
                 >
@@ -257,22 +295,20 @@ export default function NotificationDropdown({
                 </Button>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">
-                No notifications
-              </div>
+              <div className="p-4 text-center text-muted-foreground text-sm">No notifications</div>
             ) : (
               <ul>
                 {notifications.map((notification) => (
-                  <li 
-                    key={notification.id} 
+                  <li
+                    key={notification.id}
                     className={`p-3 border-b hover:bg-muted/50 transition-colors ${
-                      !notification.read ? 'bg-accent/10' : ''
+                      !notification.read ? "bg-accent/10" : ""
                     }`}
                   >
                     <div className="flex items-start">
                       <div className="flex-1 min-w-0">
-                        <Link 
-                          href={notification.link || '/notifications'} 
+                        <Link
+                          href={notification.link || "/notifications"}
                           onClick={() => {
                             setIsOpen(false)
                             if (!notification.read) {
@@ -284,7 +320,9 @@ export default function NotificationDropdown({
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notification.message}</p>
                           <div className="flex items-center mt-1.5 text-xs">
                             <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
-                            <span className="text-muted-foreground">{formatTimeAgo(notification.createdAt as Date)}</span>
+                            <span className="text-muted-foreground">
+                              {formatTimeAgo(notification.createdAt as Date)}
+                            </span>
                           </div>
                         </Link>
                       </div>
@@ -300,8 +338,8 @@ export default function NotificationDropdown({
 
           {/* Footer */}
           <div className="p-2 border-t">
-            <Link 
-              href="/notifications" 
+            <Link
+              href="/notifications"
               className="block text-center text-xs text-primary hover:underline p-1"
               onClick={() => setIsOpen(false)}
             >
@@ -313,4 +351,4 @@ export default function NotificationDropdown({
       )}
     </div>
   )
-} 
+}

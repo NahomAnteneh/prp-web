@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Loader2 } from 'lucide-react';
-import ProjectsList from '@/components/project/projects-list';
+import ProjectsList from '@/components/group/ProjectsList';
 import Navbar from '@/components/student/navbar';
 import Footer from '@/components/student/footer';
 

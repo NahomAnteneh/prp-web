@@ -22,7 +22,7 @@ export async function POST(
 
     // Check if the group exists
     const group = await db.group.findUnique({
-      where: { id: groupId },
+      where: { groupUserName: groupId },
       include: {
         members: {
           select: {
@@ -40,7 +40,7 @@ export async function POST(
     }
 
     // Check if user is authorized (is group leader or admin)
-    const isGroupLeader = group.leaderId === session.user.id;
+    const isGroupLeader = group.leaderId === session.user.userId;
     const isAdmin = session.user.role === 'ADMIN';
     
     if (!isGroupLeader && !isAdmin) {
@@ -77,8 +77,8 @@ export async function POST(
       data: {
         code: inviteCode,
         expiresAt,
-        groupId,
-        createdById: session.user.id,
+       groupUserName: group.groupUserName,
+        createdById: session.user.userId,
         email: email || null,
       },
     });
@@ -132,7 +132,7 @@ export async function GET(
         },
       });
 
-      if (!invitation || invitation.groupId !== groupId) {
+      if (!invitation || invitation.groupUserName !== groupId) {
         return NextResponse.json(
           { message: 'Invitation not found' },
           { status: 404 }
@@ -172,7 +172,7 @@ export async function GET(
     // Otherwise, list all active invitations for the group
     // Authorization: Only group leader or admin can see all invitations
     const group = await db.group.findUnique({
-      where: { id: groupId },
+      where: { groupUserName: groupId },
     });
 
     if (!group) {
@@ -182,7 +182,7 @@ export async function GET(
       );
     }
 
-    const isGroupLeader = group.leaderId === session.user.id;
+    const isGroupLeader = group.leaderId === session.user.userId;
     const isAdmin = session.user.role === 'ADMIN';
 
     if (!isGroupLeader && !isAdmin) {
@@ -194,7 +194,7 @@ export async function GET(
 
     const invitations = await db.groupInvite.findMany({
       where: {
-        groupId,
+        groupUserName: "some-group-username",
         expiresAt: { gt: new Date() }, // Only active invitations
         usedAt: null, // Only unused invitations
       },
