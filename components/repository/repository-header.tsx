@@ -8,8 +8,8 @@ import { useState, useEffect } from "react";
 import type { Session } from "next-auth";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "../student/navbar";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getRepositoryEndpoints } from "@/config/api";
+import { RepositoryNav } from "./repository-nav";
 
 interface RepositoryHeaderProps {
   owner: string;
@@ -74,28 +74,6 @@ export function RepositoryHeader({
     fetchRepositoryData();
   }, [owner, repository]);
 
-  // Navigation tabs - simplified to only Code, Feedback, and Settings
-  const tabs = [
-    { name: "Code", path: `/${owner}/${repository}`, value: "code" },
-    { name: "Feedback", path: `/${owner}/${repository}/feedback`, value: "feedback" },
-    { name: "Settings", path: `/${owner}/${repository}/settings`, value: "settings" },
-  ];
-
-  // Determine active tab value
-  const getActiveTabValue = () => {
-    if (pathname === `/${owner}/${repository}` || 
-        pathname.startsWith(`/${owner}/${repository}/tree`) ||
-        pathname.startsWith(`/${owner}/${repository}/blob`)) {
-      return "code";
-    }
-    if (pathname.startsWith(`/${owner}/${repository}/feedback`)) {
-      return "feedback";
-    }
-    if (pathname.startsWith(`/${owner}/${repository}/settings`)) {
-      return "settings";
-    }
-    return "code"; // Default
-  };
 
   return (
     <header className="w-full bg-background border-b border-border/40">
@@ -127,21 +105,8 @@ export function RepositoryHeader({
             )}
           </div>
           
-          <div className="mt-4 w-full border-b">
-            <Tabs defaultValue={getActiveTabValue()} className="w-full">
-              <TabsList className="w-full justify-start">
-                {tabs.map((tab) => (
-                  <TabsTrigger 
-                    key={tab.value} 
-                    value={tab.value}
-                    onClick={() => window.location.href = tab.path}
-                    className="relative px-1 py-1"
-                  >
-                    {tab.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+          <div className="mt-4">
+            <RepositoryNav owner={owner} repository={repository} />
           </div>
         </Container>
       </div>

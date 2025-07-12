@@ -8,8 +8,9 @@ const testApis = async () => {
     
     // Test variables
     const testUser = {
-      username: `test_user_${Date.now()}`,
-      idNumber: "123456",
+      firstName: "Test",
+      lastName: "User",
+      userId: `test_user_${Date.now()}`,
       email: `test_${Date.now()}@example.com`,
       password: "password123",
       department: "Computer Science",
@@ -51,7 +52,7 @@ const testApis = async () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          username: testUser.username,
+          username: testUser.userId,
           password: testUser.password,
           redirect: false,
           json: true
